@@ -144,6 +144,13 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
     p.write_text(s)
+    compat_dir = pathlib.Path("src/compat/msvc/common")
+    compat_dir.mkdir(parents=True, exist_ok=True)
+    (compat_dir / "attributes.h").write_text(
+        "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
+        "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
+        "#endif\n"
+    )
 '
 # PThreads4W (vcpkg) provides pthread.h on Windows
 PTHREAD_CFLAGS=""

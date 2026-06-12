@@ -158,6 +158,13 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
     p.write_text(s)
+    compat_dir = pathlib.Path("src/compat/msvc/common")
+    compat_dir.mkdir(parents=True, exist_ok=True)
+    (compat_dir / "attributes.h").write_text(
+        "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
+        "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
+        "#endif\n"
+    )
 '
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
