@@ -141,6 +141,22 @@ git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
 cd nv-codec-headers
 make -j"$THREADS" PREFIX="$P" && make PREFIX="$P" install
 
+# Discover VS-provided Clang (used for libvmaf only). Prefer explicit CLANG_BIN;
+# otherwise search common VS 2026 / VS 2022 installation paths.
+if [ -z "${CLANG_BIN:-}" ]; then
+  for d in \
+    "/c/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/Llvm/x64/bin" \
+    "/c/Program Files/Microsoft Visual Studio/18/Professional/VC/Tools/Llvm/x64/bin" \
+    "/c/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin" \
+    "/c/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/Llvm/x64/bin" \
+    "/c/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/Llvm/x64/bin" \
+    "/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin"
+  do
+    [ -f "$d/clang.exe" ] && { CLANG_BIN="$d"; break; }
+  done
+fi
+[ -n "${CLANG_BIN:-}" ] && echo "VS Clang: ${CLANG_BIN}"
+
 # ---- VMAF-CUDA ----
 echo "[2/5] VMAF-CUDA (MSVC)"
 cd /tmp && rm -rf vmaf
@@ -177,9 +193,9 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
     echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
   fi
 fi
-if command -v clang >/dev/null 2>&1; then
-  echo "使用 Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
-  CC=clang CXX=clang++ \
+if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
+  echo "使用 VS Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
+  CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
     -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
@@ -187,7 +203,7 @@ if command -v clang >/dev/null 2>&1; then
     -Dc_link_args="${PTHREAD_LDFLAGS}" \
     -Dcpp_link_args="${PTHREAD_LDFLAGS}"
 else
-  echo "警告：未找到 clang，VMAF 回退到 MSVC 并禁用 asm 优化"
+  echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
     -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \

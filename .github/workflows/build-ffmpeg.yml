@@ -295,6 +295,11 @@ jobs:
           if ($clangDir) {
             Write-Host "VS Clang found at $clangDir"
             echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            # Expose the VS Clang directory to bash steps so they can use an absolute
+            # path and avoid picking up a different clang (e.g. from MinGW/LLVM) earlier
+            # in PATH.
+            $clangDirUnix = $clangDir -replace '\\','/'
+            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
@@ -488,16 +493,16 @@ jobs:
               exit 1
             fi
           fi
-          if command -v clang >/dev/null 2>&1; then
-            echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
-            CC=clang CXX=clang++ \
+          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
+            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
               -Dc_args="-I$P/include -I${CUDA_HOME}/include --target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
               -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
               -Dc_link_args="${PTHREAD_LDFLAGS}" \
               -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
-            echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
+            echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
               -Dc_args="-I$P/include -I${CUDA_HOME}/include -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
               -Dc_link_args="${PTHREAD_LDFLAGS}"
@@ -655,6 +660,11 @@ jobs:
           if ($clangDir) {
             Write-Host "VS Clang found at $clangDir"
             echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            # Expose the VS Clang directory to bash steps so they can use an absolute
+            # path and avoid picking up a different clang (e.g. from MinGW/LLVM) earlier
+            # in PATH.
+            $clangDirUnix = $clangDir -replace '\\','/'
+            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
@@ -804,9 +814,9 @@ jobs:
               exit 1
             fi
           fi
-          if command -v clang >/dev/null 2>&1; then
-            echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
-            CC=clang CXX=clang++ \
+          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
+            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
               -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
@@ -814,7 +824,7 @@ jobs:
               -Dc_link_args="${PTHREAD_LDFLAGS}" \
               -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
-            echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
+            echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
               -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
@@ -971,6 +981,11 @@ jobs:
           if ($clangDir) {
             Write-Host "VS Clang found at $clangDir"
             echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            # Expose the VS Clang directory to bash steps so they can use an absolute
+            # path and avoid picking up a different clang (e.g. from MinGW/LLVM) earlier
+            # in PATH.
+            $clangDirUnix = $clangDir -replace '\\','/'
+            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
@@ -1136,9 +1151,9 @@ jobs:
               exit 1
             fi
           fi
-          if command -v clang >/dev/null 2>&1; then
-            echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
-            CC=clang CXX=clang++ \
+          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
+            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
               -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
@@ -1146,7 +1161,7 @@ jobs:
               -Dc_link_args="${PTHREAD_LDFLAGS}" \
               -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
-            echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
+            echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
               -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
@@ -1419,6 +1434,11 @@ jobs:
           if ($clangDir) {
             Write-Host "VS Clang found at $clangDir"
             echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            # Expose the VS Clang directory to bash steps so they can use an absolute
+            # path and avoid picking up a different clang (e.g. from MinGW/LLVM) earlier
+            # in PATH.
+            $clangDirUnix = $clangDir -replace '\\','/'
+            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
