@@ -135,6 +135,23 @@ PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
 ninja -vC build && ninja -C build install
 
+# Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
+P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
+vmaf_lib="$(find "$P/lib" -maxdepth 1 \( -name 'vmaf.lib' -o -name 'libvmaf.lib' \) | head -n1)"
+[ -z "$vmaf_lib" ] && { echo "错误：未找到 VMAF import library ($P/lib)"; exit 1; }
+cat > "$P/lib/pkgconfig/libvmaf.pc" <<EOF
+prefix=${P_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libvmaf
+Description: Netflix VMAF library
+Version: 3.0.0
+Libs: $(basename "$vmaf_lib")
+Cflags: -I\${includedir}
+EOF
+
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg (MSVC ARM64)"
 cd /tmp && rm -rf ffmpeg-src
