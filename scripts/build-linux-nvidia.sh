@@ -45,7 +45,7 @@ git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
 # ffnvcodec headers are in /usr/local/include (default path for all compilers)
 export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
-meson setup build --buildtype release --prefix="$P" \
+meson setup build --buildtype release --prefix="$P" --libdir=lib \
   -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
 ninja -vC build && ninja -C build install
 

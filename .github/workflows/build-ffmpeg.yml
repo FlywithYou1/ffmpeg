@@ -67,13 +67,14 @@ jobs:
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
           export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
-          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" \
+          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" --libdir=lib \
             -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
           ninja -vC build && ninja -C build install
 
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          export PATH="${CUDA_HOME}/bin:${PATH}"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -131,7 +132,7 @@ jobs:
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
@@ -196,16 +197,14 @@ jobs:
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
           ninja -vC build && ninja -C build install
-          # Verify
-          ls -la "${P}/lib/pkgconfig/libvmaf.pc" || { echo "::error::VMAF .pc not found"; exit 1; }
-          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig" >> "${GITHUB_ENV}"
+          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -595,14 +594,15 @@ jobs:
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
-          HOMEBREW_PREFIX="$(brew --prefix)"
-          # Homebrew 的 lame/fdk-aac 提供 lame.pc / fdk-aac.pc，
+          LAME_PREFIX="$(brew --prefix lame)"
+          FDK_PREFIX="$(brew --prefix fdk-aac)"
+          # Homebrew 的 lame/fdk-aac 是 keg-only，提供 lame.pc / fdk-aac.pc，
           # 但 ffmpeg 需要 libmp3lame.pc / libfdk-aac.pc
-          [ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" ] && \
-            ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
-          [ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
-            ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          [ -f "${LAME_PREFIX}/lib/pkgconfig/lame.pc" ] && \
+            ln -sf "${LAME_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
+          [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
+            ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" \

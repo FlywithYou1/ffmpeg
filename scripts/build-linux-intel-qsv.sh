@@ -28,7 +28,7 @@ cd /tmp && rm -rf vmaf
 git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
 PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
 ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----
