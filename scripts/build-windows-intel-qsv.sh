@@ -22,6 +22,20 @@ for nasm_dir in "/c/Program Files/NASM" "/c/Program Files (x86)/NASM" "/c/Progra
 done
 command -v nasm >/dev/null 2>&1 || echo "警告：未找到 nasm，ffmpeg 配置可能失败"
 
+# Remove Strawberry Perl paths that shadow Git for Windows tools
+__clean_path() {
+  local __new="" __e
+  IFS=':' read -ra __entries <<< "$PATH"
+  for __e in "${__entries[@]}"; do
+    case "$__e" in
+      *[Ss]trawberry*) ;;
+      *) __new="${__new:+${__new}:}${__e}" ;;
+    esac
+  done
+  export PATH="$__new"
+}
+__clean_path
+
 echo "=========================================="
 echo "FFmpeg Intel QSV (Windows MSVC)"
 echo "PREFIX: $P  THREADS: $THREADS"
@@ -30,6 +44,8 @@ echo "=========================================="
 
 export PATH="${P}/bin:${PATH}"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+# Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
+export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
 VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/x64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/x64-windows"
@@ -90,6 +106,21 @@ Description: Intel oneVPL Dispatcher
 Version: 2.16.0
 Libs: ${vpl_lib}
 EOF
+
+  # 创建库名别名，避免 ffmpeg fallback 找不到文件
+  ensure_lib_alias() {
+    local actual="$1" alias="$2"
+    if [ -f "${VCPKG_INSTALLED}/lib/${actual}" ] && [ ! -f "${VCPKG_INSTALLED}/lib/${alias}" ]; then
+      cp "${VCPKG_INSTALLED}/lib/${actual}" "${VCPKG_INSTALLED}/lib/${alias}"
+      echo "  alias: ${alias} -> ${actual}"
+    fi
+  }
+  ensure_lib_alias "${lame_lib}" "mp3lame.lib"
+  ensure_lib_alias "${lame_lib}" "libmp3lame.lib"
+  ensure_lib_alias "${fdk_lib}" "fdk-aac.lib"
+  ensure_lib_alias "${fdk_lib}" "libfdk-aac.lib"
+  ensure_lib_alias "${vpl_lib}" "vpl.lib"
+  ensure_lib_alias "${vpl_lib}" "libvpl.lib"
 
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 fi

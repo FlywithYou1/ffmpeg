@@ -22,6 +22,20 @@ for nasm_dir in "/c/Program Files/NASM" "/c/Program Files (x86)/NASM" "/c/Progra
   fi
 done
 
+# Remove Strawberry Perl paths that shadow Git for Windows tools
+__clean_path() {
+  local __new="" __e
+  IFS=':' read -ra __entries <<< "$PATH"
+  for __e in "${__entries[@]}"; do
+    case "$__e" in
+      *[Ss]trawberry*) ;;
+      *) __new="${__new:+${__new}:}${__e}" ;;
+    esac
+  done
+  export PATH="$__new"
+}
+__clean_path
+
 echo "=========================================="
 echo "FFmpeg ARM64 (Windows MSVC)"
 echo "PREFIX: $P  THREADS: $THREADS"
@@ -31,6 +45,8 @@ echo "=========================================="
 
 export PATH="${P}/bin:${PATH}"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+# Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
+export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
 VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/arm64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/arm64-windows"
@@ -78,6 +94,19 @@ Description: Fraunhofer FDK AAC codec library
 Version: 2.0.2
 Libs: ${fdk_lib}
 EOF
+
+  # 创建库名别名，避免 ffmpeg fallback 找不到文件
+  ensure_lib_alias() {
+    local actual="$1" alias="$2"
+    if [ -f "${VCPKG_INSTALLED}/lib/${actual}" ] && [ ! -f "${VCPKG_INSTALLED}/lib/${alias}" ]; then
+      cp "${VCPKG_INSTALLED}/lib/${actual}" "${VCPKG_INSTALLED}/lib/${alias}"
+      echo "  alias: ${alias} -> ${actual}"
+    fi
+  }
+  ensure_lib_alias "${lame_lib}" "mp3lame.lib"
+  ensure_lib_alias "${lame_lib}" "libmp3lame.lib"
+  ensure_lib_alias "${fdk_lib}" "fdk-aac.lib"
+  ensure_lib_alias "${fdk_lib}" "libfdk-aac.lib"
 
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 fi

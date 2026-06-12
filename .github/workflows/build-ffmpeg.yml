@@ -245,13 +245,13 @@ jobs:
   # ============================================================
   windows-nvidia:
     name: Windows (NVIDIA NVENC/CUDA)
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64 }
+        with: { arch: amd64, vsversion: "18.0" }
 
       - name: Install build tools
         shell: powershell
@@ -271,8 +271,15 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
+          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
+          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
+          # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
+          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
+          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
+          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -328,6 +335,25 @@ jobs:
             "Libs: $fdkLib"
           )
 
+          # Also create alternate import-library names so ffmpeg's non-pkg-config
+          # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
+          function Ensure-LibAlias($actual, $alias) {
+            $actualPath = Join-Path "$inst\lib" $actual
+            $aliasPath = Join-Path "$inst\lib" $alias
+            if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
+              Copy-Item $actualPath $aliasPath
+              Write-Host "Created alias $alias -> $actual"
+            }
+          }
+          Ensure-LibAlias $lameLib "mp3lame.lib"
+          Ensure-LibAlias $lameLib "libmp3lame.lib"
+          Ensure-LibAlias $fdkLib "fdk-aac.lib"
+          Ensure-LibAlias $fdkLib "libfdk-aac.lib"
+          if ($vplLib) {
+            Ensure-LibAlias $vplLib "vpl.lib"
+            Ensure-LibAlias $vplLib "libvpl.lib"
+          }
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -341,14 +367,19 @@ jobs:
       - name: Check vcpkg pkg-config
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
-          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
+          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Install CUDA Toolkit
         shell: powershell
@@ -392,6 +423,9 @@ jobs:
       - name: Build VMAF-CUDA (MSVC)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
@@ -411,11 +445,12 @@ jobs:
       - name: Build FFmpeg (MSVC)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          # Use Git for Windows' pkg-config, which properly supports PKG_CONFIG_PATH
-          export PKG_CONFIG="$(which pkg-config 2>/dev/null)"
-          [ -z "$PKG_CONFIG" ] && export PKG_CONFIG="/usr/bin/pkg-config"
-          echo "pkg-config: $($PKG_CONFIG --version 2>&1 || echo NOT FOUND)"
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
@@ -433,14 +468,18 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
-          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
           echo "=== pkg-config libfdk-aac ==="
-          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
-          pkg-config --debug vpl 2>&1 | head -40 || true
+          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
@@ -481,13 +520,13 @@ jobs:
   # ============================================================
   windows-amd-amf:
     name: Windows (AMD AMF)
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64 }
+        with: { arch: amd64, vsversion: "18.0" }
 
       - name: Install build tools
         shell: powershell
@@ -507,8 +546,15 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
+          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
+          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
+          # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
+          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
+          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
+          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -564,6 +610,25 @@ jobs:
             "Libs: $fdkLib"
           )
 
+          # Also create alternate import-library names so ffmpeg's non-pkg-config
+          # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
+          function Ensure-LibAlias($actual, $alias) {
+            $actualPath = Join-Path "$inst\lib" $actual
+            $aliasPath = Join-Path "$inst\lib" $alias
+            if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
+              Copy-Item $actualPath $aliasPath
+              Write-Host "Created alias $alias -> $actual"
+            }
+          }
+          Ensure-LibAlias $lameLib "mp3lame.lib"
+          Ensure-LibAlias $lameLib "libmp3lame.lib"
+          Ensure-LibAlias $fdkLib "fdk-aac.lib"
+          Ensure-LibAlias $fdkLib "libfdk-aac.lib"
+          if ($vplLib) {
+            Ensure-LibAlias $vplLib "vpl.lib"
+            Ensure-LibAlias $vplLib "libvpl.lib"
+          }
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -577,18 +642,26 @@ jobs:
       - name: Check vcpkg pkg-config
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
-          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
+          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
@@ -603,11 +676,12 @@ jobs:
       - name: Build FFmpeg (MSVC)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          # Use Git for Windows' pkg-config, which properly supports PKG_CONFIG_PATH
-          export PKG_CONFIG="$(which pkg-config 2>/dev/null)"
-          [ -z "$PKG_CONFIG" ] && export PKG_CONFIG="/usr/bin/pkg-config"
-          echo "pkg-config: $($PKG_CONFIG --version 2>&1 || echo NOT FOUND)"
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
@@ -623,14 +697,18 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
-          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
           echo "=== pkg-config libfdk-aac ==="
-          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
-          pkg-config --debug vpl 2>&1 | head -40 || true
+          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
@@ -671,13 +749,13 @@ jobs:
   # ============================================================
   windows-intel-qsv:
     name: Windows (Intel QSV)
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64 }
+        with: { arch: amd64, vsversion: "18.0" }
 
       - name: Install build tools
         shell: powershell
@@ -697,8 +775,15 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
+          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
+          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
+          # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
+          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
+          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
+          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -770,6 +855,23 @@ jobs:
             "Libs: $vplLib"
           )
 
+          # Also create alternate import-library names so ffmpeg's non-pkg-config
+          # fallbacks (-lmp3lame, -lfdk-aac, -lvpl) can find the files.
+          function Ensure-LibAlias($actual, $alias) {
+            $actualPath = Join-Path "$inst\lib" $actual
+            $aliasPath = Join-Path "$inst\lib" $alias
+            if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
+              Copy-Item $actualPath $aliasPath
+              Write-Host "Created alias $alias -> $actual"
+            }
+          }
+          Ensure-LibAlias $lameLib "mp3lame.lib"
+          Ensure-LibAlias $lameLib "libmp3lame.lib"
+          Ensure-LibAlias $fdkLib "fdk-aac.lib"
+          Ensure-LibAlias $fdkLib "libfdk-aac.lib"
+          Ensure-LibAlias $vplLib "vpl.lib"
+          Ensure-LibAlias $vplLib "libvpl.lib"
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -785,18 +887,26 @@ jobs:
       - name: Check vcpkg pkg-config
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
-          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
+          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
@@ -824,11 +934,12 @@ jobs:
       - name: Build FFmpeg (MSVC)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          # Use Git for Windows' pkg-config, which properly supports PKG_CONFIG_PATH
-          export PKG_CONFIG="$(which pkg-config 2>/dev/null)"
-          [ -z "$PKG_CONFIG" ] && export PKG_CONFIG="/usr/bin/pkg-config"
-          echo "pkg-config: $($PKG_CONFIG --version 2>&1 || echo NOT FOUND)"
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
@@ -844,14 +955,18 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
-          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
           echo "=== pkg-config libfdk-aac ==="
-          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
-          pkg-config --debug vpl 2>&1 | head -40 || true
+          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
@@ -1001,7 +1116,7 @@ jobs:
 
       - name: Setup MSVC (VS 2026 ARM64)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64_arm64 }
+        with: { arch: amd64_arm64, vsversion: "18.0" }
 
       - name: Install build tools
         shell: powershell
@@ -1021,8 +1136,15 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
+          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
+          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
+          # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
+          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
+          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
+          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -1078,6 +1200,25 @@ jobs:
             "Libs: $fdkLib"
           )
 
+          # Also create alternate import-library names so ffmpeg's non-pkg-config
+          # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
+          function Ensure-LibAlias($actual, $alias) {
+            $actualPath = Join-Path "$inst\lib" $actual
+            $aliasPath = Join-Path "$inst\lib" $alias
+            if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
+              Copy-Item $actualPath $aliasPath
+              Write-Host "Created alias $alias -> $actual"
+            }
+          }
+          Ensure-LibAlias $lameLib "mp3lame.lib"
+          Ensure-LibAlias $lameLib "libmp3lame.lib"
+          Ensure-LibAlias $fdkLib "fdk-aac.lib"
+          Ensure-LibAlias $fdkLib "libfdk-aac.lib"
+          if ($vplLib) {
+            Ensure-LibAlias $vplLib "vpl.lib"
+            Ensure-LibAlias $vplLib "libvpl.lib"
+          }
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -1091,18 +1232,26 @@ jobs:
       - name: Check vcpkg pkg-config
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
-          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
+          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
@@ -1117,11 +1266,12 @@ jobs:
       - name: Build FFmpeg (MSVC ARM64)
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          # Use Git for Windows' pkg-config, which properly supports PKG_CONFIG_PATH
-          export PKG_CONFIG="$(which pkg-config 2>/dev/null)"
-          [ -z "$PKG_CONFIG" ] && export PKG_CONFIG="/usr/bin/pkg-config"
-          echo "pkg-config: $($PKG_CONFIG --version 2>&1 || echo NOT FOUND)"
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
@@ -1138,14 +1288,18 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          # Remove Strawberry paths that ship broken pkg-config / ccache
+          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+          __clean_path
+          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
-          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
           echo "=== pkg-config libfdk-aac ==="
-          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
-          pkg-config --debug vpl 2>&1 | head -40 || true
+          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
