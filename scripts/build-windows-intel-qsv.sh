@@ -145,8 +145,18 @@ cd vmaf/libvmaf && rm -rf build
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false
+if command -v clang >/dev/null 2>&1; then
+  echo "使用 Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
+  CC=clang CXX=clang++ \
+  PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
+    -Dc_args="--target=x86_64-pc-windows-msvc" \
+    -Dcpp_args="--target=x86_64-pc-windows-msvc"
+else
+  echo "警告：未找到 clang，VMAF 回退到 MSVC 并禁用 asm 优化"
+  PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false
+fi
 ninja -vC build && ninja -C build install
 
 # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
