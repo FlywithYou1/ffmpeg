@@ -144,6 +144,15 @@ git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
 # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
 sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+# Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+python3 -c '
+import pathlib
+p = pathlib.Path("src/feature/mkdirp.c")
+s = p.read_text()
+s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+p.write_text(s)
+'
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"

@@ -456,6 +456,15 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+          # Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+          python3 -c '
+          import pathlib
+          p = pathlib.Path("src/feature/mkdirp.c")
+          s = p.read_text()
+          s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+          s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+          p.write_text(s)
+          '
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
@@ -768,6 +777,15 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+          # Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+          python3 -c '
+          import pathlib
+          p = pathlib.Path("src/feature/mkdirp.c")
+          s = p.read_text()
+          s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+          s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+          p.write_text(s)
+          '
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -1091,6 +1109,15 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+          # Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+          python3 -c '
+          import pathlib
+          p = pathlib.Path("src/feature/mkdirp.c")
+          s = p.read_text()
+          s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+          s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+          p.write_text(s)
+          '
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -1515,6 +1542,15 @@ jobs:
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
+          # Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+          python3 -c '
+          import pathlib
+          p = pathlib.Path("src/feature/mkdirp.c")
+          s = p.read_text()
+          s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+          s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+          p.write_text(s)
+          '
           # PThreads4W (installed via vcpkg) provides pthread.h on Windows
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
