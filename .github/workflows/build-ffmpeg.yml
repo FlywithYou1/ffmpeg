@@ -57,9 +57,8 @@ jobs:
         run: |
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
           cd nv-codec-headers
-          make -j"$(nproc)" PREFIX="${HOME}/ffmpeg-install"
-          make PREFIX="${HOME}/ffmpeg-install" install
-          echo "PKG_CONFIG_PATH=${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+          make -j"$(nproc)" PREFIX=/usr/local
+          sudo make PREFIX=/usr/local install
 
       - name: Build VMAF-CUDA
         run: |
@@ -67,17 +66,9 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
-          # nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
-          # via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
-          export CUDAFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
-          export CPPFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
-          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          CFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
-          CXXFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
-          LDFLAGS="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -lstdc++" \
+          export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
           meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" \
-            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++" \
-            -Dcuda_args="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
+            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
           ninja -vC build && ninja -C build install
 
       - name: Build FFmpeg
@@ -202,17 +193,19 @@ jobs:
       - name: Build VMAF (CPU)
         run: |
           P="${HOME}/ffmpeg-install"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
-          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+          # Verify
+          ls -la "${P}/lib/pkgconfig/libvmaf.pc" || { echo "::error::VMAF .pc not found"; exit 1; }
+          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -317,17 +310,9 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
+          export C_INCLUDE_PATH="$P/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
-          # nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
-          # via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
-          export CUDAFLAGS="-I$P/include -I${CUDA_HOME}/include"
-          export CPPFLAGS="-I$P/include -I${CUDA_HOME}/include"
-          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          CFLAGS="-I$P/include -I${CUDA_HOME}/include" \
-          CXXFLAGS="-I$P/include -I${CUDA_HOME}/include" \
-          LDFLAGS="-LIBPATH:$P/lib -LIBPATH:$CL" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
-            -Dcuda_args="-I$P/include -I${CUDA_HOME}/include"
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
@@ -505,7 +490,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib vpl
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib libvpl
           $inst = "$v\installed\x64-windows"
           # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
           $pcDir = "$inst\lib\pkgconfig"
@@ -610,7 +595,14 @@ jobs:
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          HOMEBREW_PREFIX="$(brew --prefix)"
+          # Homebrew 的 lame/fdk-aac 提供 lame.pc / fdk-aac.pc，
+          # 但 ffmpeg 需要 libmp3lame.pc / libfdk-aac.pc
+          [ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" ] && \
+            ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
+          [ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
+            ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" \

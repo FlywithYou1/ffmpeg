@@ -36,24 +36,17 @@ echo "[1/5] nv-codec-headers"
 cd /tmp && rm -rf nv-codec-headers
 git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
 cd nv-codec-headers
-make -j"$THREADS" PREFIX="$P" && make PREFIX="$P" install
+make -j"$THREADS" PREFIX=/usr/local && sudo make PREFIX=/usr/local install
 
 # ---- VMAF-CUDA ----
 echo "[2/5] VMAF-CUDA"
 cd /tmp && rm -rf vmaf
 git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
-# nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
-# via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
-export CUDAFLAGS="-I${P}/include -I${CUDA_HOME}/include"
-export CPPFLAGS="-I${P}/include -I${CUDA_HOME}/include"
-PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-CFLAGS="-I${P}/include -I${CUDA_HOME}/include" \
-CXXFLAGS="-I${P}/include -I${CUDA_HOME}/include" \
-LDFLAGS="-L${P}/lib -L${CUDA_HOME}/lib64 -lstdc++" \
+# ffnvcodec headers are in /usr/local/include (default path for all compilers)
+export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
 meson setup build --buildtype release --prefix="$P" \
-  -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++" \
-  -Dcuda_args="-I${P}/include -I${CUDA_HOME}/include"
+  -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
 ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----

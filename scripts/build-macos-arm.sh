@@ -35,6 +35,14 @@ ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg"
+# Homebrew 的 lame/fdk-aac 提供 lame.pc / fdk-aac.pc，
+# 但 ffmpeg 需要 libmp3lame.pc / libfdk-aac.pc
+HOMEBREW_PREFIX="$(brew --prefix)"
+[ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" ] && \
+  ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
+[ -f "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
+  ln -sf "${HOMEBREW_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
