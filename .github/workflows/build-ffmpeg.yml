@@ -619,19 +619,18 @@ jobs:
           FDK_PREFIX="$(brew --prefix fdk-aac)"
           # Homebrew 的 lame 不带 .pc 文件，手动生成 libmp3lame.pc
           LAME_INCLUDE=$(ls -d "${LAME_PREFIX}/include"/*/ 2>/dev/null | head -1 || echo "${LAME_PREFIX}/include")
-          LAME_LIB="${LAME_PREFIX}/lib"
-          cat > "${P}/lib/pkgconfig/libmp3lame.pc" <<LAMEPC
-prefix=${LAME_PREFIX}
-exec_prefix=\${prefix}
-libdir=${LAME_LIB}
-includedir=${LAME_INCLUDE}
-
-Name: libmp3lame
-Description: LAME MP3 encoder library
-Version: 3.100
-Libs: -L\${libdir} -lmp3lame
-Cflags: -I\${includedir}
-LAMEPC
+          {
+            echo "prefix=${LAME_PREFIX}"
+            echo 'exec_prefix=${prefix}'
+            echo "libdir=${LAME_PREFIX}/lib"
+            echo "includedir=${LAME_INCLUDE}"
+            echo ""
+            echo "Name: libmp3lame"
+            echo "Description: LAME MP3 encoder library"
+            echo "Version: 3.100"
+            echo 'Libs: -L${libdir} -lmp3lame'
+            echo 'Cflags: -I${includedir}'
+          } > "${P}/lib/pkgconfig/libmp3lame.pc"
           # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
           [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
             ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
