@@ -77,7 +77,8 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
-  --enable-sdl2 --disable-doc
+  --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
+  --disable-doc
 make -j"$THREADS" && make install
 
 # ---- 复制 DLL ----
@@ -90,8 +91,12 @@ echo "[3/4] DLL"
 # ---- 验证 + 输出 ----
 echo "--- ffmpeg ---"
 "$P/bin/ffmpeg.exe" -version 2>&1 | head -n3
+echo "--- HW Accel ---"
+"$P/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 || echo "(none)"
+echo "--- Decoders (hw) ---"
+"$P/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | grep -iE '_d3d11va|_dxva2|_mf' | head -10 || echo "(none)"
 echo "--- Encoders ---"
-"$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'libmp3lame|libfdk_aac' || echo "(none)"
+"$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'libmp3lame|libfdk_aac|_mf' || echo "(none)"
 echo "--- VMAF ---"
 "$P/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 

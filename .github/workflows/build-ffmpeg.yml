@@ -641,8 +641,8 @@ jobs:
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" \
-            --extra-cflags="-I$P/include" \
-            --extra-ldflags="-L$P/lib" \
+            --extra-cflags="-I$P/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
+            --extra-ldflags="-L$P/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
@@ -750,7 +750,8 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
-            --enable-sdl2 --disable-doc
+            --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
+            --disable-doc
           make -j"$(nproc)" && make install
 
       - name: Copy DLLs
@@ -766,6 +767,12 @@ jobs:
         shell: bash
         run: |
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
+          echo "--- HW Accel ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 || echo "(none)"
+          echo "--- Decoders (hw) ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | grep -iE '_d3d11va|_dxva2|_mf' | head -10 || echo "(none)"
+          echo "--- Encoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'libmp3lame|libfdk_aac|_mf' || echo "(none)"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
@@ -841,7 +848,7 @@ jobs:
 
             | Artifact | CPU | HW Accel | VMAF |
             |---|---|---|---|
-            | `ffmpeg-windows-arm64.zip` | Snapdragon X | Software | ✅ CPU |
+            | `ffmpeg-windows-arm64.zip` | Snapdragon X | D3D11VA / DXVA2 / MF | ✅ CPU |
 
             ### 📦 macOS (ARM64)
 

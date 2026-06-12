@@ -60,8 +60,8 @@ cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
 ./configure --prefix="$P" \
-  --extra-cflags="-I${P}/include" \
-  --extra-ldflags="-L${P}/lib" \
+  --extra-cflags="-I${P}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
+  --extra-ldflags="-L${P}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
   --extra-libs="-lpthread -lm" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
