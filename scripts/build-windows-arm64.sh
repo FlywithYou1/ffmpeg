@@ -135,10 +135,12 @@ CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 # use direct.h and define mode_t; use _mkdir on Windows.
 python3 -c '
 import pathlib
-for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h"):
+for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
     p = pathlib.Path(path)
+    if not p.exists():
+        continue
     s = p.read_text()
-    s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+    s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
     p.write_text(s)
@@ -163,6 +165,7 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
 fi
 PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+  -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
   -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
   -Dc_link_args="${PTHREAD_LDFLAGS}"
 ninja -vC build && ninja -C build install
