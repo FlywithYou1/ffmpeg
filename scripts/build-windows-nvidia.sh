@@ -153,18 +153,36 @@ export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
+# PThreads4W (vcpkg) provides pthread.h on Windows
+PTHREAD_CFLAGS=""
+PTHREAD_LDFLAGS=""
+if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+  PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+  export C_INCLUDE_PATH="${VCPKG_INSTALLED}/include:${C_INCLUDE_PATH}"
+  PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
+  [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
+  if [ -n "$PTHREAD_LIB" ]; then
+    PTHREAD_LDFLAGS="$PTHREAD_LIB"
+    echo "使用 PThreads4W: $PTHREAD_LIB"
+  else
+    echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
+  fi
+fi
 if command -v clang >/dev/null 2>&1; then
   echo "使用 Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
   CC=clang CXX=clang++ \
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
-    -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
-    -Dcpp_args="--target=x86_64-pc-windows-msvc"
+    -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+    -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
+    -Dc_link_args="${PTHREAD_LDFLAGS}" \
+    -Dcpp_link_args="${PTHREAD_LDFLAGS}"
 else
   echo "警告：未找到 clang，VMAF 回退到 MSVC 并禁用 asm 优化"
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
-    -Dc_args="-D_USE_MATH_DEFINES"
+    -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+    -Dc_link_args="${PTHREAD_LDFLAGS}"
 fi
 ninja -vC build && ninja -C build install
 

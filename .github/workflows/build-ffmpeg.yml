@@ -303,7 +303,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -464,16 +464,34 @@ jobs:
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           # nv-codec-headers provides ffnvcodec.pc; meson needs PKG_CONFIG_PATH to find it
           export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # PThreads4W (installed via vcpkg) provides pthread.h on Windows
+          PTHREAD_CFLAGS=""
+          PTHREAD_LDFLAGS=""
+          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
+            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
+            if [ -n "$PTHREAD_LIB" ]; then
+              PTHREAD_LDFLAGS="$PTHREAD_LIB"
+              echo "Using PThreads4W: $PTHREAD_LIB"
+            else
+              echo "::error::pthread.h found but no pthread*.lib under ${VCPKG_INSTALLED}/lib"
+              exit 1
+            fi
+          fi
           if command -v clang >/dev/null 2>&1; then
             echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
             CC=clang CXX=clang++ \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
-              -Dc_args="-I$P/include -I${CUDA_HOME}/include --target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
-              -Dcpp_args="--target=x86_64-pc-windows-msvc"
+              -Dc_args="-I$P/include -I${CUDA_HOME}/include --target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}" \
+              -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
-              -Dc_args="-I$P/include -I${CUDA_HOME}/include -D_USE_MATH_DEFINES"
+              -Dc_args="-I$P/include -I${CUDA_HOME}/include -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -636,7 +654,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -753,18 +771,36 @@ jobs:
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
+          # PThreads4W (installed via vcpkg) provides pthread.h on Windows
+          PTHREAD_CFLAGS=""
+          PTHREAD_LDFLAGS=""
+          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
+            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
+            if [ -n "$PTHREAD_LIB" ]; then
+              PTHREAD_LDFLAGS="$PTHREAD_LIB"
+              echo "Using PThreads4W: $PTHREAD_LIB"
+            else
+              echo "::error::pthread.h found but no pthread*.lib under ${VCPKG_INSTALLED}/lib"
+              exit 1
+            fi
+          fi
           if command -v clang >/dev/null 2>&1; then
             echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
             CC=clang CXX=clang++ \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
-              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
-              -Dcpp_args="--target=x86_64-pc-windows-msvc"
+              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}" \
+              -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
-              -Dc_args="-D_USE_MATH_DEFINES"
+              -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -925,7 +961,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib libvpl
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -1058,18 +1094,36 @@ jobs:
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
+          # PThreads4W (installed via vcpkg) provides pthread.h on Windows
+          PTHREAD_CFLAGS=""
+          PTHREAD_LDFLAGS=""
+          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
+            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
+            if [ -n "$PTHREAD_LIB" ]; then
+              PTHREAD_LDFLAGS="$PTHREAD_LIB"
+              echo "Using PThreads4W: $PTHREAD_LIB"
+            else
+              echo "::error::pthread.h found but no pthread*.lib under ${VCPKG_INSTALLED}/lib"
+              exit 1
+            fi
+          fi
           if command -v clang >/dev/null 2>&1; then
             echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
             CC=clang CXX=clang++ \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
-              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
-              -Dcpp_args="--target=x86_64-pc-windows-msvc"
+              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}" \
+              -Dcpp_link_args="${PTHREAD_LDFLAGS}"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
-              -Dc_args="-D_USE_MATH_DEFINES"
+              -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+              -Dc_link_args="${PTHREAD_LDFLAGS}"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -1346,7 +1400,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet arm64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet arm64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\arm64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -1461,10 +1515,26 @@ jobs:
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
+          # PThreads4W (installed via vcpkg) provides pthread.h on Windows
+          PTHREAD_CFLAGS=""
+          PTHREAD_LDFLAGS=""
+          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
+            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
+            if [ -n "$PTHREAD_LIB" ]; then
+              PTHREAD_LDFLAGS="$PTHREAD_LIB"
+              echo "Using PThreads4W: $PTHREAD_LIB"
+            else
+              echo "::error::pthread.h found but no pthread*.lib under ${VCPKG_INSTALLED}/lib"
+              exit 1
+            fi
+          fi
           # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
-            -Dc_args="-D_USE_MATH_DEFINES"
+            -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
+            -Dc_link_args="${PTHREAD_LDFLAGS}"
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
