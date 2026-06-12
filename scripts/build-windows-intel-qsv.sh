@@ -62,7 +62,7 @@ includedir=\${prefix}/include
 Name: libmp3lame
 Description: LAME MP3 encoder library
 Version: 3.100
-Libs: -L\${libdir} ${lame_lib}
+Libs: ${lame_lib}
 Cflags: -I\${includedir}
 EOF
 
@@ -76,7 +76,7 @@ includedir=\${prefix}/include
 Name: libfdk-aac
 Description: Fraunhofer FDK AAC codec library
 Version: 2.0.2
-Libs: -L\${libdir} ${fdk_lib}
+Libs: ${fdk_lib}
 Cflags: -I\${includedir}
 EOF
 
@@ -90,7 +90,7 @@ includedir=\${prefix}/include
 Name: vpl
 Description: Intel oneVPL Dispatcher
 Version: 2.16.0
-Libs: -L\${libdir} ${vpl_lib}
+Libs: ${vpl_lib}
 Cflags: -I\${includedir} -I\${includedir}/vpl
 EOF
 

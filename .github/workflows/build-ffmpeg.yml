@@ -300,6 +300,9 @@ jobs:
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
           $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
+          # so the .pc files only need to declare the library name. This avoids -L
+          # flags that the MSVC linker may not handle during configure tests.
           Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -309,7 +312,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: -L`${libdir} $lameLib",
+            "Libs: $lameLib",
             'Cflags: -I${includedir}'
           )
 
@@ -324,7 +327,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: -L`${libdir} $fdkLib",
+            "Libs: $fdkLib",
             'Cflags: -I${includedir}'
           )
 
@@ -519,6 +522,9 @@ jobs:
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
           $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
+          # so the .pc files only need to declare the library name. This avoids -L
+          # flags that the MSVC linker may not handle during configure tests.
           Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -528,7 +534,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: -L`${libdir} $lameLib",
+            "Libs: $lameLib",
             'Cflags: -I${includedir}'
           )
 
@@ -543,7 +549,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: -L`${libdir} $fdkLib",
+            "Libs: $fdkLib",
             'Cflags: -I${includedir}'
           )
 
@@ -692,6 +698,9 @@ jobs:
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
           $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
+          # so the .pc files only need to declare the library name. This avoids -L
+          # flags that the MSVC linker may not handle during configure tests.
           Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -701,7 +710,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: -L`${libdir} $lameLib",
+            "Libs: $lameLib",
             'Cflags: -I${includedir}'
           )
 
@@ -716,7 +725,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: -L`${libdir} $fdkLib",
+            "Libs: $fdkLib",
             'Cflags: -I${includedir}'
           )
 
@@ -733,7 +742,7 @@ jobs:
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             'Version: 2.16.0',
-            "Libs: -L`${libdir} $vplLib",
+            "Libs: $vplLib",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
 
@@ -1000,6 +1009,9 @@ jobs:
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
           $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
+          # so the .pc files only need to declare the library name. This avoids -L
+          # flags that the MSVC linker may not handle during configure tests.
           Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -1009,7 +1021,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: -L`${libdir} $lameLib",
+            "Libs: $lameLib",
             'Cflags: -I${includedir}'
           )
 
@@ -1024,7 +1036,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: -L`${libdir} $fdkLib",
+            "Libs: $fdkLib",
             'Cflags: -I${includedir}'
           )
 
