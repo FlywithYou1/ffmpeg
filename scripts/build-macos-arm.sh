@@ -38,7 +38,7 @@ echo "[2/4] FFmpeg"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
-./configure --prefix="$P" --pkg-config-flags="--static" \
+./configure --prefix="$P" \
   --extra-cflags="-I${P}/include" \
   --extra-ldflags="-L${P}/lib" \
   --extra-libs="-lpthread -lm" \

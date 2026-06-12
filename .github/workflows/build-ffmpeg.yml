@@ -82,6 +82,8 @@ jobs:
 
       - name: Build FFmpeg
         run: |
+          P="${HOME}/ffmpeg-install"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
@@ -145,6 +147,7 @@ jobs:
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -209,6 +212,7 @@ jobs:
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -263,7 +267,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
           # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
           $pcDir = "$inst\lib\pkgconfig"
@@ -399,7 +403,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
           # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
           $pcDir = "$inst\lib\pkgconfig"
@@ -501,7 +505,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib vpl
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib vpl
           $inst = "$v\installed\x64-windows"
           # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
           $pcDir = "$inst\lib\pkgconfig"
@@ -606,9 +610,10 @@ jobs:
       - name: Build FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          ./configure --prefix="$P" --pkg-config-flags="--static" \
+          ./configure --prefix="$P" \
             --extra-cflags="-I$P/include" \
             --extra-ldflags="-L$P/lib" \
             --extra-libs="-lpthread -lm" \
