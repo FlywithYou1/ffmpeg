@@ -280,6 +280,25 @@ jobs:
           [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
           echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+          # Use VS-provided Clang for libvmaf if available.
+          # Clang is used for libvmaf only; FFmpeg itself continues to use MSVC (cl.exe).
+          # If no Clang is found, the Build VMAF step falls back to MSVC with -Denable_asm=false.
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $clangDir = $null
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
+            if ($vsPath) {
+              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
+              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
+            }
+          }
+          if ($clangDir) {
+            Write-Host "VS Clang found at $clangDir"
+            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
+          }
+
       - name: vcpkg deps
         shell: powershell
         run: |
@@ -435,6 +454,8 @@ jobs:
           set -e; P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
+          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
@@ -447,12 +468,12 @@ jobs:
             echo "Building VMAF with Clang (MSVC target) to keep AVX2 asm"
             CC=clang CXX=clang++ \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
-              -Dc_args="-I$P/include -I${CUDA_HOME}/include --target=x86_64-pc-windows-msvc" \
+              -Dc_args="-I$P/include -I${CUDA_HOME}/include --target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
               -Dcpp_args="--target=x86_64-pc-windows-msvc"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
-              -Dc_args="-I$P/include -I${CUDA_HOME}/include"
+              -Dc_args="-I$P/include -I${CUDA_HOME}/include -D_USE_MATH_DEFINES"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -592,6 +613,25 @@ jobs:
           [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
           echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+          # Use VS-provided Clang for libvmaf if available.
+          # Clang is used for libvmaf only; FFmpeg itself continues to use MSVC (cl.exe).
+          # If no Clang is found, the Build VMAF step falls back to MSVC with -Denable_asm=false.
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $clangDir = $null
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
+            if ($vsPath) {
+              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
+              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
+            }
+          }
+          if ($clangDir) {
+            Write-Host "VS Clang found at $clangDir"
+            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
+          }
+
       - name: vcpkg deps
         shell: powershell
         run: |
@@ -708,6 +748,8 @@ jobs:
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
+          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -716,12 +758,13 @@ jobs:
             CC=clang CXX=clang++ \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
-              -Dc_args="--target=x86_64-pc-windows-msvc" \
+              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
               -Dcpp_args="--target=x86_64-pc-windows-msvc"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+              -Dc_args="-D_USE_MATH_DEFINES"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -859,6 +902,25 @@ jobs:
           [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
           echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+          # Use VS-provided Clang for libvmaf if available.
+          # Clang is used for libvmaf only; FFmpeg itself continues to use MSVC (cl.exe).
+          # If no Clang is found, the Build VMAF step falls back to MSVC with -Denable_asm=false.
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $clangDir = $null
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
+            if ($vsPath) {
+              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
+              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
+            }
+          }
+          if ($clangDir) {
+            Write-Host "VS Clang found at $clangDir"
+            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
+          }
+
       - name: vcpkg deps
         shell: powershell
         run: |
@@ -991,6 +1053,8 @@ jobs:
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Patch VMAF for Clang + MSVC target: don't redefine __builtin_clz under Clang
+          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -999,12 +1063,13 @@ jobs:
             CC=clang CXX=clang++ \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
-              -Dc_args="--target=x86_64-pc-windows-msvc" \
+              -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES" \
               -Dcpp_args="--target=x86_64-pc-windows-msvc"
           else
             echo "::warning::clang not found, falling back to MSVC with -Denable_asm=false"
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+              -Dc_args="-D_USE_MATH_DEFINES"
           fi
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
@@ -1258,6 +1323,25 @@ jobs:
           [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
           echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+          # Use VS-provided Clang for libvmaf if available.
+          # Clang is used for libvmaf only; FFmpeg itself continues to use MSVC (cl.exe).
+          # If no Clang is found, the Build VMAF step falls back to MSVC with -Denable_asm=false.
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $clangDir = $null
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
+            if ($vsPath) {
+              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
+              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
+            }
+          }
+          if ($clangDir) {
+            Write-Host "VS Clang found at $clangDir"
+            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
+          }
+
       - name: vcpkg deps
         shell: powershell
         run: |
@@ -1379,7 +1463,8 @@ jobs:
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+            -Dc_args="-D_USE_MATH_DEFINES"
           ninja -vC build && ninja -C build install
           # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
