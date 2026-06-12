@@ -252,7 +252,8 @@ jobs:
       - name: Install build tools
         shell: powershell
         run: |
-          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
+          pip install meson
           refreshenv
 
       - name: vcpkg deps
@@ -280,14 +281,32 @@ jobs:
           echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Install CUDA Toolkit
+        shell: powershell
+        run: |
+          # Check if CUDA already installed
+          $nvcc = Get-Command nvcc -ErrorAction SilentlyContinue
+          if ($nvcc) { Write-Host "CUDA found: $($nvcc.Source)"; exit 0 }
+          Write-Host "Installing CUDA via Chocolatey..."
+          choco install cuda -y --no-progress --version=13.3.0
+          refreshenv
+          # Add to PATH for current session
+          $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\bin"
+          if (Test-Path $cudaPath) { $env:PATH = "$cudaPath;$env:PATH" }
+
       - name: Detect CUDA
         shell: bash
         run: |
           CUDA_BASE=""
-          for d in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/v*; do
-            d2="$(cygpath -u "$d" 2>/dev/null || echo "$d")"
-            if [ -d "${d2}/bin" ] && [ -f "${d2}/bin/nvcc.exe" ]; then CUDA_BASE="${d2}"; break; fi
+          for base in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA" "/c/Program Files/NVIDIA/CUDA"; do
+            [ -d "$base" ] && for d in "$base"/v*; do
+              d2="$(dirname "$d" 2>/dev/null || echo "$d")/$(basename "$d")"
+              if [ -d "${d}/bin" ] && [ -f "${d}/bin/nvcc.exe" ]; then CUDA_BASE="${d}"; break 2; fi
+            done
           done
+          # Fallback: locate via PATH
+          [ -z "${CUDA_BASE}" ] && NVCCBIN="$(dirname "$(which nvcc 2>/dev/null || true)" 2>/dev/null || true)" && \
+            [ -n "${NVCCBIN}" ] && CUDA_BASE="$(dirname "${NVCCBIN}")"
           [ -z "${CUDA_BASE}" ] && { echo "::error::CUDA not found"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc.exe" --version
@@ -380,7 +399,8 @@ jobs:
       - name: Install build tools
         shell: powershell
         run: |
-          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
+          pip install meson
           refreshenv
 
       - name: vcpkg deps
@@ -482,7 +502,8 @@ jobs:
       - name: Install build tools
         shell: powershell
         run: |
-          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
+          pip install meson
           refreshenv
 
       - name: vcpkg deps
@@ -596,13 +617,31 @@ jobs:
           P="${HOME}/ffmpeg-install"
           LAME_PREFIX="$(brew --prefix lame)"
           FDK_PREFIX="$(brew --prefix fdk-aac)"
+          echo "=== DEBUG: pkgconfig paths ==="
+          echo "lame prefix: ${LAME_PREFIX}"
+          echo "fdk-aac prefix: ${FDK_PREFIX}"
+          echo "lame.pc:"
+          find "${LAME_PREFIX}" -name 'lame.pc' 2>/dev/null || echo "  NOT FOUND"
+          echo "fdk-aac.pc:"
+          find "${FDK_PREFIX}" -name 'fdk-aac.pc' 2>/dev/null || echo "  NOT FOUND"
+          echo "Homebrew lib pkgconfig:"
+          ls "$(brew --prefix)/lib/pkgconfig/" 2>/dev/null | grep -iE 'lame|fdk|mp3|sdl' || echo "  none"
+          echo "=============================="
           # Homebrew 的 lame/fdk-aac 是 keg-only，提供 lame.pc / fdk-aac.pc，
           # 但 ffmpeg 需要 libmp3lame.pc / libfdk-aac.pc
-          [ -f "${LAME_PREFIX}/lib/pkgconfig/lame.pc" ] && \
-            ln -sf "${LAME_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
-          [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
-            ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+          [ -f "${LAME_PREFIX}/lib/pkgconfig/lame.pc" ] && { \
+            ln -sf "${LAME_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"; \
+            echo "symlinked: libmp3lame.pc -> ${LAME_PREFIX}/lib/pkgconfig/lame.pc"; } \
+            || echo "ERROR: lame.pc not found at ${LAME_PREFIX}/lib/pkgconfig/lame.pc"
+          [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && { \
+            ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"; \
+            echo "symlinked: libfdk-aac.pc -> ${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc"; } \
+            || echo "ERROR: fdk-aac.pc not found at ${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          pkg-config --exists libmp3lame && echo "pkg-config libmp3lame: OK ($(pkg-config --modversion libmp3lame))" || echo "pkg-config libmp3lame: FAIL"
+          pkg-config --exists libfdk-aac  && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))"   || echo "pkg-config libfdk-aac: FAIL"
+          pkg-config --exists sdl2        && echo "pkg-config sdl2: OK" || echo "pkg-config sdl2: FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" \
@@ -616,6 +655,14 @@ jobs:
             --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
             --enable-hwaccel=av1_videotoolbox --disable-doc
           make -j"$(sysctl -n hw.logicalcpu)" && make install
+
+      - name: Dump config.log (on failure)
+        if: failure()
+        run: |
+          echo "=== ffbuild/config.log ==="
+          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
+          echo "=== ffbuild/config.log (LAME section) ==="
+          grep -A20 'libmp3lame' /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(no libmp3lame section)"
 
       - name: Strip, sign & verify
         run: |
@@ -641,6 +688,106 @@ jobs:
           retention-days: 30
 
   # ============================================================
+  # WINDOWS ARM64 — Snapdragon (Software Encoders + D3D11VA)
+  # ============================================================
+  windows-arm64:
+    name: Windows ARM64 (Snapdragon)
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC (VS 2026 ARM64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with: { arch: amd64_arm64 }
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
+          pip install meson
+          refreshenv
+
+      - name: vcpkg deps
+        shell: powershell
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          & "$v\vcpkg.exe" install --triplet arm64-windows mp3lame fdk-aac sdl2 libiconv zlib
+          $inst = "$v\installed\arm64-windows"
+          $pcDir = "$inst\lib\pkgconfig"
+          New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
+          $pcMixed = $inst -replace '\\','/'
+          @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -L${libdir} libmp3lame.lib',
+            'Cflags: -I${includedir}'
+          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
+          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build VMAF (CPU)
+        shell: bash
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Build FFmpeg (MSVC ARM64)
+        shell: bash
+        run: |
+          set -e; P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --toolchain=msvc --prefix="$P" \
+            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
+            --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Copy DLLs
+        shell: powershell
+        run: |
+          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
+          foreach ($d in $dlls) {
+            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
+            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          }
+
+      - name: Verify
+        shell: bash
+        run: |
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        shell: powershell
+        run: |
+          $b = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-arm64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-arm64
+          path: ffmpeg-windows-arm64.zip
+          retention-days: 30
+
+  # ============================================================
   # RELEASE
   # ============================================================
   release:
@@ -648,9 +795,11 @@ jobs:
     needs:
       - linux-nvidia
       - linux-intel-qsv
+      - linux-amd
       - windows-nvidia
       - windows-amd-amf
       - windows-intel-qsv
+      - windows-arm64
       - macos-arm
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -682,6 +831,7 @@ jobs:
             |---|---|---|---|
             | `ffmpeg-linux-nvidia.tar.xz` | NVIDIA | NVENC/CUDA | ✅ CUDA |
             | `ffmpeg-linux-intel-qsv.tar.xz` | Intel | QSV (oneVPL) + VAAPI | ✅ CPU |
+            | `ffmpeg-linux-amd.tar.xz` | AMD | VAAPI | ✅ CPU |
 
             ### 📦 Windows (x86_64, MSVC)
 
@@ -690,6 +840,12 @@ jobs:
             | `ffmpeg-windows-nvidia.zip` | NVIDIA | NVENC/CUDA | ✅ CUDA |
             | `ffmpeg-windows-amd-amf.zip` | AMD | AMF | ✅ CPU |
             | `ffmpeg-windows-intel-qsv.zip` | Intel | QSV (oneVPL) | ✅ CPU |
+
+            ### 📦 Windows (ARM64, MSVC)
+
+            | Artifact | CPU | HW Accel | VMAF |
+            |---|---|---|---|
+            | `ffmpeg-windows-arm64.zip` | Snapdragon X | Software | ✅ CPU |
 
             ### 📦 macOS (ARM64)
 

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# ============================================================
+# FFmpeg + VMAF (Windows ARM64 / Snapdragon MSVC)
+# VS 2026 ARM64 Developer Command Prompt 环境下运行 Git Bash
+# 运行前需执行: vcvarsall.bat amd64_arm64
+# ============================================================
+set -Eeuo pipefail
+trap 'echo "错误：第 ${LINENO} 行"; exit 1' ERR
+
+ORIG_DIR="$(pwd)"
+THREADS="${THREADS:-$(nproc)}"
+P="${INSTALL_PREFIX:-${HOME}/ffmpeg-install}"
+
+command -v cl.exe >/dev/null 2>&1 || { echo "请先运行 vcvarsall.bat amd64_arm64 (VS 2026)"; exit 1; }
+
+echo "=========================================="
+echo "FFmpeg ARM64 (Windows MSVC)"
+echo "PREFIX: $P  THREADS: $THREADS"
+echo "ARCH: $(uname -m)"
+echo "Compiler: $(cl.exe 2>&1 | head -n1 || echo MSVC)"
+echo "=========================================="
+
+export PATH="${P}/bin:${PATH}"
+export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
+[ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/arm64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/arm64-windows"
+[ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
+
+# Ensure vcpkg dependencies are discoverable by pkg-config.
+# vcpkg's mp3lame port does not ship a .pc file, so create one for ffmpeg.
+if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; then
+  VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
+  if [ ! -f "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" ]; then
+    mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
+    cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libmp3lame
+Description: LAME MP3 encoder library
+Version: 3.100
+Libs: -L\${libdir} libmp3lame.lib
+Cflags: -I\${includedir}
+EOF
+  fi
+  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+fi
+
+# ---- 清理 ----
+rm -rf "$P" /tmp/vmaf /tmp/ffmpeg-src 2>/dev/null || true
+mkdir -p "$P"/{bin,lib,include,lib/pkgconfig}
+
+# ---- VMAF (CPU) ----
+echo "[1/4] VMAF"
+cd /tmp && rm -rf vmaf
+git clone --depth 1 https://github.com/Netflix/vmaf.git
+cd vmaf/libvmaf && rm -rf build
+PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+ninja -vC build && ninja -C build install
+
+# ---- FFmpeg ----
+echo "[2/4] FFmpeg (MSVC ARM64)"
+cd /tmp && rm -rf ffmpeg-src
+git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+cd ffmpeg-src
+
+VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
+[ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
+
+./configure --toolchain=msvc --prefix="$P" \
+  --extra-cflags="-I${P}/include ${VCPKG_CFLAGS}" \
+  --extra-ldflags="-LIBPATH:${P}/lib ${VCPKG_LDFLAGS}" \
+  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --enable-gpl --enable-version3 --enable-nonfree \
+  --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
+  --enable-sdl2 --disable-doc
+make -j"$THREADS" && make install
+
+# ---- 复制 DLL ----
+echo "[3/4] DLL"
+[ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/bin" ] && \
+  for dll in libmp3lame.dll fdk-aac-2.dll SDL2.dll zlib1.dll; do
+    [ -f "${VCPKG_INSTALLED}/bin/$dll" ] && cp "${VCPKG_INSTALLED}/bin/$dll" "$P/bin/" && echo "  $dll"
+  done
+
+# ---- 验证 + 输出 ----
+echo "--- ffmpeg ---"
+"$P/bin/ffmpeg.exe" -version 2>&1 | head -n3
+echo "--- Encoders ---"
+"$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'libmp3lame|libfdk_aac' || echo "(none)"
+echo "--- VMAF ---"
+"$P/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+echo "[4/4] 输出"
+mkdir -p "$ORIG_DIR/output"
+cp "$P/bin/ffmpeg.exe" "$P/bin/ffprobe.exe" "$P/bin/ffplay.exe" "$ORIG_DIR/output/"
+cp "$P/bin/"*.dll "$ORIG_DIR/output/" 2>/dev/null || true
+ls -lh "$ORIG_DIR/output/"
