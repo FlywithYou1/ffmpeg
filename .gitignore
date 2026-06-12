@@ -1,0 +1,38 @@
+# FFmpeg 构建产物
+output/
+dist/
+release-assets/
+artifacts/
+ffmpeg-install/
+
+# 压缩包
+*.tar.xz
+*.tar.gz
+*.zip
+*.7z
+
+# 编译临时文件
+/tmp/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 系统
+Desktop.ini
