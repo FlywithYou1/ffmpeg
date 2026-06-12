@@ -1,0 +1,567 @@
+name: Build FFmpeg Multi-Vendor
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+    paths:
+      - '.github/workflows/build-ffmpeg.yml'
+      - 'scripts/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # LINUX — NVIDIA (NVENC/CUDA + VMAF-CUDA)
+  # ============================================================
+  linux-nvidia:
+    name: Linux (NVIDIA NVENC/CUDA)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential yasm nasm pkg-config meson ninja-build \
+            cmake git wget curl ca-certificates gnupg python3 xxd \
+            libmp3lame-dev libfdk-aac-dev libsdl2-dev
+
+      - name: Detect CUDA
+        run: |
+          CUDA_BASE=""
+          for d in /usr/local/cuda-* /usr/local/cuda; do
+            if [ -d "$d/bin" ] && [ -x "$d/bin/nvcc" ]; then CUDA_BASE="$d"; break; fi
+          done
+          [ -z "${CUDA_BASE}" ] && { echo "::error::CUDA not found"; exit 1; }
+          echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
+          "${CUDA_BASE}/bin/nvcc" --version
+
+      - name: Build nv-codec-headers
+        run: |
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
+          cd nv-codec-headers
+          make -j"$(nproc)" PREFIX="${HOME}/ffmpeg-install"
+          make PREFIX="${HOME}/ffmpeg-install" install
+          echo "PKG_CONFIG_PATH=${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Build VMAF-CUDA
+        run: |
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
+          export PATH="${CUDA_HOME}/bin:${PATH}"
+          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          CFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
+          CXXFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
+          LDFLAGS="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -lstdc++" \
+          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" \
+            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg
+        run: |
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
+            --extra-cflags="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
+            --extra-ldflags="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64" \
+            --extra-libs="-lpthread -lm -ldl -lstdc++" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
+            --enable-cuvid --enable-nvenc --disable-libnpp \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Strip & verify
+        run: |
+          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- NVENC ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        run: |
+          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          cd dist && tar -cJf ../ffmpeg-linux-nvidia.tar.xz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-nvidia
+          path: ffmpeg-linux-nvidia.tar.xz
+          retention-days: 30
+
+  # ============================================================
+  # LINUX — Intel (QSV via oneVPL + VAAPI)
+  # ============================================================
+  linux-intel-qsv:
+    name: Linux (Intel QSV)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential yasm nasm pkg-config meson ninja-build \
+            cmake git wget curl ca-certificates python3 xxd \
+            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+            libva-dev libvpl-dev libdrm-dev
+
+      - name: Build VMAF (CPU)
+        run: |
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg
+        run: |
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
+            --extra-cflags="-I${HOME}/ffmpeg-install/include" \
+            --extra-ldflags="-L${HOME}/ffmpeg-install/lib" \
+            --extra-libs="-lpthread -lm -ldl" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-libvpl --enable-vaapi \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Strip & verify
+        run: |
+          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- QSV ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "(none)"
+          echo "--- VAAPI ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        run: |
+          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          cd dist && tar -cJf ../ffmpeg-linux-intel-qsv.tar.xz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-intel-qsv
+          path: ffmpeg-linux-intel-qsv.tar.xz
+          retention-days: 30
+
+  # ============================================================
+  # WINDOWS — NVIDIA (NVENC/CUDA + VMAF-CUDA)
+  # ============================================================
+  windows-nvidia:
+    name: Windows (NVIDIA NVENC/CUDA)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC (VS 2026)
+        uses: ilammy/msvc-dev-cmd@v1
+        with: { arch: amd64, vsversion: "2026" }
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          refreshenv
+
+      - name: vcpkg deps
+        shell: powershell
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib
+          $inst = "$v\installed\x64-windows"
+          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Detect CUDA
+        shell: bash
+        run: |
+          CUDA_BASE=""
+          for d in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/v*; do
+            d2="$(cygpath -u "$d" 2>/dev/null || echo "$d")"
+            if [ -d "${d2}/bin" ] && [ -f "${d2}/bin/nvcc.exe" ]; then CUDA_BASE="${d2}"; break; fi
+          done
+          [ -z "${CUDA_BASE}" ] && { echo "::error::CUDA not found"; exit 1; }
+          echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
+          "${CUDA_BASE}/bin/nvcc.exe" --version
+
+      - name: Build nv-codec-headers
+        shell: bash
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
+          cd nv-codec-headers
+          make -j"$(nproc)" PREFIX="$P" && make PREFIX="$P" install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Build VMAF-CUDA (MSVC)
+        shell: bash
+        run: |
+          set -e; P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
+          export PATH="${CUDA_HOME}/bin:${PATH}"
+          CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          CFLAGS="-I$P/include -I${CUDA_HOME}/include" \
+          CXXFLAGS="-I$P/include -I${CUDA_HOME}/include" \
+          LDFLAGS="-LIBPATH:$P/lib -LIBPATH:$CL" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg (MSVC)
+        shell: bash
+        run: |
+          set -e; P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          ./configure --toolchain=msvc --prefix="$P" \
+            --extra-cflags="-I$P/include -I${CUDA_HOME}/include -I${VCPKG_INSTALLED}/include" \
+            --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
+            --enable-cuvid --enable-nvenc --disable-libnpp \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Copy DLLs
+        shell: powershell
+        run: |
+          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
+          foreach ($d in $dlls) {
+            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
+            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          }
+
+      - name: Verify
+        shell: bash
+        run: |
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
+          echo "--- NVENC ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        shell: powershell
+        run: |
+          $b = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-nvidia.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-nvidia
+          path: ffmpeg-windows-nvidia.zip
+          retention-days: 30
+
+  # ============================================================
+  # WINDOWS — AMD (AMF)
+  # ============================================================
+  windows-amd-amf:
+    name: Windows (AMD AMF)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC (VS 2026)
+        uses: ilammy/msvc-dev-cmd@v1
+        with: { arch: amd64, vsversion: "2026" }
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          refreshenv
+
+      - name: vcpkg deps
+        shell: powershell
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib
+          $inst = "$v\installed\x64-windows"
+          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build VMAF (CPU)
+        shell: bash
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg (MSVC)
+        shell: bash
+        run: |
+          set -e; P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --toolchain=msvc --prefix="$P" \
+            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-amf \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Copy DLLs
+        shell: powershell
+        run: |
+          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
+          foreach ($d in $dlls) {
+            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
+            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          }
+
+      - name: Verify
+        shell: bash
+        run: |
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
+          echo "--- AMF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_amf' | head -10 || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        shell: powershell
+        run: |
+          $b = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-amd-amf.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-amd-amf
+          path: ffmpeg-windows-amd-amf.zip
+          retention-days: 30
+
+  # ============================================================
+  # WINDOWS — Intel (QSV via oneVPL)
+  # ============================================================
+  windows-intel-qsv:
+    name: Windows (Intel QSV)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC (VS 2026)
+        uses: ilammy/msvc-dev-cmd@v1
+        with: { arch: amd64, vsversion: "2026" }
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install -y --no-progress nasm pkgconfiglite make activeperl
+          refreshenv
+
+      - name: vcpkg deps
+        shell: powershell
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib vpl
+          $inst = "$v\installed\x64-windows"
+          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build VMAF (CPU)
+        shell: bash
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg (MSVC)
+        shell: bash
+        run: |
+          set -e; P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --toolchain=msvc --prefix="$P" \
+            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-libvpl \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Copy DLLs
+        shell: powershell
+        run: |
+          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll","libvpl.dll")
+          foreach ($d in $dlls) {
+            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
+            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          }
+
+      - name: Verify
+        shell: bash
+        run: |
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
+          echo "--- QSV ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        shell: powershell
+        run: |
+          $b = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-intel-qsv.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-intel-qsv
+          path: ffmpeg-windows-intel-qsv.zip
+          retention-days: 30
+
+  # ============================================================
+  # macOS ARM (VideoToolbox + VMAF)
+  # ============================================================
+  macos-arm:
+    name: macOS ARM (VideoToolbox)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2
+
+      - name: Build VMAF (CPU)
+        run: |
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+
+      - name: Build FFmpeg
+        run: |
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
+            --extra-cflags="-I${HOME}/ffmpeg-install/include" \
+            --extra-ldflags="-L${HOME}/ffmpeg-install/lib" \
+            --extra-libs="-lpthread -lm" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
+            --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
+            --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
+            --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
+            --enable-hwaccel=av1_videotoolbox --disable-doc
+          make -j"$(sysctl -n hw.logicalcpu)" && make install
+
+      - name: Strip, sign & verify
+        run: |
+          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          for bin in ffmpeg ffprobe ffplay; do codesign --force --sign - "${HOME}/ffmpeg-install/bin/${bin}" 2>/dev/null || true; done
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- VideoToolbox encoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
+          echo "--- VideoToolbox decoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        run: |
+          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          cd dist && tar -cJf ../ffmpeg-macos-arm.tar.xz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-macos-arm
+          path: ffmpeg-macos-arm.tar.xz
+          retention-days: 30
+
+  # ============================================================
+  # RELEASE
+  # ============================================================
+  release:
+    name: Create GitHub Release
+    needs:
+      - linux-nvidia
+      - linux-intel-qsv
+      - windows-nvidia
+      - windows-amd-amf
+      - windows-intel-qsv
+      - macos-arm
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name '*.tar.xz' -o -name '*.zip' \) -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FFmpeg ${{ github.ref_name }}
+          body: |
+            ## 🎬 FFmpeg Multi-Vendor Build
+
+            Each archive contains **ffmpeg + ffprobe + ffplay** with vendor-specific hardware acceleration.
+
+            ### 📦 Linux (x86_64)
+
+            | Artifact | GPU | HW Accel | VMAF |
+            |---|---|---|---|
+            | `ffmpeg-linux-nvidia.tar.xz` | NVIDIA | NVENC/CUDA | ✅ CUDA |
+            | `ffmpeg-linux-intel-qsv.tar.xz` | Intel | QSV (oneVPL) + VAAPI | ✅ CPU |
+
+            ### 📦 Windows (x86_64, MSVC)
+
+            | Artifact | GPU | HW Accel | VMAF |
+            |---|---|---|---|
+            | `ffmpeg-windows-nvidia.zip` | NVIDIA | NVENC/CUDA | ✅ CUDA |
+            | `ffmpeg-windows-amd-amf.zip` | AMD | AMF | ✅ CPU |
+            | `ffmpeg-windows-intel-qsv.zip` | Intel | QSV (oneVPL) | ✅ CPU |
+
+            ### 📦 macOS (ARM64)
+
+            | Artifact | GPU | HW Accel | VMAF |
+            |---|---|---|---|
+            | `ffmpeg-macos-arm.tar.xz` | Apple | VideoToolbox | ✅ CPU |
+
+            > All builds include: libmp3lame + libfdk-aac + SDL2 (ffplay)
+            > Windows builds compiled with MSVC 2026, requires VC++ Redistributable.
+          files: release-assets/*
+          draft: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+          fail_on_unmatched_files: true
