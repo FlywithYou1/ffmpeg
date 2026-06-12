@@ -131,14 +131,17 @@ cd vmaf/libvmaf && rm -rf build
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-# Patch mkdirp.c for Windows: unistd.h is not available, use direct.h/_mkdir
+# Patch mkdirp.c/.h for Windows: unistd.h/sys/types.h are not available,
+# use direct.h and define mode_t; use _mkdir on Windows.
 python3 -c '
 import pathlib
-p = pathlib.Path("src/feature/mkdirp.c")
-s = p.read_text()
-s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
-s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-p.write_text(s)
+for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h"):
+    p = pathlib.Path(path)
+    s = p.read_text()
+    s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#else\n#include <unistd.h>\n#endif")
+    s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
+    s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
+    p.write_text(s)
 '
 # PThreads4W (vcpkg) provides pthread.h on Windows
 PTHREAD_CFLAGS=""
@@ -150,6 +153,10 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
   if [ -n "$PTHREAD_LIB" ]; then
     PTHREAD_LDFLAGS="$PTHREAD_LIB"
     echo "使用 PThreads4W: $PTHREAD_LIB"
+    # 让 pthreadVC3.dll 在运行时可被找到（如 meson 编译器自检）
+    if [ -d "${VCPKG_INSTALLED}/bin" ]; then
+      export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
+    fi
   else
     echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
   fi
