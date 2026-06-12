@@ -63,7 +63,6 @@ Name: libmp3lame
 Description: LAME MP3 encoder library
 Version: 3.100
 Libs: ${lame_lib}
-Cflags: -I\${includedir}
 EOF
 
   fdk_lib="$(find_import_lib fdk-aac libfdk-aac fdk-aac-2)" || { echo "错误：未找到 fdk-aac import library"; exit 1; }
@@ -77,7 +76,6 @@ Name: libfdk-aac
 Description: Fraunhofer FDK AAC codec library
 Version: 2.0.2
 Libs: ${fdk_lib}
-Cflags: -I\${includedir}
 EOF
 
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"

@@ -271,9 +271,8 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
+          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -312,8 +311,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: $lameLib",
-            'Cflags: -I${includedir}'
+            "Libs: $lameLib"
           )
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
@@ -327,8 +325,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: $fdkLib",
-            'Cflags: -I${includedir}'
+            "Libs: $fdkLib"
           )
 
           Write-Host "Installed import libraries:"
@@ -345,9 +342,13 @@ jobs:
         shell: bash
         run: |
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
+          echo "--- .pc files ---"
+          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
+          echo "--- pkg-config checks ---"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Install CUDA Toolkit
         shell: powershell
@@ -428,6 +429,19 @@ jobs:
             --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
+      - name: Dump ffbuild/config.log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== ffbuild/config.log ==="
+          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
+          echo "=== pkg-config libmp3lame ==="
+          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          echo "=== pkg-config libfdk-aac ==="
+          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          echo "=== pkg-config vpl ==="
+          pkg-config --debug vpl 2>&1 | head -40 || true
+
       - name: Copy DLLs
         shell: powershell
         run: |
@@ -493,9 +507,8 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
+          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -534,8 +547,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: $lameLib",
-            'Cflags: -I${includedir}'
+            "Libs: $lameLib"
           )
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
@@ -549,8 +561,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: $fdkLib",
-            'Cflags: -I${includedir}'
+            "Libs: $fdkLib"
           )
 
           Write-Host "Installed import libraries:"
@@ -567,9 +578,13 @@ jobs:
         shell: bash
         run: |
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
+          echo "--- .pc files ---"
+          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
+          echo "--- pkg-config checks ---"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -603,6 +618,19 @@ jobs:
             --enable-libvmaf --enable-amf \
             --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
+
+      - name: Dump ffbuild/config.log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== ffbuild/config.log ==="
+          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
+          echo "=== pkg-config libmp3lame ==="
+          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          echo "=== pkg-config libfdk-aac ==="
+          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          echo "=== pkg-config vpl ==="
+          pkg-config --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
@@ -669,9 +697,8 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
+          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -710,8 +737,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: $lameLib",
-            'Cflags: -I${includedir}'
+            "Libs: $lameLib"
           )
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
@@ -725,8 +751,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: $fdkLib",
-            'Cflags: -I${includedir}'
+            "Libs: $fdkLib"
           )
 
           # vpl.pc — vcpkg libvpl uses cmake-config, ffmpeg needs pkg-config
@@ -742,8 +767,7 @@ jobs:
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             'Version: 2.16.0',
-            "Libs: $vplLib",
-            'Cflags: -I${includedir} -I${includedir}/vpl'
+            "Libs: $vplLib"
           )
 
           Write-Host "Installed import libraries:"
@@ -762,9 +786,13 @@ jobs:
         shell: bash
         run: |
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
+          echo "--- .pc files ---"
+          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
+          echo "--- pkg-config checks ---"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -804,13 +832,26 @@ jobs:
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
-            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl \
             --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
+
+      - name: Dump ffbuild/config.log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== ffbuild/config.log ==="
+          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
+          echo "=== pkg-config libmp3lame ==="
+          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          echo "=== pkg-config libfdk-aac ==="
+          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          echo "=== pkg-config vpl ==="
+          pkg-config --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
@@ -980,9 +1021,8 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
+          # Ensure nasm + pkg-config from Git for Windows are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -1021,8 +1061,7 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            "Libs: $lameLib",
-            'Cflags: -I${includedir}'
+            "Libs: $lameLib"
           )
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
@@ -1036,8 +1075,7 @@ jobs:
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
             'Version: 2.0.2',
-            "Libs: $fdkLib",
-            'Cflags: -I${includedir}'
+            "Libs: $fdkLib"
           )
 
           Write-Host "Installed import libraries:"
@@ -1054,9 +1092,13 @@ jobs:
         shell: bash
         run: |
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
-          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
-          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
+          echo "--- .pc files ---"
+          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
+          echo "--- pkg-config checks ---"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: version=$(pkg-config --modversion libmp3lame) libs=$(pkg-config --libs libmp3lame) cflags=$(pkg-config --cflags libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: version=$(pkg-config --modversion libfdk-aac) libs=$(pkg-config --libs libfdk-aac) cflags=$(pkg-config --cflags libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: version=$(pkg-config --modversion sdl2) libs=$(pkg-config --libs sdl2) cflags=$(pkg-config --cflags sdl2)" || echo "sdl2 NOT FOUND"
+          pkg-config --exists vpl && echo "vpl OK: version=$(pkg-config --modversion vpl) libs=$(pkg-config --libs vpl) cflags=$(pkg-config --cflags vpl)" || echo "vpl NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -1091,6 +1133,19 @@ jobs:
             --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
             --disable-doc
           make -j"$(nproc)" && make install
+
+      - name: Dump ffbuild/config.log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== ffbuild/config.log ==="
+          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
+          echo "=== pkg-config libmp3lame ==="
+          pkg-config --debug libmp3lame 2>&1 | head -40 || true
+          echo "=== pkg-config libfdk-aac ==="
+          pkg-config --debug libfdk-aac 2>&1 | head -40 || true
+          echo "=== pkg-config vpl ==="
+          pkg-config --debug vpl 2>&1 | head -40 || true
 
       - name: Copy DLLs
         shell: powershell
