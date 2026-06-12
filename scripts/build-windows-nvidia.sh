@@ -53,7 +53,7 @@ echo "=========================================="
 
 export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
 export PATH="${CUDA_HOME}/bin:${P}/bin:${PATH}"
-export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
 # Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
@@ -125,7 +125,7 @@ EOF
   ensure_lib_alias "${fdk_lib}" "fdk-aac.lib"
   ensure_lib_alias "${fdk_lib}" "libfdk-aac.lib"
 
-  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 fi
 
 # ---- 清理 ----

@@ -43,7 +43,7 @@ echo "Compiler: $(cl.exe 2>&1 | head -n1 || echo MSVC)"
 echo "=========================================="
 
 export PATH="${P}/bin:${PATH}"
-export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
 # Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
@@ -128,7 +128,7 @@ EOF
   ensure_lib_alias "${vpl_lib}" "vpl.lib"
   ensure_lib_alias "${vpl_lib}" "libvpl.lib"
 
-  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 fi
 
 # ---- 清理 ----
@@ -143,7 +143,7 @@ cd vmaf/libvmaf && rm -rf build
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
 ninja -vC build && ninja -C build install
 
