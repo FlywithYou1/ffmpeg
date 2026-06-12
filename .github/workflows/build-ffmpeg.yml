@@ -456,11 +456,17 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
+          # Normalize pkg-config path so bash/ffmpeg configure can execute it reliably
+          if command -v cygpath >/dev/null 2>&1; then
+            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
+          fi
+          export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
+            --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-I$P/include -I${CUDA_HOME}/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -693,10 +699,16 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
+          # Normalize pkg-config path so bash/ffmpeg configure can execute it reliably
+          if command -v cygpath >/dev/null 2>&1; then
+            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
+          fi
+          export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
+            --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -957,10 +969,16 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
+          # Normalize pkg-config path so bash/ffmpeg configure can execute it reliably
+          if command -v cygpath >/dev/null 2>&1; then
+            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
+          fi
+          export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
+            --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -1295,10 +1313,16 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
+          # Normalize pkg-config path so bash/ffmpeg configure can execute it reliably
+          if command -v cygpath >/dev/null 2>&1; then
+            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
+          fi
+          export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
+            --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \

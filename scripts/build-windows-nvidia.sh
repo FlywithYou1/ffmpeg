@@ -53,6 +53,12 @@ echo "=========================================="
 
 export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
 export PATH="${CUDA_HOME}/bin:${P}/bin:${PATH}"
+
+# Resolve default vcpkg root before pkg-config detection uses it.
+VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
+[ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/x64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/x64-windows"
+[ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
+
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
 # Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
@@ -64,10 +70,6 @@ fi
 export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
 CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
-
-VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
-[ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/x64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/x64-windows"
-[ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
 # Ensure vcpkg dependencies are discoverable by pkg-config.
 # vcpkg ports do not always ship pkg-config files, so create the ones ffmpeg expects.
