@@ -80,7 +80,7 @@ jobs:
           cd ffmpeg-src
           ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
             --extra-cflags="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
-            --extra-ldflags="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64" \
+            --extra-ldflags="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -Wl,-rpath,${HOME}/ffmpeg-install/lib" \
             --extra-libs="-lpthread -lm -ldl -lstdc++" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
@@ -90,12 +90,14 @@ jobs:
 
       - name: Strip & verify
         run: |
-          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          P="${HOME}/ffmpeg-install"
+          export LD_LIBRARY_PATH="${P}/lib:${LD_LIBRARY_PATH:-}"
+          strip "${P}/bin/ffmpeg" "${P}/bin/ffprobe" "${P}/bin/ffplay" 2>/dev/null || true
+          "${P}/bin/ffmpeg" -version 2>&1 | head -n5
           echo "--- NVENC ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
+          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
           echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+          "${P}/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
       - name: Package
         run: |
@@ -144,7 +146,7 @@ jobs:
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
             --extra-cflags="-I$P/include" \
-            --extra-ldflags="-L$P/lib" \
+            --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-vaapi \
@@ -153,6 +155,7 @@ jobs:
 
       - name: Strip & verify
         run: |
+          export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
           strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
           "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
           echo "--- QSV ---"
@@ -209,7 +212,7 @@ jobs:
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
             --extra-cflags="-I$P/include" \
-            --extra-ldflags="-L$P/lib" \
+            --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-vaapi \
@@ -218,6 +221,7 @@ jobs:
 
       - name: Strip & verify
         run: |
+          export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
           strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
           "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
           echo "--- VAAPI ---"
@@ -330,6 +334,9 @@ jobs:
           export PATH="${CUDA_HOME}/bin:${PATH}"
           export C_INCLUDE_PATH="$P/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          # Ensure MSVC link.exe before Git's link.EXE for meson
+          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
+          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -434,6 +441,9 @@ jobs:
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Ensure MSVC link.exe before Git's link.EXE for meson
+          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
+          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
@@ -537,6 +547,9 @@ jobs:
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Ensure MSVC link.exe before Git's link.EXE for meson
+          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
+          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
@@ -665,10 +678,16 @@ jobs:
           strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
           for bin in ffmpeg ffprobe ffplay; do codesign --force --sign - "${HOME}/ffmpeg-install/bin/${bin}" 2>/dev/null || true; done
           "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- HW Accel Methods ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -hwaccels 2>&1 || echo "(none)"
           echo "--- VideoToolbox encoders ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
           echo "--- VideoToolbox decoders ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox || echo "(none)"
+          echo "--- All VT-related (enc+dec+hwaccel) ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -i videotoolbox | head -20 || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox | head -20 || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -hwaccels 2>&1 | grep -i video || true
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
@@ -733,6 +752,9 @@ jobs:
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
+          # Ensure MSVC link.exe before Git's link.EXE for meson
+          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
+          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install

@@ -76,6 +76,8 @@ echo "[3/4] 签名 + 验证"
 strip "$P/bin/ffmpeg" "$P/bin/ffprobe" "$P/bin/ffplay" 2>/dev/null || true
 for bin in ffmpeg ffprobe ffplay; do codesign --force --sign - "$P/bin/$bin" 2>/dev/null || true; done
 "$P/bin/ffmpeg" -version 2>&1 | head -n3
+echo "--- HW Accel Methods ---"
+"$P/bin/ffmpeg" -hide_banner -hwaccels 2>&1 || echo "(none)"
 echo "--- VideoToolbox encoders ---"
 "$P/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
 echo "--- VideoToolbox decoders ---"

@@ -77,6 +77,9 @@ git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
 # nvcc fatbin does not pick up meson's cuda_args; use C_INCLUDE_PATH instead
 export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
+# Ensure MSVC link.exe before Git's link.EXE for meson
+CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
+[ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
 ninja -vC build && ninja -C build install
 
