@@ -31,6 +31,18 @@ jobs:
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev
 
+      - name: Install CUDA Toolkit
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y wget
+          # Add NVIDIA CUDA repository for Ubuntu 24.04
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y cuda-toolkit-12-6
+          # Make CUDA discoverable via /usr/local/cuda symlink
+          sudo ln -sf /usr/local/cuda-12.6 /usr/local/cuda 2>/dev/null || true
+
       - name: Detect CUDA
         run: |
           CUDA_BASE=""
@@ -117,19 +129,22 @@ jobs:
 
       - name: Build VMAF (CPU)
         run: |
+          P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" -Denable_cuda=false
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg
         run: |
+          P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
-            --extra-cflags="-I${HOME}/ffmpeg-install/include" \
-            --extra-ldflags="-L${HOME}/ffmpeg-install/lib" \
+          ./configure --prefix="$P" --pkg-config-flags="--static" \
+            --extra-cflags="-I$P/include" \
+            --extra-ldflags="-L$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-vaapi \
@@ -156,6 +171,68 @@ jobs:
         with:
           name: ffmpeg-linux-intel-qsv
           path: ffmpeg-linux-intel-qsv.tar.xz
+          retention-days: 30
+
+  # ============================================================
+  # LINUX — AMD (VAAPI)
+  # ============================================================
+  linux-amd:
+    name: Linux (AMD VAAPI)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential yasm nasm pkg-config meson ninja-build \
+            cmake git wget curl ca-certificates python3 xxd \
+            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+            libva-dev libdrm-dev
+
+      - name: Build VMAF (CPU)
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Build FFmpeg
+        run: |
+          P="${HOME}/ffmpeg-install"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --prefix="$P" --pkg-config-flags="--static" \
+            --extra-cflags="-I$P/include" \
+            --extra-ldflags="-L$P/lib" \
+            --extra-libs="-lpthread -lm -ldl" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-vaapi \
+            --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: Strip & verify
+        run: |
+          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- VAAPI ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "(none)"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+
+      - name: Package
+        run: |
+          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          cd dist && tar -cJf ../ffmpeg-linux-amd.tar.xz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-amd
+          path: ffmpeg-linux-amd.tar.xz
           retention-days: 30
 
   # ============================================================
@@ -309,6 +386,7 @@ jobs:
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg (MSVC)
         shell: bash
@@ -394,6 +472,7 @@ jobs:
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg (MSVC)
         shell: bash
@@ -457,19 +536,22 @@ jobs:
 
       - name: Build VMAF (CPU)
         run: |
+          P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" -Denable_cuda=false
+          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg
         run: |
+          P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
-            --extra-cflags="-I${HOME}/ffmpeg-install/include" \
-            --extra-ldflags="-L${HOME}/ffmpeg-install/lib" \
+          ./configure --prefix="$P" --pkg-config-flags="--static" \
+            --extra-cflags="-I$P/include" \
+            --extra-ldflags="-L$P/lib" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
