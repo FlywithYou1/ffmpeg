@@ -35,12 +35,24 @@ ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg"
-# Homebrew 的 lame/fdk-aac 是 keg-only，提供 lame.pc / fdk-aac.pc，
-# 但 ffmpeg 需要 libmp3lame.pc / libfdk-aac.pc
+# Homebrew 的 lame 不带 .pc 文件，手动生成 libmp3lame.pc
 LAME_PREFIX="$(brew --prefix lame)"
 FDK_PREFIX="$(brew --prefix fdk-aac)"
-[ -f "${LAME_PREFIX}/lib/pkgconfig/lame.pc" ] && \
-  ln -sf "${LAME_PREFIX}/lib/pkgconfig/lame.pc" "${P}/lib/pkgconfig/libmp3lame.pc"
+LAME_INCLUDE=$(ls -d "${LAME_PREFIX}/include"/*/ 2>/dev/null | head -1 || echo "${LAME_PREFIX}/include")
+LAME_LIB="${LAME_PREFIX}/lib"
+cat > "${P}/lib/pkgconfig/libmp3lame.pc" <<LAMEPC
+prefix=${LAME_PREFIX}
+exec_prefix=\${prefix}
+libdir=${LAME_LIB}
+includedir=${LAME_INCLUDE}
+
+Name: libmp3lame
+Description: LAME MP3 encoder library
+Version: 3.100
+Libs: -L\${libdir} -lmp3lame
+Cflags: -I\${includedir}
+LAMEPC
+# fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
 [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
   ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
