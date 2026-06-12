@@ -25,6 +25,28 @@ VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/x64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/x64-windows"
 [ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
+# Ensure vcpkg dependencies are discoverable by pkg-config.
+# vcpkg's mp3lame port does not ship a .pc file, so create one for ffmpeg.
+if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; then
+  VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
+  if [ ! -f "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" ]; then
+    mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
+    cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libmp3lame
+Description: LAME MP3 encoder library
+Version: 3.100
+Libs: -L\${libdir} libmp3lame.lib
+Cflags: -I\${includedir}
+EOF
+  fi
+  export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+fi
+
 # ---- 清理 ----
 rm -rf "$P" /tmp/vmaf /tmp/ffmpeg-src 2>/dev/null || true
 mkdir -p "$P"/{bin,lib,include,lib/pkgconfig}
@@ -59,7 +81,7 @@ make -j"$THREADS" && make install
 # ---- 复制 DLL ----
 echo "[3/4] DLL"
 [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/bin" ] && \
-  for dll in liblame.dll fdk-aac-2.dll SDL2.dll zlib1.dll; do
+  for dll in libmp3lame.dll fdk-aac-2.dll SDL2.dll zlib1.dll; do
     [ -f "${VCPKG_INSTALLED}/bin/$dll" ] && cp "${VCPKG_INSTALLED}/bin/$dll" "$P/bin/" && echo "  $dll"
   done
 

@@ -43,12 +43,17 @@ echo "[2/5] VMAF-CUDA"
 cd /tmp && rm -rf vmaf
 git clone --depth 1 https://github.com/Netflix/vmaf.git
 cd vmaf/libvmaf && rm -rf build
+# nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
+# via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
+export CUDAFLAGS="-I${P}/include -I${CUDA_HOME}/include"
+export CPPFLAGS="-I${P}/include -I${CUDA_HOME}/include"
 PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
 CFLAGS="-I${P}/include -I${CUDA_HOME}/include" \
 CXXFLAGS="-I${P}/include -I${CUDA_HOME}/include" \
 LDFLAGS="-L${P}/lib -L${CUDA_HOME}/lib64 -lstdc++" \
 meson setup build --buildtype release --prefix="$P" \
-  -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
+  -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++" \
+  -Dcuda_args="-I${P}/include -I${CUDA_HOME}/include"
 ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----

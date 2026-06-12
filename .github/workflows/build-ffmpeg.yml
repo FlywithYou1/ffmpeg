@@ -39,9 +39,9 @@ jobs:
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update -qq
-          sudo apt-get install -y cuda-toolkit-12-6
+          sudo apt-get install -y cuda-toolkit-13-3
           # Make CUDA discoverable via /usr/local/cuda symlink
-          sudo ln -sf /usr/local/cuda-12.6 /usr/local/cuda 2>/dev/null || true
+          sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
 
       - name: Detect CUDA
         run: |
@@ -67,12 +67,17 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
+          # nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
+          # via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
+          export CUDAFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
+          export CPPFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
           PKG_CONFIG_PATH="${HOME}/ffmpeg-install/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           CFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
           CXXFLAGS="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
           LDFLAGS="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -lstdc++" \
           meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" \
-            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
+            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++" \
+            -Dcuda_args="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include"
           ninja -vC build && ninja -C build install
 
       - name: Build FFmpeg
@@ -240,13 +245,13 @@ jobs:
   # ============================================================
   windows-nvidia:
     name: Windows (NVIDIA NVENC/CUDA)
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64, vsversion: "2026" }
+        with: { arch: amd64 }
 
       - name: Install build tools
         shell: powershell
@@ -258,10 +263,26 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
+          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
+          $pcDir = "$inst\lib\pkgconfig"
+          New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
+          $pcMixed = $inst -replace '\\','/'
+          @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -L${libdir} libmp3lame.lib',
+            'Cflags: -I${includedir}'
+          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
           echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Detect CUDA
         shell: bash
@@ -293,12 +314,18 @@ jobs:
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          # nvcc fatbin compilation does not pick up CFLAGS/CXXFLAGS; pass includes
+          # via CUDAFLAGS/CPPFLAGS and meson's cuda_args explicitly.
+          export CUDAFLAGS="-I$P/include -I${CUDA_HOME}/include"
+          export CPPFLAGS="-I$P/include -I${CUDA_HOME}/include"
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
           CFLAGS="-I$P/include -I${CUDA_HOME}/include" \
           CXXFLAGS="-I$P/include -I${CUDA_HOME}/include" \
           LDFLAGS="-LIBPATH:$P/lib -LIBPATH:$CL" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
+            -Dcuda_args="-I$P/include -I${CUDA_HOME}/include"
           ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: Build FFmpeg (MSVC)
         shell: bash
@@ -320,7 +347,7 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
+          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
           foreach ($d in $dlls) {
             $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
             if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
@@ -354,13 +381,13 @@ jobs:
   # ============================================================
   windows-amd-amf:
     name: Windows (AMD AMF)
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64, vsversion: "2026" }
+        with: { arch: amd64 }
 
       - name: Install build tools
         shell: powershell
@@ -372,10 +399,26 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
+          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
+          $pcDir = "$inst\lib\pkgconfig"
+          New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
+          $pcMixed = $inst -replace '\\','/'
+          @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -L${libdir} libmp3lame.lib',
+            'Cflags: -I${includedir}'
+          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
           echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -406,7 +449,7 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
+          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
           foreach ($d in $dlls) {
             $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
             if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
@@ -440,13 +483,13 @@ jobs:
   # ============================================================
   windows-intel-qsv:
     name: Windows (Intel QSV)
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup MSVC (VS 2026)
         uses: ilammy/msvc-dev-cmd@v1
-        with: { arch: amd64, vsversion: "2026" }
+        with: { arch: amd64 }
 
       - name: Install build tools
         shell: powershell
@@ -458,10 +501,26 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows liblame fdk-aac libsdl2 libiconv zlib vpl
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac libsdl2 libiconv zlib vpl
           $inst = "$v\installed\x64-windows"
+          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
+          $pcDir = "$inst\lib\pkgconfig"
+          New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
+          $pcMixed = $inst -replace '\\','/'
+          @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -L${libdir} libmp3lame.lib',
+            'Cflags: -I${includedir}'
+          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
           echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$inst\lib\pkgconfig" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -492,7 +551,7 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("liblame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll","libvpl.dll")
+          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll","libvpl.dll")
           foreach ($d in $dlls) {
             $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
             if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
