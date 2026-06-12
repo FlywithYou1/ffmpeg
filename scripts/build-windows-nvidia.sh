@@ -152,7 +152,7 @@ export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
 PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-meson setup build --buildtype release --prefix="$P" -Denable_cuda=true
+meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false
 ninja -vC build && ninja -C build install
 
 # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
