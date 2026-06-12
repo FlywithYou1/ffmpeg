@@ -12,6 +12,16 @@ P="${INSTALL_PREFIX:-${HOME}/ffmpeg-install}"
 
 command -v cl.exe >/dev/null 2>&1 || { echo "请先运行 vcvars64.bat (VS 2026)"; exit 1; }
 
+# Ensure nasm is discoverable (required by ffmpeg x86/x64 assembly)
+for nasm_dir in "/c/Program Files/NASM" "/c/Program Files (x86)/NASM" "/c/ProgramData/chocolatey/bin"; do
+  if [ -f "$nasm_dir/nasm.exe" ]; then
+    export PATH="$nasm_dir:$PATH"
+    echo "nasm: $nasm_dir/nasm.exe"
+    break
+  fi
+done
+command -v nasm >/dev/null 2>&1 || echo "警告：未找到 nasm，ffmpeg 配置可能失败"
+
 echo "=========================================="
 echo "FFmpeg AMD AMF (Windows MSVC)"
 echo "PREFIX: $P  THREADS: $THREADS"
@@ -26,12 +36,24 @@ VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
 # Ensure vcpkg dependencies are discoverable by pkg-config.
-# vcpkg's mp3lame port does not ship a .pc file, so create one for ffmpeg.
+# vcpkg ports do not always ship pkg-config files, so create the ones ffmpeg expects.
 if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; then
   VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
-  if [ ! -f "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" ]; then
-    mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
-    cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
+
+  find_import_lib() {
+    for name in "$@"; do
+      if [ -f "${VCPKG_INSTALLED}/lib/${name}.lib" ]; then
+        echo "${name}.lib"
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
+
+  lame_lib="$(find_import_lib mp3lame libmp3lame)" || { echo "错误：未找到 mp3lame import library"; exit 1; }
+  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
 prefix=${VCPKG_INSTALLED_MIXED}
 exec_prefix=\${prefix}
 libdir=\${prefix}/lib
@@ -40,10 +62,24 @@ includedir=\${prefix}/include
 Name: libmp3lame
 Description: LAME MP3 encoder library
 Version: 3.100
-Libs: -L\${libdir} libmp3lame.lib
+Libs: -L\${libdir} ${lame_lib}
 Cflags: -I\${includedir}
 EOF
-  fi
+
+  fdk_lib="$(find_import_lib fdk-aac libfdk-aac fdk-aac-2)" || { echo "错误：未找到 fdk-aac import library"; exit 1; }
+  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libfdk-aac.pc" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libfdk-aac
+Description: Fraunhofer FDK AAC codec library
+Version: 2.0.2
+Libs: -L\${libdir} ${fdk_lib}
+Cflags: -I\${includedir}
+EOF
+
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 fi
 

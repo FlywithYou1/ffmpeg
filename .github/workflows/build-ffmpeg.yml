@@ -260,6 +260,17 @@ jobs:
           choco install -y --no-progress nasm make activeperl ninja
           pip install meson
           refreshenv
+          # NASM may install under Program Files; expose it explicitly so bash ./configure can find it
+          $nasmDir = $null
+          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
+            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
+          }
+          if ($nasmDir) {
+            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "nasm found at $nasmDir"
+          } else {
+            Write-Host "::warning::nasm.exe not found in expected locations"
+          }
           # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -274,7 +285,22 @@ jobs:
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          @(
+
+          function Find-ImportLib($candidates) {
+            foreach ($name in $candidates) {
+              $p = Join-Path "$inst\lib" "$name.lib"
+              if (Test-Path $p) { return "$name.lib" }
+            }
+            return $null
+          }
+          function Write-Utf8($path, $lines) {
+            [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
+          }
+
+          # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
+          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
@@ -283,11 +309,42 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            'Libs: -L${libdir} libmp3lame.lib',
+            "Libs: -L`${libdir} $lameLib",
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          )
+
+          $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
+          if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libfdk-aac.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libfdk-aac',
+            'Description: Fraunhofer FDK AAC codec library',
+            'Version: 2.0.2',
+            "Libs: -L`${libdir} $fdkLib",
+            'Cflags: -I${includedir}'
+          )
+
+          Write-Host "Installed import libraries:"
+          Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+          Write-Host "libmp3lame.pc:"
+          Get-Content "$pcDir/libmp3lame.pc"
+          Write-Host "libfdk-aac.pc:"
+          Get-Content "$pcDir/libfdk-aac.pc"
+
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check vcpkg pkg-config
+        shell: bash
+        run: |
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
 
       - name: Install CUDA Toolkit
         shell: powershell
@@ -371,10 +428,12 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
-          foreach ($d in $dlls) {
-            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
-            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          $src = "$env:VCPKG_INSTALLED\bin"
+          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName $dst -Force
+            Write-Host "  copied $($_.Name)"
           }
 
       - name: Verify
@@ -420,6 +479,17 @@ jobs:
           choco install -y --no-progress nasm make activeperl ninja
           pip install meson
           refreshenv
+          # NASM may install under Program Files; expose it explicitly so bash ./configure can find it
+          $nasmDir = $null
+          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
+            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
+          }
+          if ($nasmDir) {
+            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "nasm found at $nasmDir"
+          } else {
+            Write-Host "::warning::nasm.exe not found in expected locations"
+          }
           # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -434,7 +504,22 @@ jobs:
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          @(
+
+          function Find-ImportLib($candidates) {
+            foreach ($name in $candidates) {
+              $p = Join-Path "$inst\lib" "$name.lib"
+              if (Test-Path $p) { return "$name.lib" }
+            }
+            return $null
+          }
+          function Write-Utf8($path, $lines) {
+            [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
+          }
+
+          # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
+          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
@@ -443,11 +528,42 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            'Libs: -L${libdir} libmp3lame.lib',
+            "Libs: -L`${libdir} $lameLib",
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          )
+
+          $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
+          if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libfdk-aac.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libfdk-aac',
+            'Description: Fraunhofer FDK AAC codec library',
+            'Version: 2.0.2',
+            "Libs: -L`${libdir} $fdkLib",
+            'Cflags: -I${includedir}'
+          )
+
+          Write-Host "Installed import libraries:"
+          Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+          Write-Host "libmp3lame.pc:"
+          Get-Content "$pcDir/libmp3lame.pc"
+          Write-Host "libfdk-aac.pc:"
+          Get-Content "$pcDir/libfdk-aac.pc"
+
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check vcpkg pkg-config
+        shell: bash
+        run: |
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -485,10 +601,12 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
-          foreach ($d in $dlls) {
-            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
-            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          $src = "$env:VCPKG_INSTALLED\bin"
+          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName $dst -Force
+            Write-Host "  copied $($_.Name)"
           }
 
       - name: Verify
@@ -534,6 +652,17 @@ jobs:
           choco install -y --no-progress nasm make activeperl ninja
           pip install meson
           refreshenv
+          # NASM may install under Program Files; expose it explicitly so bash ./configure can find it
+          $nasmDir = $null
+          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
+            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
+          }
+          if ($nasmDir) {
+            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "nasm found at $nasmDir"
+          } else {
+            Write-Host "::warning::nasm.exe not found in expected locations"
+          }
           # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -548,10 +677,22 @@ jobs:
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          # vcpkg ports (mp3lame, libvpl) use CMake configs, not pkg-config.
-          # Manually create .pc files so ffmpeg ./configure can detect them.
-          # libmp3lame.pc
-          @(
+
+          function Find-ImportLib($candidates) {
+            foreach ($name in $candidates) {
+              $p = Join-Path "$inst\lib" "$name.lib"
+              if (Test-Path $p) { return "$name.lib" }
+            }
+            return $null
+          }
+          function Write-Utf8($path, $lines) {
+            [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
+          }
+
+          # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
+          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
@@ -560,12 +701,30 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            'Libs: -L${libdir} libmp3lame.lib',
+            "Libs: -L`${libdir} $lameLib",
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          )
+
+          $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
+          if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libfdk-aac.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libfdk-aac',
+            'Description: Fraunhofer FDK AAC codec library',
+            'Version: 2.0.2',
+            "Libs: -L`${libdir} $fdkLib",
+            'Cflags: -I${includedir}'
+          )
+
           # vpl.pc — vcpkg libvpl uses cmake-config, ffmpeg needs pkg-config
           # oneVPL 2.x headers live under include/vpl/; include parent too for compat
-          @(
+          $vplLib = Find-ImportLib @('vpl','libvpl')
+          if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/vpl.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
@@ -574,11 +733,29 @@ jobs:
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             'Version: 2.16.0',
-            'Libs: -L${libdir} vpl.lib',
+            "Libs: -L`${libdir} $vplLib",
             'Cflags: -I${includedir} -I${includedir}/vpl'
-          ) | Set-Content -Encoding utf8 "$pcDir/vpl.pc"
+          )
+
+          Write-Host "Installed import libraries:"
+          Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+          Write-Host "libmp3lame.pc:"
+          Get-Content "$pcDir/libmp3lame.pc"
+          Write-Host "libfdk-aac.pc:"
+          Get-Content "$pcDir/libfdk-aac.pc"
+          Write-Host "vpl.pc:"
+          Get-Content "$pcDir/vpl.pc"
+
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check vcpkg pkg-config
+        shell: bash
+        run: |
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -629,10 +806,12 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll","libvpl.dll")
-          foreach ($d in $dlls) {
-            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
-            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          $src = "$env:VCPKG_INSTALLED\bin"
+          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName $dst -Force
+            Write-Host "  copied $($_.Name)"
           }
 
       - name: Verify
@@ -781,6 +960,17 @@ jobs:
           choco install -y --no-progress nasm make activeperl ninja
           pip install meson
           refreshenv
+          # NASM may install under Program Files; expose it explicitly so bash ./configure can find it
+          $nasmDir = $null
+          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
+            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
+          }
+          if ($nasmDir) {
+            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "nasm found at $nasmDir"
+          } else {
+            Write-Host "::warning::nasm.exe not found in expected locations"
+          }
           # Ensure nasm + pkg-config from Git / Strawberry are on PATH for bash steps
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Strawberry\c\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -795,7 +985,22 @@ jobs:
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          @(
+
+          function Find-ImportLib($candidates) {
+            foreach ($name in $candidates) {
+              $p = Join-Path "$inst\lib" "$name.lib"
+              if (Test-Path $p) { return "$name.lib" }
+            }
+            return $null
+          }
+          function Write-Utf8($path, $lines) {
+            [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
+          }
+
+          # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
+          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libmp3lame.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
@@ -804,11 +1009,42 @@ jobs:
             'Name: libmp3lame',
             'Description: LAME MP3 encoder library',
             'Version: 3.100',
-            'Libs: -L${libdir} libmp3lame.lib',
+            "Libs: -L`${libdir} $lameLib",
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          )
+
+          $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
+          if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+          Write-Utf8 "$pcDir/libfdk-aac.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libfdk-aac',
+            'Description: Fraunhofer FDK AAC codec library',
+            'Version: 2.0.2',
+            "Libs: -L`${libdir} $fdkLib",
+            'Cflags: -I${includedir}'
+          )
+
+          Write-Host "Installed import libraries:"
+          Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+          Write-Host "libmp3lame.pc:"
+          Get-Content "$pcDir/libmp3lame.pc"
+          Write-Host "libfdk-aac.pc:"
+          Get-Content "$pcDir/libfdk-aac.pc"
+
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check vcpkg pkg-config
+        shell: bash
+        run: |
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          pkg-config --exists libmp3lame && echo "libmp3lame OK: $(pkg-config --modversion libmp3lame) $(pkg-config --libs libmp3lame)" || echo "libmp3lame NOT FOUND"
+          pkg-config --exists libfdk-aac && echo "libfdk-aac OK: $(pkg-config --modversion libfdk-aac) $(pkg-config --libs libfdk-aac)" || echo "libfdk-aac NOT FOUND"
+          pkg-config --exists sdl2 && echo "sdl2 OK: $(pkg-config --modversion sdl2)" || echo "sdl2 NOT FOUND"
 
       - name: Build VMAF (CPU)
         shell: bash
@@ -847,10 +1083,12 @@ jobs:
       - name: Copy DLLs
         shell: powershell
         run: |
-          $dlls = @("libmp3lame.dll","fdk-aac-2.dll","SDL2.dll","zlib1.dll")
-          foreach ($d in $dlls) {
-            $s = Join-Path "$env:VCPKG_INSTALLED\bin" $d
-            if (Test-Path $s) { Copy-Item $s "$env:USERPROFILE\ffmpeg-install\bin\" -Force }
+          $src = "$env:VCPKG_INSTALLED\bin"
+          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName $dst -Force
+            Write-Host "  copied $($_.Name)"
           }
 
       - name: Verify
