@@ -46,6 +46,12 @@ echo "=========================================="
 export PATH="${P}/bin:${PATH}"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
+# Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
+if [ -n "${VCPKG_INSTALLED:-}" ]; then
+  for pc in "${VCPKG_INSTALLED}/bin/pkgconf.exe" "${VCPKG_INSTALLED}/tools/pkgconf/pkgconf.exe" "${VCPKG_INSTALLED}/tools/pkgconf/pkg-config.exe"; do
+    if [ -f "$pc" ]; then export PKG_CONFIG="$pc"; break; fi
+  done
+fi
 export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
 VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"

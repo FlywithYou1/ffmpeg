@@ -271,10 +271,9 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
-          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
+          # Ensure nasm is on PATH for bash steps.
+          # pkg-config will be provided by vcpkg's pkgconf port (installed later).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
           # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
           $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
@@ -285,7 +284,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -354,6 +353,12 @@ jobs:
             Ensure-LibAlias $vplLib "libvpl.lib"
           }
 
+          # pkg-config implementation from vcpkg (Git for Windows lacks it on this runner)
+          $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+          $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
+          Write-Host "pkg-config: $pkgconfMixed"
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -362,6 +367,7 @@ jobs:
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
@@ -370,7 +376,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
@@ -449,7 +455,7 @@ jobs:
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -471,7 +477,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
@@ -546,10 +552,9 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
-          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
+          # Ensure nasm is on PATH for bash steps.
+          # pkg-config will be provided by vcpkg's pkgconf port (installed later).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
           # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
           $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
@@ -560,7 +565,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -629,6 +634,12 @@ jobs:
             Ensure-LibAlias $vplLib "libvpl.lib"
           }
 
+          # pkg-config implementation from vcpkg (Git for Windows lacks it on this runner)
+          $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+          $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
+          Write-Host "pkg-config: $pkgconfMixed"
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -637,6 +648,7 @@ jobs:
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
@@ -645,7 +657,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
@@ -680,7 +692,7 @@ jobs:
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -700,7 +712,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
@@ -775,10 +787,9 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
-          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
+          # Ensure nasm is on PATH for bash steps.
+          # pkg-config will be provided by vcpkg's pkgconf port (installed later).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
           # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
           $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
@@ -789,7 +800,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib libvpl
+          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib libvpl
           $inst = "$v\installed\x64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -872,6 +883,12 @@ jobs:
           Ensure-LibAlias $vplLib "vpl.lib"
           Ensure-LibAlias $vplLib "libvpl.lib"
 
+          # pkg-config implementation from vcpkg (Git for Windows lacks it on this runner)
+          $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+          $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
+          Write-Host "pkg-config: $pkgconfMixed"
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -882,6 +899,7 @@ jobs:
           Get-Content "$pcDir/vpl.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
@@ -890,7 +908,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
@@ -938,7 +956,7 @@ jobs:
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -958,7 +976,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
@@ -1136,10 +1154,9 @@ jobs:
           } else {
             Write-Host "::warning::nasm.exe not found in expected locations"
           }
-          # Ensure nasm is on PATH for bash steps; force Git for Windows' pkg-config
-          # (Strawberry Perl ships a broken pkg-config that misses Pod::Usage).
+          # Ensure nasm is on PATH for bash steps.
+          # pkg-config will be provided by vcpkg's pkgconf port (installed later).
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "PKG_CONFIG=/usr/bin/pkg-config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           # Remove Strawberry Perl from PATH: its pkg-config is broken and its ccache
           # breaks meson. GITHUB_ENV propagates the cleaned PATH to subsequent steps.
           $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
@@ -1150,7 +1167,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet arm64-windows mp3lame fdk-aac sdl2 libiconv zlib
+          & "$v\vcpkg.exe" install --triplet arm64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\arm64-windows"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
@@ -1219,6 +1236,12 @@ jobs:
             Ensure-LibAlias $vplLib "libvpl.lib"
           }
 
+          # pkg-config implementation from vcpkg (Git for Windows lacks it on this runner)
+          $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+          $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
+          Write-Host "pkg-config: $pkgconfMixed"
+
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
           Write-Host "libmp3lame.pc:"
@@ -1227,6 +1250,7 @@ jobs:
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
@@ -1235,7 +1259,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- .pc files ---"
@@ -1270,7 +1294,7 @@ jobs:
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -1291,7 +1315,7 @@ jobs:
           # Remove Strawberry paths that ship broken pkg-config / ccache
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
+          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
