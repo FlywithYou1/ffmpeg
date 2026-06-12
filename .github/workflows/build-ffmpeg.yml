@@ -19,7 +19,7 @@ jobs:
   # ============================================================
   linux-nvidia:
     name: Linux (NVIDIA NVENC/CUDA)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +115,7 @@ jobs:
   # ============================================================
   linux-intel-qsv:
     name: Linux (Intel QSV)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
@@ -181,7 +181,7 @@ jobs:
   # ============================================================
   linux-amd:
     name: Linux (AMD VAAPI)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
@@ -245,7 +245,7 @@ jobs:
   # ============================================================
   windows-nvidia:
     name: Windows (NVIDIA NVENC/CUDA)
-    runs-on: windows-2025-vs2026
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -259,6 +259,8 @@ jobs:
           choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
           pip install meson
           refreshenv
+          # Ensure nasm is on PATH for subsequent bash steps
+          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -266,12 +268,12 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
-          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
-          $pcDir = "$inst\lib\pkgconfig"
+          # Convert to forward slashes so pkg-config (bash) can use the path
+          $instMixed = $inst -replace '\\','/'
+          $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          $pcMixed = $inst -replace '\\','/'
           @(
-            "prefix=$pcMixed",
+            "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
             'includedir=${prefix}/include',
@@ -281,8 +283,8 @@ jobs:
             'Version: 3.100',
             'Libs: -L${libdir} libmp3lame.lib',
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
-          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install CUDA Toolkit
@@ -395,7 +397,7 @@ jobs:
   # ============================================================
   windows-amd-amf:
     name: Windows (AMD AMF)
-    runs-on: windows-2025-vs2026
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -409,6 +411,8 @@ jobs:
           choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
           pip install meson
           refreshenv
+          # Ensure nasm is on PATH for subsequent bash steps
+          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -416,12 +420,12 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\x64-windows"
-          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
-          $pcDir = "$inst\lib\pkgconfig"
+          # Convert to forward slashes so pkg-config (bash) can use the path
+          $instMixed = $inst -replace '\\','/'
+          $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          $pcMixed = $inst -replace '\\','/'
           @(
-            "prefix=$pcMixed",
+            "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
             'includedir=${prefix}/include',
@@ -431,8 +435,8 @@ jobs:
             'Version: 3.100',
             'Libs: -L${libdir} libmp3lame.lib',
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
-          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build VMAF (CPU)
@@ -501,7 +505,7 @@ jobs:
   # ============================================================
   windows-intel-qsv:
     name: Windows (Intel QSV)
-    runs-on: windows-2025-vs2026
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -515,6 +519,8 @@ jobs:
           choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
           pip install meson
           refreshenv
+          # Ensure nasm is on PATH for subsequent bash steps
+          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -522,12 +528,15 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           & "$v\vcpkg.exe" install --triplet x64-windows mp3lame fdk-aac sdl2 libiconv zlib libvpl
           $inst = "$v\installed\x64-windows"
-          # vcpkg's mp3lame port does not ship a pkg-config file; create one for ffmpeg
-          $pcDir = "$inst\lib\pkgconfig"
+          # Convert to forward slashes so pkg-config (bash) can use the path
+          $instMixed = $inst -replace '\\','/'
+          $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          $pcMixed = $inst -replace '\\','/'
+          # vcpkg ports (mp3lame, libvpl) use CMake configs, not pkg-config.
+          # Manually create .pc files so ffmpeg ./configure can detect them.
+          # libmp3lame.pc
           @(
-            "prefix=$pcMixed",
+            "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
             'includedir=${prefix}/include',
@@ -537,8 +546,22 @@ jobs:
             'Version: 3.100',
             'Libs: -L${libdir} libmp3lame.lib',
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
-          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          # vpl.pc — vcpkg libvpl uses cmake-config, ffmpeg needs pkg-config
+          # oneVPL 2.x headers live under include/vpl/; include parent too for compat
+          @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: vpl',
+            'Description: Intel oneVPL Dispatcher',
+            'Version: 2.16.0',
+            'Libs: -L${libdir} vpl.lib',
+            'Cflags: -I${includedir} -I${includedir}/vpl'
+          ) | Set-Content -Encoding utf8 "$pcDir/vpl.pc"
+          echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build VMAF (CPU)
@@ -554,6 +577,19 @@ jobs:
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Debug pkg-config (vpl)
+        shell: bash
+        run: |
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          echo "--- pkg-config search path ---"
+          pkg-config --variable=pc_path pkg-config 2>/dev/null || true
+          echo "--- vpl.pc ---"
+          pkg-config --exists vpl && echo "vpl found: $(pkg-config --modversion vpl)" || echo "vpl NOT FOUND"
+          echo "--- vpl.pc details ---"
+          pkg-config --debug vpl 2>&1 | head -20 || true
+          echo "--- vpl.pc file ---"
+          find "${VCPKG_INSTALLED}" -name 'vpl.pc' 2>/dev/null || echo "(not found in vcpkg tree)"
 
       - name: Build FFmpeg (MSVC)
         shell: bash
@@ -675,21 +711,24 @@ jobs:
 
       - name: Strip, sign & verify
         run: |
-          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          FF="${HOME}/ffmpeg-install/bin/ffmpeg"
+          strip "${FF}" "${FF/%ffmpeg/ffprobe}" "${FF/%ffmpeg/ffplay}" 2>/dev/null || true
           for bin in ffmpeg ffprobe ffplay; do codesign --force --sign - "${HOME}/ffmpeg-install/bin/${bin}" 2>/dev/null || true; done
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          "${FF}" -version 2>&1 | head -n5
           echo "--- HW Accel Methods ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -hwaccels 2>&1 || echo "(none)"
+          "${FF}" -hide_banner -hwaccels 2>&1 || echo "(none)"
           echo "--- VideoToolbox encoders ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
-          echo "--- VideoToolbox decoders ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox || echo "(none)"
-          echo "--- All VT-related (enc+dec+hwaccel) ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -i videotoolbox | head -20 || true
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox | head -20 || true
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -hwaccels 2>&1 | grep -i video || true
+          "${FF}" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
+          echo "--- VT hwaccel decode support (via -hwaccel videotoolbox) ---"
+          # Modern ffmpeg (6.0+) uses the hwaccel framework for VT decoding, not standalone decoder wrappers.
+          # Each --enable-hwaccel=xxx_videotoolbox registers a codec backend under the unified 'videotoolbox' hwaccel.
+          # Verify by checking that 'videotoolbox' is listed in -hwaccels AND that each hw-codec is recognized.
+          echo "  hwaccel videotoolbox available: $("${FF}" -hide_banner -hwaccels 2>&1 | grep -q videotoolbox && echo YES || echo NO)"
+          for c in h264 hevc vp9 prores av1; do
+            echo "  hw-codec ${c}: $("${FF}" -hide_banner -hwaccel videotoolbox -codecs 2>&1 | grep -i "${c}" | head -1 || echo '(not listed)')"
+          done
           echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+          "${FF}" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
       - name: Package
         run: |
@@ -707,7 +746,7 @@ jobs:
   # ============================================================
   windows-arm64:
     name: Windows ARM64 (Snapdragon)
-    runs-on: windows-11-arm
+    runs-on: windows-11-vs2026-arm
     steps:
       - uses: actions/checkout@v4
 
@@ -721,6 +760,8 @@ jobs:
           choco install -y --no-progress nasm pkgconfiglite make activeperl ninja
           pip install meson
           refreshenv
+          # Ensure nasm is on PATH for subsequent bash steps
+          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: vcpkg deps
         shell: powershell
@@ -728,11 +769,12 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           & "$v\vcpkg.exe" install --triplet arm64-windows mp3lame fdk-aac sdl2 libiconv zlib
           $inst = "$v\installed\arm64-windows"
-          $pcDir = "$inst\lib\pkgconfig"
+          # Convert to forward slashes so pkg-config (bash) can use the path
+          $instMixed = $inst -replace '\\','/'
+          $pcDir = "$instMixed/lib/pkgconfig"
           New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
-          $pcMixed = $inst -replace '\\','/'
           @(
-            "prefix=$pcMixed",
+            "prefix=$instMixed",
             'exec_prefix=${prefix}',
             'libdir=${prefix}/lib',
             'includedir=${prefix}/include',
@@ -742,8 +784,8 @@ jobs:
             'Version: 3.100',
             'Libs: -L${libdir} libmp3lame.lib',
             'Cflags: -I${includedir}'
-          ) | Set-Content -Encoding utf8 "$pcDir\libmp3lame.pc"
-          echo "VCPKG_INSTALLED=$inst" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          ) | Set-Content -Encoding utf8 "$pcDir/libmp3lame.pc"
+          echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build VMAF (CPU)
@@ -827,7 +869,7 @@ jobs:
       - windows-arm64
       - macos-arm
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:

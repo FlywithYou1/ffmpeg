@@ -80,8 +80,13 @@ echo "--- HW Accel Methods ---"
 "$P/bin/ffmpeg" -hide_banner -hwaccels 2>&1 || echo "(none)"
 echo "--- VideoToolbox encoders ---"
 "$P/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -iE 'h264_videotoolbox|hevc_videotoolbox|prores_videotoolbox' || echo "(none)"
-echo "--- VideoToolbox decoders ---"
-"$P/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i videotoolbox || echo "(none)"
+echo "--- VT hwaccel decode support (via -hwaccel videotoolbox) ---"
+# Modern ffmpeg (6.0+) uses the hwaccel framework for VT decoding, not standalone decoder wrappers.
+# Each --enable-hwaccel=xxx_videotoolbox registers a codec backend under the unified 'videotoolbox' hwaccel.
+echo "  hwaccel videotoolbox: $("$P/bin/ffmpeg" -hide_banner -hwaccels 2>&1 | grep -q videotoolbox && echo YES || echo NO)"
+for c in h264 hevc vp9 prores av1; do
+  echo "  hw-codec ${c}: $("$P/bin/ffmpeg" -hide_banner -hwaccel videotoolbox -codecs 2>&1 | grep -i "${c}" | head -1 || echo '(not listed)')"
+done
 echo "--- VMAF ---"
 "$P/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
