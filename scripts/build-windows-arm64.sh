@@ -131,36 +131,50 @@ cd vmaf/libvmaf && rm -rf build
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-# Patch mkdirp.c/.h for Windows: unistd.h/sys/types.h are not available,
-# use direct.h and define mode_t; use _mkdir on Windows.
+# Patch VMAF for Windows ARM64 MSVC: missing POSIX headers, ARM64 intrinsics,
+# and void* arithmetic which MSVC does not allow.
 python3 -c '
 import pathlib
-for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
+for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c",
+             "src/feature/cuda/integer_adm_cuda.c", "src/feature/integer_vif.h",
+             "src/feature/integer_vif.c", "src/feature/integer_adm.c"):
     p = pathlib.Path(path)
     if not p.exists():
         continue
-    s = p.read_text()
+    s = p.read_text(encoding='utf-8')
     s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-    p.write_text(s)
-    compat_dir = pathlib.Path("src/compat/msvc/common")
-    compat_dir.mkdir(parents=True, exist_ok=True)
-    (compat_dir / "attributes.h").write_text(
-        "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-        "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-        "#endif\n"
+    s = s.replace(
+        "#ifdef _MSC_VER\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)__lzcnt(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)__lzcnt64(x);\n}\n\n#endif",
+        "#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)_CountLeadingZeros(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)_CountLeadingZeros64(x);\n}\n\n#elif defined(_MSC_VER)\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)__lzcnt(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)__lzcnt64(x);\n}\n\n#endif"
     )
+    s = s.replace(
+        "void *data = aligned_malloc(data_sz, MAX_ALIGN);",
+        "char *data = (char *)aligned_malloc(data_sz, MAX_ALIGN);"
+    )
+    s = s.replace(
+        "#include \"integer_adm.h\"",
+        "#include \"integer_adm.h\"\n\n#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n#define __builtin_clz(x) _CountLeadingZeros(x)\n#endif"
+    )
+    p.write_text(s, encoding='utf-8')
+compat_dir = pathlib.Path("src/compat/msvc/common")
+compat_dir.mkdir(parents=True, exist_ok=True)
+(compat_dir / "attributes.h").write_text(
+    "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
+    "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
+    "#endif\n"
+)
 '
 # PThreads4W (vcpkg) provides pthread.h on Windows
 PTHREAD_CFLAGS=""
 PTHREAD_LDFLAGS=""
 if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-  PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+  PTHREAD_CFLAGS="-I${VCPKG_INSTALLED_MIXED}/include"
   PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
   [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
   if [ -n "$PTHREAD_LIB" ]; then
-    PTHREAD_LDFLAGS="$PTHREAD_LIB"
+    PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
     echo "使用 PThreads4W: $PTHREAD_LIB"
     # 让 pthreadVC3.dll 在运行时可被找到（如 meson 编译器自检）
     if [ -d "${VCPKG_INSTALLED}/bin" ]; then
@@ -170,12 +184,38 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
     echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
   fi
 fi
+# Helper: build a Meson array literal from positional args (handles spaces safely)
+__meson_array() {
+  local arr="[" first=1
+  for x in "$@"; do
+    [ "$first" -eq 1 ] || arr="$arr,"
+    first=0
+    arr="$arr\"$x\""
+  done
+  arr="$arr]"
+  printf '%s' "$arr"
+}
+
+VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
 PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
   -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-  -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
-  -Dc_link_args="${PTHREAD_LDFLAGS}"
-ninja -vC build && ninja -C build install
+  -Dc_args="$VMAF_C_ARGS" \
+  -Dc_link_args="$VMAF_LINK_ARGS"
+ninja -vC build
+# Workaround: meson/Clang on Windows sometimes fails to locate the generated import library.
+# Ensure it is named exactly as meson expects before install.
+if [ ! -f build/src/vmaf.lib ]; then
+  for cand in build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
+    if [ -f "$cand" ]; then
+      cp "$cand" build/src/vmaf.lib
+      echo "Workaround: copied $cand -> build/src/vmaf.lib"
+      break
+    fi
+  done
+fi
+ninja -C build install
 
 # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
 P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"

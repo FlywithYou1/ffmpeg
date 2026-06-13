@@ -69,12 +69,19 @@ if [ -n "${VCPKG_INSTALLED:-}" ]; then
 fi
 export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
+# Convert common paths to mixed (C:/...) form to avoid shell quoting issues with spaces.
+P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
+CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+VCPKG_INSTALLED_MIXED=""
+if [ -n "${VCPKG_INSTALLED:-}" ]; then
+  VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
+fi
+
 CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
 
 # Ensure vcpkg dependencies are discoverable by pkg-config.
 # vcpkg ports do not always ship pkg-config files, so create the ones ffmpeg expects.
 if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; then
-  VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
 
   find_import_lib() {
     for name in "$@"; do
@@ -172,11 +179,11 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
     p = pathlib.Path(path)
     if not p.exists():
         continue
-    s = p.read_text()
+    s = p.read_text(encoding='utf-8')
     s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-    p.write_text(s)
+    p.write_text(s, encoding='utf-8')
     compat_dir = pathlib.Path("src/compat/msvc/common")
     compat_dir.mkdir(parents=True, exist_ok=True)
     (compat_dir / "attributes.h").write_text(
@@ -194,12 +201,12 @@ CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 PTHREAD_CFLAGS=""
 PTHREAD_LDFLAGS=""
 if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-  PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+  PTHREAD_CFLAGS="-I${VCPKG_INSTALLED_MIXED}/include"
   export C_INCLUDE_PATH="${VCPKG_INSTALLED}/include:${C_INCLUDE_PATH}"
   PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
   [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
   if [ -n "$PTHREAD_LIB" ]; then
-    PTHREAD_LDFLAGS="$PTHREAD_LIB"
+    PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
     echo "使用 PThreads4W: $PTHREAD_LIB"
     # 让 pthreadVC3.dll 在运行时可被找到（如 meson 编译器自检）
     if [ -d "${VCPKG_INSTALLED}/bin" ]; then
@@ -209,28 +216,56 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
     echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
   fi
 fi
+# Helper: build a Meson array literal from positional args (handles spaces safely)
+__meson_array() {
+  local arr="[" first=1
+  for x in "$@"; do
+    [ "$first" -eq 1 ] || arr="$arr,"
+    first=0
+    arr="$arr\"$x\""
+  done
+  arr="$arr]"
+  printf '%s' "$arr"
+}
+
 if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   echo "使用 VS Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
+  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-    -Dc_args="--target=x86_64-pc-windows-msvc -D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
-    -Dcpp_args="--target=x86_64-pc-windows-msvc ${PTHREAD_CFLAGS}" \
-    -Dc_link_args="${PTHREAD_LDFLAGS}" \
-    -Dcpp_link_args="${PTHREAD_LDFLAGS}"
+    -Dc_args="$VMAF_C_ARGS" \
+    -Dcpp_args="$VMAF_CPP_ARGS" \
+    -Dc_link_args="$VMAF_LINK_ARGS" \
+    -Dcpp_link_args="$VMAF_LINK_ARGS"
 else
   echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
+  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-    -Dc_args="-D_USE_MATH_DEFINES ${PTHREAD_CFLAGS}" \
-    -Dc_link_args="${PTHREAD_LDFLAGS}"
+    -Dc_args="$VMAF_C_ARGS" \
+    -Dc_link_args="$VMAF_LINK_ARGS"
 fi
-ninja -vC build && ninja -C build install
+ninja -vC build
+# Workaround: meson/Clang on Windows sometimes fails to locate the generated import library.
+# Ensure it is named exactly as meson expects before install.
+if [ ! -f build/src/vmaf.lib ]; then
+  for cand in build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
+    if [ -f "$cand" ]; then
+      cp "$cand" build/src/vmaf.lib
+      echo "Workaround: copied $cand -> build/src/vmaf.lib"
+      break
+    fi
+  done
+fi
+ninja -C build install
 
 # Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
-P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
 vmaf_lib="$(find "$P/lib" -maxdepth 1 \( -name 'vmaf.lib' -o -name 'libvmaf.lib' \) | head -n1)"
 [ -z "$vmaf_lib" ] && { echo "错误：未找到 VMAF import library ($P/lib)"; exit 1; }
 cat > "$P/lib/pkgconfig/libvmaf.pc" <<EOF
