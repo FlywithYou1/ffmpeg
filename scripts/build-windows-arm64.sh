@@ -206,7 +206,7 @@ meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable
 ninja -vC build
 
 # Manual install: build a static libvmaf on Windows/MSVC to avoid DLL import-library issues.
-mkdir -p "$P/lib" "$P/include/libvmaf"
+mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
 
 vmaf_static_lib=""
 for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
