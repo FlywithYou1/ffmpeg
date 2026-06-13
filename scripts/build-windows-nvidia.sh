@@ -305,8 +305,8 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   else
     echo "使用 VS Clang (MSVC target) 编译 VMAF（nasm 缺失，禁用 asm 优化）"
   fi
-  VMAF_C_ARGS=$(__meson_array "-MT" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-  VMAF_CPP_ARGS=$(__meson_array "-MT" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-fms-runtime-lib=static" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_CPP_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
