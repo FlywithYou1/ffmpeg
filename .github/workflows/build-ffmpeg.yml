@@ -649,6 +649,13 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          echo "--- libvmaf.pc ---"
+          cat "$P/lib/pkgconfig/libvmaf.pc" || true
+          echo "--- pkg-config libvmaf ---"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
@@ -1044,6 +1051,13 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          echo "--- libvmaf.pc ---"
+          cat "$P/lib/pkgconfig/libvmaf.pc" || true
+          echo "--- pkg-config libvmaf ---"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
@@ -1475,6 +1489,13 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          echo "--- libvmaf.pc ---"
+          cat "$P/lib/pkgconfig/libvmaf.pc" || true
+          echo "--- pkg-config libvmaf ---"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
@@ -1957,6 +1978,13 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          echo "--- libvmaf.pc ---"
+          cat "$P/lib/pkgconfig/libvmaf.pc" || true
+          echo "--- pkg-config libvmaf ---"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
