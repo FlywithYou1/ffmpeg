@@ -9,6 +9,7 @@ trap 'echo "错误：第 ${LINENO} 行"; exit 1' ERR
 ORIG_DIR="$(pwd)"
 THREADS="${THREADS:-$(nproc)}"
 P="${INSTALL_PREFIX:-${HOME}/ffmpeg-install}"
+P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
 
 command -v cl.exe >/dev/null 2>&1 || { echo "请先运行 vcvars64.bat (VS 2026)"; exit 1; }
 
@@ -59,7 +60,7 @@ VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/x64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/x64-windows"
 [ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
-export PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
 # Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
@@ -288,11 +289,11 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   else
     echo "使用 VS Clang (MSVC target) 编译 VMAF（nasm 缺失，禁用 asm 优化）"
   fi
-  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-  VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-MD" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_CPP_ARGS=$(__meson_array "-MD" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-  PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
+  PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
@@ -301,9 +302,9 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
     -Dcpp_link_args="$VMAF_LINK_ARGS"
 else
   echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
-  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-MD" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-  PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
+  PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
@@ -338,7 +339,7 @@ Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
-export PKG_CONFIG_PATH="$P/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
 echo "libvmaf.pc contents:"
 cat "$P/lib/pkgconfig/libvmaf.pc"
 echo "pkg-config check: $(pkg-config --modversion libvmaf 2>&1 || true)"
@@ -354,8 +355,8 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="/MD -I${P}/include -I${CUDA_HOME}/include ${VCPKG_CFLAGS}" \
-  --extra-ldflags="-LIBPATH:${P}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
+  --extra-cflags="-MD -I${P_MIXED}/include -I${CUDA_HOME}/include ${VCPKG_CFLAGS}" \
+  --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
   --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \

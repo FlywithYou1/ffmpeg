@@ -10,6 +10,7 @@ trap 'echo "错误：第 ${LINENO} 行"; exit 1' ERR
 ORIG_DIR="$(pwd)"
 THREADS="${THREADS:-$(nproc)}"
 P="${INSTALL_PREFIX:-${HOME}/ffmpeg-install}"
+P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
 
 command -v cl.exe >/dev/null 2>&1 || { echo "请先运行 vcvarsall.bat amd64_arm64 (VS 2026)"; exit 1; }
 
@@ -50,7 +51,7 @@ VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
 [ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/arm64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/arm64-windows"
 [ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
-export PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 # Use Git for Windows' pkg-config; Strawberry Perl's pkg-config is broken.
 # Use vcpkg's pkgconf if available, otherwise fall back to Git for Windows' pkg-config
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
@@ -182,6 +183,20 @@ compat_dir.mkdir(parents=True, exist_ok=True)
     "#endif\n"
 )
 '
+# Patch C99 VLAs for MSVC C11: MSVC does not support variable-length arrays.
+python3 -c '
+import pathlib
+for path in ("src/predict.c", "src/libvmaf.c"):
+    p = pathlib.Path(path)
+    if not p.exists():
+        continue
+    s = p.read_text(encoding="utf-8")
+    if "#include <malloc.h>" not in s:
+        s = "#include <malloc.h>\n" + s
+    s = s.replace("double scores[model_collection->cnt];", "double *scores = (double *)_alloca(sizeof(double) * model_collection->cnt);")
+    s = s.replace("char name[name_sz];", "char *name = (char *)_alloca(name_sz);")
+    p.write_text(s, encoding="utf-8")
+'
 # PThreads4W (vcpkg) provides pthread.h on Windows
 PTHREAD_CFLAGS=""
 PTHREAD_LDFLAGS=""
@@ -212,9 +227,9 @@ __meson_array() {
   printf '%s' "$arr"
 }
 
-VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+VMAF_C_ARGS=$(__meson_array "-MD" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
 VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-PKG_CONFIG_PATH="${P}/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
+PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
 meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
   -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
   -Dc_args="$VMAF_C_ARGS" \
@@ -249,7 +264,7 @@ Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
-export PKG_CONFIG_PATH="$P/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
 echo "libvmaf.pc contents:"
 cat "$P/lib/pkgconfig/libvmaf.pc"
 echo "pkg-config check: $(pkg-config --modversion libvmaf 2>&1 || true)"
@@ -265,8 +280,8 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="/MD -I${P}/include ${VCPKG_CFLAGS}" \
-  --extra-ldflags="-LIBPATH:${P}/lib ${VCPKG_LDFLAGS}" \
+  --extra-cflags="-MD -I${P_MIXED}/include ${VCPKG_CFLAGS}" \
+  --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
