@@ -230,8 +230,8 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   else
     echo "使用 VS Clang (MSVC target) 编译 VMAF（nasm 缺失，禁用 asm 优化）"
   fi
-  VMAF_C_ARGS=$(__meson_array "-MD" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-  VMAF_CPP_ARGS=$(__meson_array "-MD" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-MT" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_CPP_ARGS=$(__meson_array "-MT" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
@@ -243,10 +243,10 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
     -Dcpp_link_args="$VMAF_LINK_ARGS"
 else
   echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
-  VMAF_C_ARGS=$(__meson_array "-MD" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-MT" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
     -Dc_link_args="$VMAF_LINK_ARGS"
@@ -277,7 +277,7 @@ includedir=\${prefix}/include
 Name: libvmaf
 Description: Netflix VMAF library
 Version: 3.0.0
-Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
+Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
@@ -311,9 +311,9 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="-MD -I${P_MIXED}/include -I${AMF_INCLUDE} ${VCPKG_CFLAGS}" \
+  --extra-cflags="-MT -I${P_MIXED}/include -I${AMF_INCLUDE} ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
-  --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-amf \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
