@@ -292,12 +292,18 @@ echo "[2/4] FFmpeg (MSVC)"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
+# Patch MSVC dependency awk command for MSYS2 make
+python3 "$ORIG_DIR/scripts/patch-ffmpeg-msvc-dep.py"
+# AMF public headers are not shipped by vcpkg
+AMF_DIR="/tmp/AMF"
+[ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"
+AMF_INCLUDE="$(cygpath -m "$AMF_DIR/amf/public/include")"
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="-MD -I${P_MIXED}/include ${VCPKG_CFLAGS}" \
+  --extra-cflags="-MD -I${P_MIXED}/include -I${AMF_INCLUDE} ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \

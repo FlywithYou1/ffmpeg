@@ -308,6 +308,8 @@ echo "[2/4] FFmpeg (MSVC)"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
+# Patch MSVC dependency awk command for MSYS2 make
+python3 "$ORIG_DIR/scripts/patch-ffmpeg-msvc-dep.py"
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
