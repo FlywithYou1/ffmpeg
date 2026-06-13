@@ -653,8 +653,8 @@ jobs:
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
-          echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
       - name: Dump VMAF meson log
         if: failure()
@@ -1075,8 +1075,8 @@ jobs:
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
-          echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
       - name: Dump VMAF meson log
         if: failure()
@@ -1522,8 +1522,8 @@ jobs:
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
-          echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
       - name: Dump VMAF meson log
         if: failure()
@@ -1537,13 +1537,14 @@ jobs:
       - name: Debug pkg-config (vpl)
         shell: bash
         run: |
+          echo "PKG_CONFIG=${PKG_CONFIG}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- pkg-config search path ---"
-          pkg-config --variable=pc_path pkg-config 2>/dev/null || true
+          $PKG_CONFIG --variable=pc_path pkg-config 2>/dev/null || true
           echo "--- vpl.pc ---"
-          pkg-config --exists vpl && echo "vpl found: $(pkg-config --modversion vpl)" || echo "vpl NOT FOUND"
+          $PKG_CONFIG --exists vpl && echo "vpl found: $($PKG_CONFIG --modversion vpl)" || echo "vpl NOT FOUND"
           echo "--- vpl.pc details ---"
-          pkg-config --debug vpl 2>&1 | head -20 || true
+          $PKG_CONFIG --debug vpl 2>&1 | head -20 || true
           echo "--- vpl.pc file ---"
           find "${VCPKG_INSTALLED}" -name 'vpl.pc' 2>/dev/null || echo "(not found in vcpkg tree)"
 
@@ -2069,8 +2070,8 @@ jobs:
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
-          echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
       - name: Dump VMAF meson log
         if: failure()

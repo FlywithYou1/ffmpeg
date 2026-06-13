@@ -269,8 +269,8 @@ EOF
 export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
 echo "libvmaf.pc contents:"
 cat "$P/lib/pkgconfig/libvmaf.pc"
-echo "pkg-config check: $(pkg-config --modversion libvmaf 2>&1 || true)"
-echo "pkg-config --libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+echo "pkg-config check: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
+echo "pkg-config --libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg (MSVC ARM64)"
