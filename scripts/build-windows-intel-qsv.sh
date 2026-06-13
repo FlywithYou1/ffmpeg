@@ -113,6 +113,7 @@ Name: vpl
 Description: Intel oneVPL Dispatcher
 Version: 2.16.0
 Libs: ${vpl_lib}
+Cflags: -I\${includedir} -I\${includedir}/vpl
 EOF
 
   # 创建库名别名，避免 ffmpeg fallback 找不到文件
@@ -275,7 +276,7 @@ includedir=\${prefix}/include
 Name: libvmaf
 Description: Netflix VMAF library
 Version: 3.0.0
-Libs: -lvmaf ${PTHREAD_LDFLAGS}
+Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
@@ -297,7 +298,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 ./configure --toolchain=msvc --prefix="$P" \
   --extra-cflags="/MD -I${P}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P}/lib ${VCPKG_LDFLAGS}" \
-  --extra-libs="ucrt.lib msvcrt.lib advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libvpl \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc

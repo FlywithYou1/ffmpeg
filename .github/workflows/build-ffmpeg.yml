@@ -615,7 +615,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -661,9 +661,9 @@ jobs:
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-I$P/include -I${CUDA_HOME}/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="/MD -I$P/include -I${CUDA_HOME}/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --disable-libnpp \
@@ -1017,7 +1017,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -1062,9 +1062,9 @@ jobs:
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="/MD -I$P/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf \
             --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
@@ -1252,7 +1252,8 @@ jobs:
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             'Version: 2.16.0',
-            "Libs: $vplLib"
+            "Libs: $vplLib",
+            'Cflags: -I${includedir} -I${includedir}/vpl'
           )
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
@@ -1433,7 +1434,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -1502,7 +1503,7 @@ jobs:
             --pkg-config="$PKG_CONFIG" \
             --extra-cflags="/MD -I$P/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="ucrt.lib msvcrt.lib advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl \
             --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
@@ -1944,7 +1945,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -1989,9 +1990,9 @@ jobs:
           cd ffmpeg-src
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-I$P/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="/MD -I$P/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+            --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
             --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \

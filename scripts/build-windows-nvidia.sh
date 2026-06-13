@@ -318,7 +318,7 @@ includedir=\${prefix}/include
 Name: libvmaf
 Description: Netflix VMAF library
 Version: 3.0.0
-Libs: -lvmaf ${PTHREAD_LDFLAGS}
+Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
@@ -338,9 +338,9 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="-I${P}/include -I${CUDA_HOME}/include ${VCPKG_CFLAGS}" \
+  --extra-cflags="/MD -I${P}/include -I${CUDA_HOME}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
-  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
   --enable-cuvid --enable-nvenc --disable-libnpp \
