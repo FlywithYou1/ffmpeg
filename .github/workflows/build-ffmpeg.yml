@@ -540,7 +540,7 @@ jobs:
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -550,25 +550,23 @@ jobs:
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dc_link_args="$VMAF_LINK_ARGS"
           fi
           ninja -vC build
 
-          # Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
-          # or installs it under an unexpected name. Copy the artifacts explicitly.
-          mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+          # Manual install: build a static libvmaf on Windows/Clang to avoid DLL import-library issues.
+          mkdir -p "$P/lib" "$P/include/libvmaf"
 
-          implib=""
-          for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-            [ -f "$cand" ] && { implib="$cand"; break; }
+          vmaf_static_lib=""
+          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
+            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
           done
-          [ -z "$implib" ] && { echo "::error::VMAF import library not found under build/src"; ls -la build/src; exit 1; }
+          [ -z "$vmaf_static_lib" ] && { echo "::error::VMAF static library not found under build/src"; ls -la build/src; exit 1; }
 
-          cp build/src/vmaf.dll "$P/bin/"
-          cp "$implib" "$P/lib/vmaf.lib"
+          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -582,7 +580,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            'Libs: -lvmaf' \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -929,7 +927,7 @@ jobs:
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -940,25 +938,23 @@ jobs:
             VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dc_link_args="$VMAF_LINK_ARGS"
           fi
           ninja -vC build
 
-          # Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
-          # or installs it under an unexpected name. Copy the artifacts explicitly.
-          mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+          # Manual install: build a static libvmaf on Windows/Clang to avoid DLL import-library issues.
+          mkdir -p "$P/lib" "$P/include/libvmaf"
 
-          implib=""
-          for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-            [ -f "$cand" ] && { implib="$cand"; break; }
+          vmaf_static_lib=""
+          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
+            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
           done
-          [ -z "$implib" ] && { echo "::error::VMAF import library not found under build/src"; ls -la build/src; exit 1; }
+          [ -z "$vmaf_static_lib" ] && { echo "::error::VMAF static library not found under build/src"; ls -la build/src; exit 1; }
 
-          cp build/src/vmaf.dll "$P/bin/"
-          cp "$implib" "$P/lib/vmaf.lib"
+          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -973,7 +969,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            'Libs: -lvmaf' \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -1334,7 +1330,7 @@ jobs:
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -1345,25 +1341,23 @@ jobs:
             VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dc_link_args="$VMAF_LINK_ARGS"
           fi
           ninja -vC build
 
-          # Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
-          # or installs it under an unexpected name. Copy the artifacts explicitly.
-          mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+          # Manual install: build a static libvmaf on Windows/Clang to avoid DLL import-library issues.
+          mkdir -p "$P/lib" "$P/include/libvmaf"
 
-          implib=""
-          for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-            [ -f "$cand" ] && { implib="$cand"; break; }
+          vmaf_static_lib=""
+          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
+            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
           done
-          [ -z "$implib" ] && { echo "::error::VMAF import library not found under build/src"; ls -la build/src; exit 1; }
+          [ -z "$vmaf_static_lib" ] && { echo "::error::VMAF static library not found under build/src"; ls -la build/src; exit 1; }
 
-          cp build/src/vmaf.dll "$P/bin/"
-          cp "$implib" "$P/lib/vmaf.lib"
+          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -1378,7 +1372,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            'Libs: -lvmaf' \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -1846,24 +1840,22 @@ jobs:
           VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
           # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
             -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
             -Dc_args="$VMAF_C_ARGS" \
             -Dc_link_args="$VMAF_LINK_ARGS"
           ninja -vC build
 
-          # Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
-          # or installs it under an unexpected name. Copy the artifacts explicitly.
-          mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+          # Manual install: build a static libvmaf on Windows/Clang to avoid DLL import-library issues.
+          mkdir -p "$P/lib" "$P/include/libvmaf"
 
-          implib=""
-          for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-            [ -f "$cand" ] && { implib="$cand"; break; }
+          vmaf_static_lib=""
+          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
+            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
           done
-          [ -z "$implib" ] && { echo "::error::VMAF import library not found under build/src"; ls -la build/src; exit 1; }
+          [ -z "$vmaf_static_lib" ] && { echo "::error::VMAF static library not found under build/src"; ls -la build/src; exit 1; }
 
-          cp build/src/vmaf.dll "$P/bin/"
-          cp "$implib" "$P/lib/vmaf.lib"
+          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -1878,7 +1870,7 @@ jobs:
             'Name: libvmaf' \
             'Description: Netflix VMAF library' \
             'Version: 3.0.0' \
-            'Libs: -lvmaf' \
+            "Libs: -lvmaf ${PTHREAD_LDFLAGS}" \
             'Cflags: -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"

@@ -199,24 +199,22 @@ __meson_array() {
 VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
 VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
 PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false \
+meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
   -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
   -Dc_args="$VMAF_C_ARGS" \
   -Dc_link_args="$VMAF_LINK_ARGS"
 ninja -vC build
 
-# Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
-# or installs it under an unexpected name. Copy the artifacts explicitly.
-mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+# Manual install: build a static libvmaf on Windows/MSVC to avoid DLL import-library issues.
+mkdir -p "$P/lib" "$P/include/libvmaf"
 
-implib=""
-for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-  [ -f "$cand" ] && { implib="$cand"; break; }
+vmaf_static_lib=""
+for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
+  [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
 done
-[ -z "$implib" ] && { echo "错误：未找到 VMAF import library (build/src)"; ls -la build/src; exit 1; }
+[ -z "$vmaf_static_lib" ] && { echo "错误：未找到 VMAF static library (build/src)"; ls -la build/src; exit 1; }
 
-cp build/src/vmaf.dll "$P/bin/"
-cp "$implib" "$P/lib/vmaf.lib"
+cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
 cp include/libvmaf/*.h "$P/include/libvmaf/"
 [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
 [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -231,7 +229,7 @@ includedir=\${prefix}/include
 Name: libvmaf
 Description: Netflix VMAF library
 Version: 3.0.0
-Libs: -lvmaf
+Libs: -lvmaf ${PTHREAD_LDFLAGS}
 Cflags: -I\${includedir}/libvmaf
 EOF
 
