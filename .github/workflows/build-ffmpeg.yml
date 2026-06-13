@@ -673,6 +673,11 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
+          # Make nvcc discoverable for --enable-cuda-nvcc
+          export CUDA_HOME="/c/cuda"
+          export CUDA_PATH="/c/cuda"
+          export CUDACXX="/c/cuda/bin/nvcc"
+          export PATH="/c/cuda/bin:${PATH}"
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG is not set"; exit 1; }
           # Normalize pkg-config path so bash/ffmpeg configure can execute it reliably
           if command -v cygpath >/dev/null 2>&1; then
