@@ -192,7 +192,19 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
         "#endif\n"
     )
 '
-# nvcc fatbin does not pick up meson's cuda_args; use C_INCLUDE_PATH instead
+# nvcc fatbin uses a hard-coded custom_target command; inject extra include dirs
+# so CUDA .cu files can find ffnvcodec headers (from nv-codec-headers) and pthread.h.
+python3 -c "
+import pathlib
+mb = pathlib.Path('src/meson.build')
+s = mb.read_text(encoding='utf-8')
+s = s.replace(
+    \"'-I', '../src/' + cuda_dir,\",
+    \"'-I', '../src/' + cuda_dir,\\n                '-I', '${P_MIXED}/include',\\n                '-I', '${VCPKG_INSTALLED_MIXED}/include',\")
+mb.write_text(s, encoding='utf-8')
+"
+# nvcc host compiler (cl) also consults INCLUDE on Windows
+export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED}/include;${INCLUDE:-}"
 export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)

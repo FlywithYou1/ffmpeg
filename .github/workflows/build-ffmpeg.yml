@@ -482,8 +482,21 @@ jobs:
                   "#endif\n"
               )
           '
+          # nvcc fatbin uses a hard-coded custom_target command; inject extra include dirs
+          # so CUDA .cu files can find ffnvcodec headers (from nv-codec-headers) and pthread.h.
+          python3 -c "
+          import pathlib
+          mb = pathlib.Path('src/meson.build')
+          s = mb.read_text(encoding='utf-8')
+          s = s.replace(
+              \"'-I', '../src/' + cuda_dir,\",
+              \"'-I', '../src/' + cuda_dir,\\n                '-I', '${P_MIXED}/include',\\n                '-I', '${VCPKG_INSTALLED_MIXED}/include',\")
+          mb.write_text(s, encoding='utf-8')
+          "
           export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
           export PATH="${CUDA_HOME}/bin:${PATH}"
+          # nvcc host compiler (cl) also consults INCLUDE on Windows
+          export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED}/include;${INCLUDE:-}"
           CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
@@ -512,6 +525,10 @@ jobs:
           # Convert paths to mixed (C:/...) form so spaces inside paths stay as single argv tokens
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
           CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+          VCPKG_INSTALLED_MIXED=""
+          if [ -n "${VCPKG_INSTALLED:-}" ]; then
+            VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED")"
+          fi
           # VMAF asm needs nasm on x86/x64; gracefully disable if it is not available.
           if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
             VMAF_ENABLE_ASM=true
