@@ -694,7 +694,7 @@ jobs:
           echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          python3 "$GITHUB_WORKSPACE/scripts/patch-ffmpeg-msvc-dep.py" configure
+          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
@@ -1116,7 +1116,7 @@ jobs:
           echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          python3 "$GITHUB_WORKSPACE/scripts/patch-ffmpeg-msvc-dep.py" configure
+          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # AMF public headers are not shipped by vcpkg. FFmpeg expects #include <AMF/core/Version.h>,
           # so create an AMF/ wrapper directory inside the AMF include path.
           AMF_DIR="/tmp/AMF"
@@ -1586,7 +1586,7 @@ jobs:
           echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          python3 "$GITHUB_WORKSPACE/scripts/patch-ffmpeg-msvc-dep.py" configure
+          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-MD -I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
@@ -2111,7 +2111,7 @@ jobs:
           echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          python3 "$GITHUB_WORKSPACE/scripts/patch-ffmpeg-msvc-dep.py" configure
+          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-MD -I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
