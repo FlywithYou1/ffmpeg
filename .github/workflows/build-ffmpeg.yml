@@ -618,11 +618,11 @@ jobs:
             else
               echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
             fi
-            VMAF_C_ARGS=$(__meson_array "-fms-runtime-lib=static" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -630,7 +630,7 @@ jobs:
               -Dcpp_link_args="$VMAF_LINK_ARGS"
           else
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-MT" "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
@@ -725,7 +725,7 @@ jobs:
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-MT -I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -1052,12 +1052,12 @@ jobs:
             else
               echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
             fi
-            VMAF_C_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -1065,7 +1065,7 @@ jobs:
               -Dcpp_link_args="$VMAF_LINK_ARGS"
           else
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-MT" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
@@ -1158,7 +1158,7 @@ jobs:
           AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-MT -I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -1501,12 +1501,12 @@ jobs:
             else
               echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
             fi
-            VMAF_C_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "-fms-runtime-lib=static" "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -1514,7 +1514,7 @@ jobs:
               -Dcpp_link_args="$VMAF_LINK_ARGS"
           else
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-MT" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+            VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
@@ -1620,7 +1620,7 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-MT -I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -2064,7 +2064,7 @@ jobs:
             arr="$arr]"
             printf '%s' "$arr"
           }
-          VMAF_C_ARGS=$(__meson_array "-MT" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+          VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
           VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
           # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
@@ -2147,7 +2147,7 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-MT -I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
