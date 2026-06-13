@@ -463,6 +463,12 @@ jobs:
         run: |
           $cuda = $env:CUDA_HOME
           if (-not $cuda) { Write-Error "CUDA_HOME is not set"; exit 1 }
+          # Detect CUDA writes an MSYS-style path (/c/...); mklink needs a Windows path.
+          if ($cuda -match '^/([a-zA-Z])/(.*)$') {
+            $cuda = "$($matches[1].ToUpper()):\$($matches[2])" -replace '/', '\\'
+          } elseif ($cuda -match '^[a-zA-Z]:') {
+            $cuda = $cuda -replace '/', '\\'
+          }
           $link = "C:\cuda"
           if (Test-Path $link) {
             # Remove junction/directory forcefully, including read-only or in-use items
@@ -538,9 +544,12 @@ jobs:
                   "    {0.944, 0.521, 0.404, {1.868, 1.0, 0.516, 1.0}}};")
               p.write_text(s, encoding="utf-8")
           '
-          export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
-          export PATH="${CUDA_HOME}/bin:${PATH}"
-          CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          # Use the space-free junction for nvcc so meson does not have to quote a path with spaces.
+          export CUDA_HOME="/c/cuda"
+          export CUDA_PATH="/c/cuda"
+          export CUDACXX="/c/cuda/bin/nvcc"
+          export PATH="/c/cuda/bin:${PATH}"
+          CL="/c/cuda/lib/x64"; [ ! -d "$CL" ] && CL="/c/cuda/lib"
           # Ensure MSVC link.exe before Git's link.EXE for meson
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -681,6 +690,7 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
+          CUDA_HOME_MIXED="C:/cuda"
           # Make nvcc discoverable for --enable-cuda-nvcc
           export CUDA_HOME="/c/cuda"
           export CUDA_PATH="/c/cuda"
@@ -711,7 +721,7 @@ jobs:
           cd ffmpeg-src
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # Patch ffbuild/library.mak so lib.exe receives a Windows-absolute response file path.
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)echo $^ > $@.objs\n\t$(Q)cygpath -w -f $@.objs > $@.objs.tmp && mv $@.objs.tmp $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @\"$$(cygpath -w -a \"$@.objs\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) @$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
@@ -1135,7 +1145,7 @@ jobs:
           cd ffmpeg-src
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # Patch ffbuild/library.mak so lib.exe receives a Windows-absolute response file path.
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)echo $^ > $@.objs\n\t$(Q)cygpath -w -f $@.objs > $@.objs.tmp && mv $@.objs.tmp $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @\"$$(cygpath -w -a \"$@.objs\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) @$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           # AMF public headers are not shipped by vcpkg. FFmpeg expects #include <AMF/core/Version.h>,
           # so create an AMF/ wrapper directory inside the AMF include path.
           AMF_DIR="/tmp/AMF"
@@ -1607,7 +1617,7 @@ jobs:
           cd ffmpeg-src
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # Patch ffbuild/library.mak so lib.exe receives a Windows-absolute response file path.
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)echo $^ > $@.objs\n\t$(Q)cygpath -w -f $@.objs > $@.objs.tmp && mv $@.objs.tmp $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @\"$$(cygpath -w -a \"$@.objs\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) @$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-MD -I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
@@ -2134,7 +2144,7 @@ jobs:
           cd ffmpeg-src
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # Patch ffbuild/library.mak so lib.exe receives a Windows-absolute response file path.
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)echo $^ > $@.objs\n\t$(Q)cygpath -w -f $@.objs > $@.objs.tmp && mv $@.objs.tmp $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @\"$$(cygpath -w -a \"$@.objs\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) @$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --extra-cflags="-MD -I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
