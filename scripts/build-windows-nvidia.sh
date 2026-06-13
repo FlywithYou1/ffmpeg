@@ -80,6 +80,15 @@ if command -v cmd.exe >/dev/null 2>&1; then
   cmd //c "mklink /J C:\\cuda \"$(cygpath -w "$CUDA_HOME")\"" >/dev/null 2>&1 || true
   [ -d "/c/cuda" ] && CUDA_HOME_MIXED="C:/cuda"
 fi
+
+# Verify nvcc is reachable before FFmpeg configure (--enable-cuda-nvcc needs it).
+if ! command -v nvcc >/dev/null 2>&1; then
+  echo "错误：nvcc 不在 PATH 中 (CUDA_HOME=${CUDA_HOME})"
+  echo "PATH=${PATH}"
+  exit 1
+fi
+echo "nvcc: $(which nvcc)"
+nvcc --version
 VCPKG_INSTALLED_MIXED=""
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
   VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
@@ -359,6 +368,8 @@ git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
 # Patch MSVC dependency awk command for MSYS2 make
 python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
+# Patch ffbuild/library.mak so lib.exe receives a Windows-absolute response file path.
+python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)echo $^ > $@.objs\n\t$(Q)cygpath -w -f $@.objs > $@.objs.tmp && mv $@.objs.tmp $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @\"$$(cygpath -w -a \"$@.objs\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
