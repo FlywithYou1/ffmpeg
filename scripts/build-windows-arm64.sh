@@ -233,6 +233,12 @@ Libs: -lvmaf ${PTHREAD_LDFLAGS}
 Cflags: -I\${includedir}/libvmaf
 EOF
 
+export PKG_CONFIG_PATH="$P/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+echo "libvmaf.pc contents:"
+cat "$P/lib/pkgconfig/libvmaf.pc"
+echo "pkg-config check: $(pkg-config --modversion libvmaf 2>&1 || true)"
+echo "pkg-config --libs: $(pkg-config --libs libvmaf 2>&1 || true)"
+
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg (MSVC ARM64)"
 cd /tmp && rm -rf ffmpeg-src
