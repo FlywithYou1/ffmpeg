@@ -202,6 +202,14 @@ if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" 
     echo "错误：找到 pthread.h 但未找到 pthread*.lib (${VCPKG_INSTALLED}/lib)"; exit 1
   fi
 fi
+# VMAF asm needs nasm on x86/x64; gracefully disable if it is not available.
+if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
+  VMAF_ENABLE_ASM=true
+else
+  VMAF_ENABLE_ASM=false
+  echo "警告：未找到 nasm，VMAF 将禁用 asm 优化"
+fi
+
 # Helper: build a Meson array literal from positional args (handles spaces safely)
 __meson_array() {
   local arr="[" first=1
@@ -215,13 +223,17 @@ __meson_array() {
 }
 
 if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-  echo "使用 VS Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
+  if [ "$VMAF_ENABLE_ASM" = "true" ]; then
+    echo "使用 VS Clang (MSVC target) 编译 VMAF 以保留 AVX2 优化"
+  else
+    echo "使用 VS Clang (MSVC target) 编译 VMAF（nasm 缺失，禁用 asm 优化）"
+  fi
   VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
     -Dcpp_args="$VMAF_CPP_ARGS" \

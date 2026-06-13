@@ -512,6 +512,13 @@ jobs:
           # Convert paths to mixed (C:/...) form so spaces inside paths stay as single argv tokens
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
           CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+          # VMAF asm needs nasm on x86/x64; gracefully disable if it is not available.
+          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
+            VMAF_ENABLE_ASM=true
+          else
+            VMAF_ENABLE_ASM=false
+            echo "::warning::nasm not found, disabling VMAF asm optimizations"
+          fi
           # Helper: build a Meson array literal from positional args (handles spaces safely)
           __meson_array() {
             local arr="[" first=1
@@ -524,12 +531,16 @@ jobs:
             printf '%s' "$arr"
           }
           if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
+              echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            else
+              echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
+            fi
             VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -887,6 +898,13 @@ jobs:
               exit 1
             fi
           fi
+          # VMAF asm needs nasm on x86/x64; gracefully disable if it is not available.
+          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
+            VMAF_ENABLE_ASM=true
+          else
+            VMAF_ENABLE_ASM=false
+            echo "::warning::nasm not found, disabling VMAF asm optimizations"
+          fi
           # Helper: build a Meson array literal from positional args (handles spaces safely)
           __meson_array() {
             local arr="[" first=1
@@ -899,13 +917,17 @@ jobs:
             printf '%s' "$arr"
           }
           if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
+              echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            else
+              echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
+            fi
             VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -1279,6 +1301,13 @@ jobs:
               exit 1
             fi
           fi
+          # VMAF asm needs nasm on x86/x64; gracefully disable if it is not available.
+          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
+            VMAF_ENABLE_ASM=true
+          else
+            VMAF_ENABLE_ASM=false
+            echo "::warning::nasm not found, disabling VMAF asm optimizations"
+          fi
           # Helper: build a Meson array literal from positional args (handles spaces safely)
           __meson_array() {
             local arr="[" first=1
@@ -1291,13 +1320,17 @@ jobs:
             printf '%s' "$arr"
           }
           if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
+              echo "Building VMAF with VS Clang (MSVC target) to keep AVX2 asm"
+            else
+              echo "Building VMAF with VS Clang (MSVC target) (nasm missing, disabling asm)"
+            fi
             VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
             PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false \
+            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
               -Dcpp_args="$VMAF_CPP_ARGS" \
