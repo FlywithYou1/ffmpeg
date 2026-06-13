@@ -168,11 +168,11 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
     p = pathlib.Path(path)
     if not p.exists():
         continue
-    s = p.read_text(encoding='utf-8')
+    s = p.read_text(encoding="utf-8")
     s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
     s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
     s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-    p.write_text(s, encoding='utf-8')
+    p.write_text(s, encoding="utf-8")
     compat_dir = pathlib.Path("src/compat/msvc/common")
     compat_dir.mkdir(parents=True, exist_ok=True)
     (compat_dir / "attributes.h").write_text(
