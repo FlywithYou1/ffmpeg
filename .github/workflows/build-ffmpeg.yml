@@ -94,8 +94,14 @@ jobs:
           export LD_LIBRARY_PATH="${P}/lib:${LD_LIBRARY_PATH:-}"
           strip "${P}/bin/ffmpeg" "${P}/bin/ffprobe" "${P}/bin/ffplay" 2>/dev/null || true
           "${P}/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
+          echo "--- NVENC encoders ---"
+          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -i nvenc | head -20 || echo "(none)"
+
+          echo "--- CUVID decoders ---"
+          "${P}/bin/ffmpeg" -hide_banner -decoders 2>&1 | grep -i cuvid | head -20 || echo "(none)"
+
+          echo "--- HW accels ---"
+          "${P}/bin/ffmpeg" -hide_banner -hwaccels 2>&1 | head -30
           echo "--- VMAF ---"
           "${P}/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
@@ -766,8 +772,14 @@ jobs:
         shell: bash
         run: |
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
+          echo "--- NVENC encoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -i nvenc | head -20 || echo "(none)"
+
+          echo "--- CUVID decoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | grep -i cuvid | head -20 || echo "(none)"
+
+          echo "--- HW accels ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 | head -30
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
