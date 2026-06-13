@@ -192,6 +192,24 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
         "#endif\n"
     )
 '
+# nvcc (CUDA .cu) compiles as C++ and does not support C11 designated initializers
+# before C++20. Rewrite the one struct in integer_adm.h to positional initialization.
+python3 -c '
+import pathlib
+p = pathlib.Path("src/feature/integer_adm.h")
+if p.exists():
+    s = p.read_text(encoding="utf-8")
+    s = s.replace(
+        "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
+        "    {.a = 0.495, .k = 0.466, .f0 = 0.401, .g = {1.501, 1.0, 0.534, 1.0}},\n"
+        "    {.a = 1.633, .k = 0.353, .f0 = 0.209, .g = {1.520, 1.0, 0.502, 1.0}},\n"
+        "    {.a = 0.944, .k = 0.521, .f0 = 0.404, .g = {1.868, 1.0, 0.516, 1.0}}};",
+        "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
+        "    {0.495, 0.466, 0.401, {1.501, 1.0, 0.534, 1.0}},\n"
+        "    {1.633, 0.353, 0.209, {1.520, 1.0, 0.502, 1.0}},\n"
+        "    {0.944, 0.521, 0.404, {1.868, 1.0, 0.516, 1.0}}};")
+    p.write_text(s, encoding="utf-8")
+'
 # nvcc fatbin uses a hard-coded custom_target command; inject extra include dirs
 # so CUDA .cu files can find ffnvcodec headers (from nv-codec-headers) and pthread.h.
 python3 -c "
