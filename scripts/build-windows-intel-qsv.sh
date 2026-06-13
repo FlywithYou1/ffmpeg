@@ -295,9 +295,9 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="-I${P}/include ${VCPKG_CFLAGS}" \
+  --extra-cflags="/MD -I${P}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P}/lib ${VCPKG_LDFLAGS}" \
-  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="ucrt.lib msvcrt.lib advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libvpl \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
