@@ -274,6 +274,10 @@ echo "pkg-config --libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg (MSVC ARM64)"
+cd /tmp && rm -rf gas-preprocessor
+git clone --depth 1 https://git.ffmpeg.org/gas-preprocessor.git gas-preprocessor
+export PATH="/tmp/gas-preprocessor:$PATH"
+
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
@@ -285,7 +289,7 @@ python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
-./configure --toolchain=msvc --prefix="$P" --arch=arm64 --disable-asm \
+./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
   --extra-cflags="-I${P_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
