@@ -275,7 +275,7 @@ echo "pkg-config --libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg (MSVC ARM64)"
 cd /tmp && rm -rf gas-preprocessor
-git clone --depth 1 https://git.ffmpeg.org/gas-preprocessor.git gas-preprocessor
+git clone --depth 1 https://github.com/FFmpeg/gas-preprocessor.git gas-preprocessor
 export PATH="/tmp/gas-preprocessor:$PATH"
 
 cd /tmp && rm -rf ffmpeg-src
