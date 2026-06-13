@@ -204,23 +204,24 @@ meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable
   -Dc_args="$VMAF_C_ARGS" \
   -Dc_link_args="$VMAF_LINK_ARGS"
 ninja -vC build
-# Workaround: meson/Clang on Windows sometimes fails to locate the generated import library.
-# Ensure it is named exactly as meson expects before install.
-if [ ! -f build/src/vmaf.lib ]; then
-  for cand in build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
-    if [ -f "$cand" ]; then
-      cp "$cand" build/src/vmaf.lib
-      echo "Workaround: copied $cand -> build/src/vmaf.lib"
-      break
-    fi
-  done
-fi
-ninja -C build install
 
-# Ensure libvmaf.pc exists for ffmpeg configure (meson may omit it on Windows)
+# Manual install: meson/Clang on Windows sometimes cannot locate the generated import library
+# or installs it under an unexpected name. Copy the artifacts explicitly.
+mkdir -p "$P/bin" "$P/lib" "$P/include/libvmaf"
+
+implib=""
+for cand in build/src/vmaf.lib build/src/libvmaf.lib build/src/vmaf.dll.a build/src/libvmaf.dll.a; do
+  [ -f "$cand" ] && { implib="$cand"; break; }
+done
+[ -z "$implib" ] && { echo "错误：未找到 VMAF import library (build/src)"; ls -la build/src; exit 1; }
+
+cp build/src/vmaf.dll "$P/bin/"
+cp "$implib" "$P/lib/vmaf.lib"
+cp include/libvmaf/*.h "$P/include/libvmaf/"
+[ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
+[ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
+
 P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-vmaf_lib="$(find "$P/lib" -maxdepth 1 \( -name 'vmaf.lib' -o -name 'libvmaf.lib' \) | head -n1)"
-[ -z "$vmaf_lib" ] && { echo "错误：未找到 VMAF import library ($P/lib)"; exit 1; }
 cat > "$P/lib/pkgconfig/libvmaf.pc" <<EOF
 prefix=${P_MIXED}
 exec_prefix=\${prefix}
@@ -230,8 +231,8 @@ includedir=\${prefix}/include
 Name: libvmaf
 Description: Netflix VMAF library
 Version: 3.0.0
-Libs: $(basename "$vmaf_lib")
-Cflags: -I\${includedir}
+Libs: -lvmaf
+Cflags: -I\${includedir}/libvmaf
 EOF
 
 # ---- FFmpeg ----
