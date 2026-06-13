@@ -394,14 +394,8 @@ echo "[4/5] DLL"
 # ---- 验证 + 输出 ----
 echo "--- ffmpeg ---"
 "$P/bin/ffmpeg.exe" -version 2>&1 | head -n3
-echo "--- NVENC encoders ---"
-"$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -i nvenc | head -20 || echo "(none)"
-
-echo "--- CUVID decoders ---"
-"$P/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | grep -i cuvid | head -20 || echo "(none)"
-
-echo "--- HW accels ---"
-"$P/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 | head -30
+echo "--- NVENC ---"
+"$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
 echo "--- VMAF ---"
 "$P/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
 
