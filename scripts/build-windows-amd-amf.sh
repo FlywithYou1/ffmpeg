@@ -293,7 +293,7 @@ cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
 # Patch MSVC dependency awk command for MSYS2 make
-python3 "$ORIG_DIR/scripts/patch-ffmpeg-msvc-dep.py"
+python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace('\''gsub(/\\/, "/")'\'', '\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
 # AMF public headers are not shipped by vcpkg
 AMF_DIR="/tmp/AMF"
 [ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"

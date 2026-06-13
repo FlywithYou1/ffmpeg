@@ -278,7 +278,7 @@ cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
 # Patch MSVC dependency awk command for MSYS2 make
-python3 "$ORIG_DIR/scripts/patch-ffmpeg-msvc-dep.py"
+python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace('\''gsub(/\\/, "/")'\'', '\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
