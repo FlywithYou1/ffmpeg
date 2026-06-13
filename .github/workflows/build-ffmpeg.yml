@@ -458,6 +458,17 @@ jobs:
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc.exe" --version
 
+      - name: Create CUDA junction
+        shell: powershell
+        run: |
+          $cuda = $env:CUDA_HOME
+          if (-not $cuda) { Write-Error "CUDA_HOME is not set"; exit 1 }
+          $link = "C:\cuda"
+          if (Test-Path $link) { Remove-Item $link -Recurse -Force -ErrorAction SilentlyContinue }
+          cmd /c mklink /J "$link" "$cuda" | Out-Null
+          echo "CUDA_HOME_MIXED=C:/cuda" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "CUDA junction: $link -> $cuda"
+
       - name: Build nv-codec-headers
         shell: bash
         run: |
@@ -679,10 +690,10 @@ jobs:
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           python3 "${GITHUB_WORKSPACE}/scripts/patch-ffmpeg-msvc-dep.py"
-          CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+          CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
-            --extra-cflags="-MD -I$P_MIXED/include -I${CUDA_HOME}/include -I${VCPKG_INSTALLED}/include" \
+            --extra-cflags="-MD -I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -1967,7 +1978,7 @@ jobs:
           # MSVC C11 does not support C99 variable-length arrays; replace with _alloca.
           python3 -c '
           import pathlib
-          for path in ("src/predict.c", "src/libvmaf.c"):
+          for path in ("src/predict.c", "src/libvmaf.c", "src/read_json_model.c"):
               p = pathlib.Path(path)
               if not p.exists():
                   continue
@@ -1976,6 +1987,8 @@ jobs:
                   s = "#include <malloc.h>\n" + s
               s = s.replace("double scores[model_collection->cnt];", "double *scores = (double *)_alloca(sizeof(double) * model_collection->cnt);")
               s = s.replace("char name[name_sz];", "char *name = (char *)_alloca(name_sz);")
+              s = s.replace("char cfg_name[cfg_name_sz];", "char *cfg_name = (char *)_alloca(cfg_name_sz);")
+              s = s.replace("char generated_key[generated_key_sz];", "char generated_key[5];")
               p.write_text(s, encoding="utf-8")
           '
           # PThreads4W (installed via vcpkg) provides pthread.h on Windows

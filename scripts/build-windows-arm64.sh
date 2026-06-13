@@ -186,7 +186,7 @@ compat_dir.mkdir(parents=True, exist_ok=True)
 # Patch C99 VLAs for MSVC C11: MSVC does not support variable-length arrays.
 python3 -c '
 import pathlib
-for path in ("src/predict.c", "src/libvmaf.c"):
+for path in ("src/predict.c", "src/libvmaf.c", "src/read_json_model.c"):
     p = pathlib.Path(path)
     if not p.exists():
         continue
@@ -195,6 +195,8 @@ for path in ("src/predict.c", "src/libvmaf.c"):
         s = "#include <malloc.h>\n" + s
     s = s.replace("double scores[model_collection->cnt];", "double *scores = (double *)_alloca(sizeof(double) * model_collection->cnt);")
     s = s.replace("char name[name_sz];", "char *name = (char *)_alloca(name_sz);")
+    s = s.replace("char cfg_name[cfg_name_sz];", "char *cfg_name = (char *)_alloca(cfg_name_sz);")
+    s = s.replace("char generated_key[generated_key_sz];", "char generated_key[5];")
     p.write_text(s, encoding="utf-8")
 '
 # PThreads4W (vcpkg) provides pthread.h on Windows

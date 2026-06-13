@@ -73,12 +73,19 @@ export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 # Convert common paths to mixed (C:/...) form to avoid shell quoting issues with spaces.
 P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
 CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+# CUDA default install path contains spaces which break FFmpeg's configure/unquoted
+# $CFLAGS/$LDFLAGS. Use a junction to a space-free path for compiler flags.
+if command -v cmd.exe >/dev/null 2>&1; then
+  rm -rf /c/cuda
+  cmd //c "mklink /J C:\\cuda \"$(cygpath -w "$CUDA_HOME")\"" >/dev/null 2>&1 || true
+  [ -d "/c/cuda" ] && CUDA_HOME_MIXED="C:/cuda"
+fi
 VCPKG_INSTALLED_MIXED=""
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
   VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
 fi
 
-CL="${CUDA_HOME}/lib/x64"; [ ! -d "$CL" ] && CL="${CUDA_HOME}/lib"
+CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
 
 # Ensure vcpkg dependencies are discoverable by pkg-config.
 # vcpkg ports do not always ship pkg-config files, so create the ones ffmpeg expects.
@@ -357,7 +364,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" \
-  --extra-cflags="-MD -I${P_MIXED}/include -I${CUDA_HOME}/include ${VCPKG_CFLAGS}" \
+  --extra-cflags="-MD -I${P_MIXED}/include -I${CUDA_HOME_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
   --extra-libs="ucrt.lib msvcrt.lib vcruntime.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
