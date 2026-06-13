@@ -285,7 +285,7 @@ python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
-./configure --toolchain=msvc --prefix="$P" \
+./configure --toolchain=msvc --prefix="$P" --arch=arm64 --disable-x86asm \
   --extra-cflags="-I${P_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
