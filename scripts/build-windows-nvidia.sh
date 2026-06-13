@@ -121,6 +121,22 @@ Version: 2.0.2
 Libs: ${fdk_lib}
 EOF
 
+  # SDL2 (ffplay 需要)
+  sdl2_lib="$(find_import_lib SDL2)" || { echo "错误：未找到 SDL2 import library"; exit 1; }
+  sdl2main_lib="$(find_import_lib SDL2main)" || sdl2main_lib=""
+  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/sdl2.pc" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: sdl2
+Description: Simple DirectMedia Layer
+Version: 2.30.0
+Libs: ${sdl2main_lib:+-lSDL2main }-lSDL2
+Cflags: -I\${includedir} -I\${includedir}/SDL2
+EOF
+
   # 创建库名别名，避免 ffmpeg fallback 找不到文件
   ensure_lib_alias() {
     local actual="$1" alias="$2"
@@ -276,7 +292,7 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-  PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+  PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
@@ -287,7 +303,7 @@ else
   echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
   VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-  PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+  PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
   meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
@@ -322,7 +338,7 @@ Libs: -lvmaf ${PTHREAD_LDFLAGS} -lucrt -lmsvcrt -lvcruntime -ladvapi32
 Cflags: -I\${includedir}/libvmaf
 EOF
 
-export PKG_CONFIG_PATH="$P/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$P/lib/pkgconfig${PKG_CONFIG_PATH:+;$PKG_CONFIG_PATH}"
 echo "libvmaf.pc contents:"
 cat "$P/lib/pkgconfig/libvmaf.pc"
 echo "pkg-config check: $(pkg-config --modversion libvmaf 2>&1 || true)"

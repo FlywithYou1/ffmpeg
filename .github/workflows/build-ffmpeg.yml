@@ -357,6 +357,23 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
+          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
+          $sdl2Lib = Find-ImportLib @('SDL2')
+          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+          $sdl2mainLib = Find-ImportLib @('SDL2main')
+          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          Write-Utf8 "$pcDir/sdl2.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: sdl2',
+            'Description: Simple DirectMedia Layer',
+            'Version: 2.30.0',
+            "Libs: $sdl2Libs",
+            'Cflags: -I${includedir} -I${includedir}/SDL2'
+          )
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -507,7 +524,7 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           # nv-codec-headers provides ffnvcodec.pc; meson needs PKG_CONFIG_PATH to find it
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           # PThreads4W (installed via vcpkg) provides pthread.h on Windows
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
@@ -622,7 +639,7 @@ jobs:
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
           echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
 
@@ -649,7 +666,7 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc" || true
@@ -838,6 +855,23 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
+          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
+          $sdl2Lib = Find-ImportLib @('SDL2')
+          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+          $sdl2mainLib = Find-ImportLib @('SDL2main')
+          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          Write-Utf8 "$pcDir/sdl2.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: sdl2',
+            'Description: Simple DirectMedia Layer',
+            'Version: 2.30.0',
+            "Libs: $sdl2Libs",
+            'Cflags: -I${includedir} -I${includedir}/SDL2'
+          )
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -974,7 +1008,7 @@ jobs:
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+            PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
@@ -985,7 +1019,7 @@ jobs:
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+            PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
@@ -1024,7 +1058,7 @@ jobs:
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
           echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
 
@@ -1051,7 +1085,7 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc" || true
@@ -1238,6 +1272,23 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
+          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
+          $sdl2Lib = Find-ImportLib @('SDL2')
+          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+          $sdl2mainLib = Find-ImportLib @('SDL2main')
+          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          Write-Utf8 "$pcDir/sdl2.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: sdl2',
+            'Description: Simple DirectMedia Layer',
+            'Version: 2.30.0',
+            "Libs: $sdl2Libs",
+            'Cflags: -I${includedir} -I${includedir}/SDL2'
+          )
 
           # vpl.pc — vcpkg libvpl uses cmake-config, ffmpeg needs pkg-config
           # oneVPL 2.x headers live under include/vpl/; include parent too for compat
@@ -1252,7 +1303,7 @@ jobs:
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             'Version: 2.16.0',
-            "Libs: $vplLib",
+            "Libs: -lvpl",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
 
@@ -1391,7 +1442,7 @@ jobs:
             VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
             CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+            PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
@@ -1402,7 +1453,7 @@ jobs:
             echo "::warning::VS Clang not found, falling back to MSVC with -Denable_asm=false"
             VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
             VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+            PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
               -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
               -Dc_args="$VMAF_C_ARGS" \
@@ -1441,7 +1492,7 @@ jobs:
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
           echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
 
@@ -1490,7 +1541,7 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc" || true
@@ -1780,6 +1831,23 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
+          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
+          $sdl2Lib = Find-ImportLib @('SDL2')
+          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+          $sdl2mainLib = Find-ImportLib @('SDL2main')
+          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          Write-Utf8 "$pcDir/sdl2.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: sdl2',
+            'Description: Simple DirectMedia Layer',
+            'Version: 2.30.0',
+            "Libs: $sdl2Libs",
+            'Cflags: -I${includedir} -I${includedir}/SDL2'
+          )
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -1869,8 +1937,8 @@ jobs:
                   "char *data = (char *)aligned_malloc(data_sz, MAX_ALIGN);"
               )
               s = s.replace(
-                  '#include "integer_adm.h"',
-                  '#include "integer_adm.h"\n\n#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n#define __builtin_clz(x) _CountLeadingZeros(x)\n#endif'
+                  "#include \"integer_adm.h\"",
+                  "#include \"integer_adm.h\"\n\n#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n#define __builtin_clz(x) _CountLeadingZeros(x)\n#endif"
               )
               p.write_text(s, encoding="utf-8")
           compat_dir = pathlib.Path("src/compat/msvc/common")
@@ -1914,7 +1982,7 @@ jobs:
           VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
           VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
           # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
-          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Ddefault_library=static \
             -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
             -Dc_args="$VMAF_C_ARGS" \
@@ -1952,7 +2020,7 @@ jobs:
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc"
           echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "modversion: $(pkg-config --modversion libvmaf 2>&1 || true)"
           echo "libs: $(pkg-config --libs libvmaf 2>&1 || true)"
 
@@ -1979,7 +2047,7 @@ jobs:
           fi
           export PKG_CONFIG
           echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo NOT FOUND))"
-          export PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           echo "--- libvmaf.pc ---"
           cat "$P/lib/pkgconfig/libvmaf.pc" || true
