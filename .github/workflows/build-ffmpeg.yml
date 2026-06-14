@@ -304,20 +304,83 @@ jobs:
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
 
+      - name: Build libmp3lame (static)
+        shell: powershell
+        run: |
+          $lamePrefix = "$env:USERPROFILE\lame-install"
+          $lamePrefixMixed = $lamePrefix -replace '\\','/'
+          New-Item -ItemType Directory -Path "$lamePrefix\include\lame", "$lamePrefix\lib", "$lamePrefix\lib\pkgconfig" -Force | Out-Null
+
+          cd "$env:TEMP"
+          Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
+          git clone --depth 1 --branch 3.100 https://github.com/rbrito/lame.git lame-src
+          if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
+          cd lame-src
+
+          if (Test-Path configMS.h) {
+            Copy-Item configMS.h config.h -Force
+            Write-Host "Using configMS.h as config.h"
+          }
+          elseif (Test-Path vc_solution\config.h) {
+            Copy-Item vc_solution\config.h config.h -Force
+            Write-Host "Using vc_solution\config.h"
+          }
+          else {
+            Write-Host "Creating minimal config.h"
+            $configH = "#ifndef LAME_CONFIG_H`n#define LAME_CONFIG_H`n#define HAVE_INTTYPES_H 1`n#define HAVE_STDINT_H 1`n#define HAVE_STDLIB_H 1`n#define HAVE_STRING_H 1`n#define HAVE_STRINGS_H 0`n#define HAVE_SYS_STAT_H 0`n#define HAVE_SYS_TYPES_H 0`n#define HAVE_UNISTD_H 0`n#define SIZEOF_INT 4`n#define SIZEOF_LONG 4`n#define SIZEOF_LONG_LONG 8`n#define SIZEOF_FLOAT 4`n#define SIZEOF_DOUBLE 8`n#define HAVE_XMMINTRIN_H 1`n#endif"
+            Set-Content config.h -Value $configH -Encoding UTF8
+          }
+
+          $buildDir = "$env:TEMP\lame-src\build"
+          New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+
+          $srcFiles = @()
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
+
+          $objs = @()
+          foreach ($src in $srcFiles) {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
+            $obj = Join-Path $buildDir "$base.obj"
+            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
+            $objs += $obj
+          }
+
+          lib.exe /nologo /out:"$lamePrefix\lib\libmp3lame.lib" $objs
+          if ($LASTEXITCODE -ne 0) { throw "Failed to create libmp3lame.lib" }
+
+          Copy-Item "$lamePrefix\lib\libmp3lame.lib" "$lamePrefix\lib\mp3lame.lib" -Force
+          Copy-Item include\lame.h "$lamePrefix\include\lame\lame.h" -Force
+
+          $pcDir = "$lamePrefixMixed/lib/pkgconfig"
+          @(
+            "prefix=$lamePrefixMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -lmp3lame',
+            'Cflags: -I${includedir}'
+          ) | Set-Content "$pcDir/libmp3lame.pc" -Encoding UTF8
+
+          Write-Host "Built libmp3lame at $lamePrefix"
+          Get-ChildItem "$lamePrefix\lib\*.lib"
+          Get-Content "$pcDir/libmp3lame.pc"
+
+          echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: vcpkg deps
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
-          $lameSrc = "$v\installed\x64-windows"
-          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
-          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -340,22 +403,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
-          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
-          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
-          # so the .pc files only need to declare the library name. This avoids -L
-          # flags that the MSVC linker may not handle during configure tests.
-          Write-Utf8 "$pcDir/libmp3lame.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: libmp3lame',
-            'Description: LAME MP3 encoder library',
-            'Version: 3.100',
-            "Libs: $lameLib"
-          )
+          # libmp3lame.pc is provided by the standalone Build libmp3lame step.
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
@@ -398,8 +446,6 @@ jobs:
               Write-Host "Created alias $alias -> $actual"
             }
           }
-          Ensure-LibAlias $lameLib "mp3lame.lib"
-          Ensure-LibAlias $lameLib "libmp3lame.lib"
           Ensure-LibAlias $fdkLib "fdk-aac.lib"
           Ensure-LibAlias $fdkLib "libfdk-aac.lib"
           if ($vplLib) {
@@ -415,14 +461,18 @@ jobs:
 
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
-          Write-Host "libmp3lame.pc:"
-          Get-Content "$pcDir/libmp3lame.pc"
+          if ($env:LAME_PKG_CONFIG_PATH -and (Test-Path "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc")) {
+            Write-Host "libmp3lame.pc:"
+            Get-Content "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc"
+          }
           Write-Host "libfdk-aac.pc:"
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $lamePc = $env:LAME_PKG_CONFIG_PATH
+          $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
+          echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
         shell: bash
@@ -740,8 +790,8 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
@@ -864,20 +914,83 @@ jobs:
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
 
+      - name: Build libmp3lame (static)
+        shell: powershell
+        run: |
+          $lamePrefix = "$env:USERPROFILE\lame-install"
+          $lamePrefixMixed = $lamePrefix -replace '\\','/'
+          New-Item -ItemType Directory -Path "$lamePrefix\include\lame", "$lamePrefix\lib", "$lamePrefix\lib\pkgconfig" -Force | Out-Null
+
+          cd "$env:TEMP"
+          Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
+          git clone --depth 1 --branch 3.100 https://github.com/rbrito/lame.git lame-src
+          if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
+          cd lame-src
+
+          if (Test-Path configMS.h) {
+            Copy-Item configMS.h config.h -Force
+            Write-Host "Using configMS.h as config.h"
+          }
+          elseif (Test-Path vc_solution\config.h) {
+            Copy-Item vc_solution\config.h config.h -Force
+            Write-Host "Using vc_solution\config.h"
+          }
+          else {
+            Write-Host "Creating minimal config.h"
+            $configH = "#ifndef LAME_CONFIG_H`n#define LAME_CONFIG_H`n#define HAVE_INTTYPES_H 1`n#define HAVE_STDINT_H 1`n#define HAVE_STDLIB_H 1`n#define HAVE_STRING_H 1`n#define HAVE_STRINGS_H 0`n#define HAVE_SYS_STAT_H 0`n#define HAVE_SYS_TYPES_H 0`n#define HAVE_UNISTD_H 0`n#define SIZEOF_INT 4`n#define SIZEOF_LONG 4`n#define SIZEOF_LONG_LONG 8`n#define SIZEOF_FLOAT 4`n#define SIZEOF_DOUBLE 8`n#define HAVE_XMMINTRIN_H 1`n#endif"
+            Set-Content config.h -Value $configH -Encoding UTF8
+          }
+
+          $buildDir = "$env:TEMP\lame-src\build"
+          New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+
+          $srcFiles = @()
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
+
+          $objs = @()
+          foreach ($src in $srcFiles) {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
+            $obj = Join-Path $buildDir "$base.obj"
+            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
+            $objs += $obj
+          }
+
+          lib.exe /nologo /out:"$lamePrefix\lib\libmp3lame.lib" $objs
+          if ($LASTEXITCODE -ne 0) { throw "Failed to create libmp3lame.lib" }
+
+          Copy-Item "$lamePrefix\lib\libmp3lame.lib" "$lamePrefix\lib\mp3lame.lib" -Force
+          Copy-Item include\lame.h "$lamePrefix\include\lame\lame.h" -Force
+
+          $pcDir = "$lamePrefixMixed/lib/pkgconfig"
+          @(
+            "prefix=$lamePrefixMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -lmp3lame',
+            'Cflags: -I${includedir}'
+          ) | Set-Content "$pcDir/libmp3lame.pc" -Encoding UTF8
+
+          Write-Host "Built libmp3lame at $lamePrefix"
+          Get-ChildItem "$lamePrefix\lib\*.lib"
+          Get-Content "$pcDir/libmp3lame.pc"
+
+          echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: vcpkg deps
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
-          $lameSrc = "$v\installed\x64-windows"
-          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
-          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -900,22 +1013,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
-          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
-          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
-          # so the .pc files only need to declare the library name. This avoids -L
-          # flags that the MSVC linker may not handle during configure tests.
-          Write-Utf8 "$pcDir/libmp3lame.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: libmp3lame',
-            'Description: LAME MP3 encoder library',
-            'Version: 3.100',
-            "Libs: $lameLib"
-          )
+          # libmp3lame.pc is provided by the standalone Build libmp3lame step.
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
@@ -958,8 +1056,6 @@ jobs:
               Write-Host "Created alias $alias -> $actual"
             }
           }
-          Ensure-LibAlias $lameLib "mp3lame.lib"
-          Ensure-LibAlias $lameLib "libmp3lame.lib"
           Ensure-LibAlias $fdkLib "fdk-aac.lib"
           Ensure-LibAlias $fdkLib "libfdk-aac.lib"
           if ($vplLib) {
@@ -975,14 +1071,18 @@ jobs:
 
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
-          Write-Host "libmp3lame.pc:"
-          Get-Content "$pcDir/libmp3lame.pc"
+          if ($env:LAME_PKG_CONFIG_PATH -and (Test-Path "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc")) {
+            Write-Host "libmp3lame.pc:"
+            Get-Content "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc"
+          }
           Write-Host "libfdk-aac.pc:"
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $lamePc = $env:LAME_PKG_CONFIG_PATH
+          $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
+          echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
         shell: bash
@@ -1187,8 +1287,8 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf \
@@ -1310,20 +1410,83 @@ jobs:
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
 
+      - name: Build libmp3lame (static)
+        shell: powershell
+        run: |
+          $lamePrefix = "$env:USERPROFILE\lame-install"
+          $lamePrefixMixed = $lamePrefix -replace '\\','/'
+          New-Item -ItemType Directory -Path "$lamePrefix\include\lame", "$lamePrefix\lib", "$lamePrefix\lib\pkgconfig" -Force | Out-Null
+
+          cd "$env:TEMP"
+          Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
+          git clone --depth 1 --branch 3.100 https://github.com/rbrito/lame.git lame-src
+          if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
+          cd lame-src
+
+          if (Test-Path configMS.h) {
+            Copy-Item configMS.h config.h -Force
+            Write-Host "Using configMS.h as config.h"
+          }
+          elseif (Test-Path vc_solution\config.h) {
+            Copy-Item vc_solution\config.h config.h -Force
+            Write-Host "Using vc_solution\config.h"
+          }
+          else {
+            Write-Host "Creating minimal config.h"
+            $configH = "#ifndef LAME_CONFIG_H`n#define LAME_CONFIG_H`n#define HAVE_INTTYPES_H 1`n#define HAVE_STDINT_H 1`n#define HAVE_STDLIB_H 1`n#define HAVE_STRING_H 1`n#define HAVE_STRINGS_H 0`n#define HAVE_SYS_STAT_H 0`n#define HAVE_SYS_TYPES_H 0`n#define HAVE_UNISTD_H 0`n#define SIZEOF_INT 4`n#define SIZEOF_LONG 4`n#define SIZEOF_LONG_LONG 8`n#define SIZEOF_FLOAT 4`n#define SIZEOF_DOUBLE 8`n#define HAVE_XMMINTRIN_H 1`n#endif"
+            Set-Content config.h -Value $configH -Encoding UTF8
+          }
+
+          $buildDir = "$env:TEMP\lame-src\build"
+          New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+
+          $srcFiles = @()
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
+
+          $objs = @()
+          foreach ($src in $srcFiles) {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
+            $obj = Join-Path $buildDir "$base.obj"
+            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
+            $objs += $obj
+          }
+
+          lib.exe /nologo /out:"$lamePrefix\lib\libmp3lame.lib" $objs
+          if ($LASTEXITCODE -ne 0) { throw "Failed to create libmp3lame.lib" }
+
+          Copy-Item "$lamePrefix\lib\libmp3lame.lib" "$lamePrefix\lib\mp3lame.lib" -Force
+          Copy-Item include\lame.h "$lamePrefix\include\lame\lame.h" -Force
+
+          $pcDir = "$lamePrefixMixed/lib/pkgconfig"
+          @(
+            "prefix=$lamePrefixMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -lmp3lame',
+            'Cflags: -I${includedir}'
+          ) | Set-Content "$pcDir/libmp3lame.pc" -Encoding UTF8
+
+          Write-Host "Built libmp3lame at $lamePrefix"
+          Get-ChildItem "$lamePrefix\lib\*.lib"
+          Get-Content "$pcDir/libmp3lame.pc"
+
+          echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: vcpkg deps
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl
-          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
-          $lameSrc = "$v\installed\x64-windows"
-          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
-          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1346,22 +1509,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
-          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
-          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
-          # so the .pc files only need to declare the library name. This avoids -L
-          # flags that the MSVC linker may not handle during configure tests.
-          Write-Utf8 "$pcDir/libmp3lame.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: libmp3lame',
-            'Description: LAME MP3 encoder library',
-            'Version: 3.100',
-            "Libs: $lameLib"
-          )
+          # libmp3lame.pc is provided by the standalone Build libmp3lame step.
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
@@ -1421,8 +1569,6 @@ jobs:
               Write-Host "Created alias $alias -> $actual"
             }
           }
-          Ensure-LibAlias $lameLib "mp3lame.lib"
-          Ensure-LibAlias $lameLib "libmp3lame.lib"
           Ensure-LibAlias $fdkLib "fdk-aac.lib"
           Ensure-LibAlias $fdkLib "libfdk-aac.lib"
           Ensure-LibAlias $vplLib "vpl.lib"
@@ -1436,8 +1582,10 @@ jobs:
 
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
-          Write-Host "libmp3lame.pc:"
-          Get-Content "$pcDir/libmp3lame.pc"
+          if ($env:LAME_PKG_CONFIG_PATH -and (Test-Path "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc")) {
+            Write-Host "libmp3lame.pc:"
+            Get-Content "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc"
+          }
           Write-Host "libfdk-aac.pc:"
           Get-Content "$pcDir/libfdk-aac.pc"
           Write-Host "vpl.pc:"
@@ -1445,7 +1593,9 @@ jobs:
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $lamePc = $env:LAME_PKG_CONFIG_PATH
+          $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
+          echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
         shell: bash
@@ -1663,8 +1813,8 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include" \
+            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl \
@@ -1889,20 +2039,83 @@ jobs:
             Write-Host "::warning::VS Clang not found; VMAF will fall back to MSVC with -Denable_asm=false"
           }
 
+      - name: Build libmp3lame (static)
+        shell: powershell
+        run: |
+          $lamePrefix = "$env:USERPROFILE\lame-install"
+          $lamePrefixMixed = $lamePrefix -replace '\\','/'
+          New-Item -ItemType Directory -Path "$lamePrefix\include\lame", "$lamePrefix\lib", "$lamePrefix\lib\pkgconfig" -Force | Out-Null
+
+          cd "$env:TEMP"
+          Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
+          git clone --depth 1 --branch 3.100 https://github.com/rbrito/lame.git lame-src
+          if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
+          cd lame-src
+
+          if (Test-Path configMS.h) {
+            Copy-Item configMS.h config.h -Force
+            Write-Host "Using configMS.h as config.h"
+          }
+          elseif (Test-Path vc_solution\config.h) {
+            Copy-Item vc_solution\config.h config.h -Force
+            Write-Host "Using vc_solution\config.h"
+          }
+          else {
+            Write-Host "Creating minimal config.h"
+            $configH = "#ifndef LAME_CONFIG_H`n#define LAME_CONFIG_H`n#define HAVE_INTTYPES_H 1`n#define HAVE_STDINT_H 1`n#define HAVE_STDLIB_H 1`n#define HAVE_STRING_H 1`n#define HAVE_STRINGS_H 0`n#define HAVE_SYS_STAT_H 0`n#define HAVE_SYS_TYPES_H 0`n#define HAVE_UNISTD_H 0`n#define SIZEOF_INT 4`n#define SIZEOF_LONG 4`n#define SIZEOF_LONG_LONG 8`n#define SIZEOF_FLOAT 4`n#define SIZEOF_DOUBLE 8`n#define HAVE_XMMINTRIN_H 1`n#endif"
+            Set-Content config.h -Value $configH -Encoding UTF8
+          }
+
+          $buildDir = "$env:TEMP\lame-src\build"
+          New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+
+          $srcFiles = @()
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
+
+          $objs = @()
+          foreach ($src in $srcFiles) {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
+            $obj = Join-Path $buildDir "$base.obj"
+            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
+            $objs += $obj
+          }
+
+          lib.exe /nologo /out:"$lamePrefix\lib\libmp3lame.lib" $objs
+          if ($LASTEXITCODE -ne 0) { throw "Failed to create libmp3lame.lib" }
+
+          Copy-Item "$lamePrefix\lib\libmp3lame.lib" "$lamePrefix\lib\mp3lame.lib" -Force
+          Copy-Item include\lame.h "$lamePrefix\include\lame\lame.h" -Force
+
+          $pcDir = "$lamePrefixMixed/lib/pkgconfig"
+          @(
+            "prefix=$lamePrefixMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: libmp3lame',
+            'Description: LAME MP3 encoder library',
+            'Version: 3.100',
+            'Libs: -lmp3lame',
+            'Cflags: -I${includedir}'
+          ) | Set-Content "$pcDir/libmp3lame.pc" -Encoding UTF8
+
+          Write-Host "Built libmp3lame at $lamePrefix"
+          Get-ChildItem "$lamePrefix\lib\*.lib"
+          Get-Content "$pcDir/libmp3lame.pc"
+
+          echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: vcpkg deps
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\arm64-windows-static"
-          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
           & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
-          & "$v\vcpkg.exe" install --triplet arm64-windows mp3lame
-          $lameSrc = "$v\installed\arm64-windows"
-          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
-          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1925,22 +2138,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
-          if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
-          # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
-          # so the .pc files only need to declare the library name. This avoids -L
-          # flags that the MSVC linker may not handle during configure tests.
-          Write-Utf8 "$pcDir/libmp3lame.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: libmp3lame',
-            'Description: LAME MP3 encoder library',
-            'Version: 3.100',
-            "Libs: $lameLib"
-          )
+          # libmp3lame.pc is provided by the standalone Build libmp3lame step.
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
@@ -1983,8 +2181,6 @@ jobs:
               Write-Host "Created alias $alias -> $actual"
             }
           }
-          Ensure-LibAlias $lameLib "mp3lame.lib"
-          Ensure-LibAlias $lameLib "libmp3lame.lib"
           Ensure-LibAlias $fdkLib "fdk-aac.lib"
           Ensure-LibAlias $fdkLib "libfdk-aac.lib"
           if ($vplLib) {
@@ -2000,14 +2196,18 @@ jobs:
 
           Write-Host "Installed import libraries:"
           Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
-          Write-Host "libmp3lame.pc:"
-          Get-Content "$pcDir/libmp3lame.pc"
+          if ($env:LAME_PKG_CONFIG_PATH -and (Test-Path "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc")) {
+            Write-Host "libmp3lame.pc:"
+            Get-Content "$env:LAME_PKG_CONFIG_PATH/libmp3lame.pc"
+          }
           Write-Host "libfdk-aac.pc:"
           Get-Content "$pcDir/libfdk-aac.pc"
 
           echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $lamePc = $env:LAME_PKG_CONFIG_PATH
+          $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
+          echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Check vcpkg pkg-config
         shell: bash
@@ -2209,8 +2409,8 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
