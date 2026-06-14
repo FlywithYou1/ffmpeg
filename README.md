@@ -10,6 +10,8 @@
 
 从 [Releases](https://github.com/FlywithYou1/ffmpeg/releases) 下载，每个压缩包包含 `ffmpeg.exe` + `ffprobe.exe` + `ffplay.exe`。
 
+Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**无需额外 DLL**。
+
 ### Linux (x86_64)
 
 | Artifact | GPU | HW Accel | VMAF |

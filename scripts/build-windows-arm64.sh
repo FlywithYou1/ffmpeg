@@ -48,7 +48,7 @@ export PATH="${P}/bin:${PATH}"
 
 # Resolve default vcpkg root before pkg-config detection uses it.
 VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
-[ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/arm64-windows" ] && VCPKG_INSTALLED="/c/vcpkg/installed/arm64-windows"
+[ -z "${VCPKG_INSTALLED}" ] && [ -d "/c/vcpkg/installed/arm64-windows-static" ] && VCPKG_INSTALLED="/c/vcpkg/installed/arm64-windows-static"
 [ -n "${VCPKG_INSTALLED}" ] && echo "vcpkg: $VCPKG_INSTALLED"
 
 export PKG_CONFIG_PATH="${P_MIXED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
@@ -290,6 +290,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
 
 ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
+  --pkg-config-flags="--static" \
   --extra-cflags="-I${P_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \

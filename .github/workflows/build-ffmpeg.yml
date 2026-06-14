@@ -308,8 +308,8 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
-          $inst = "$v\installed\x64-windows"
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
+          $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -726,6 +726,7 @@ jobs:
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
+            --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -854,8 +855,8 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
-          $inst = "$v\installed\x64-windows"
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
+          $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1159,6 +1160,7 @@ jobs:
           AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
+            --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -1286,8 +1288,8 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet x64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl
-          $inst = "$v\installed\x64-windows"
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl
+          $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1621,6 +1623,7 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
+            --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
@@ -1851,8 +1854,8 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          & "$v\vcpkg.exe" install --triplet arm64-windows pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
-          $inst = "$v\installed\arm64-windows"
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
+          $inst = "$v\installed\arm64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -2153,6 +2156,7 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
             --pkg-config="$PKG_CONFIG" \
+            --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
