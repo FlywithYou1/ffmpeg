@@ -308,6 +308,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
@@ -860,6 +861,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
@@ -1298,6 +1300,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl
           $inst = "$v\installed\x64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
@@ -1869,6 +1872,7 @@ jobs:
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
           & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\arm64-windows-static"
           # Convert to forward slashes so pkg-config (bash) can use the path
