@@ -112,7 +112,28 @@ bash ffmpeg-archlinux-nvidia.sh
 
 ---
 
+## 🏷️ 发版
+
+Release 由 Git tag 触发。推送 tag 后 GitHub Actions 会自动构建所有平台并创建 Release：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+也可以手动在 Actions 页面点击 **Run workflow** 触发。
+
+---
+
 ## ⚠️ 技术说明
+
+### Windows MSVC 运行时
+
+Windows 构建统一使用 **/MT 静态运行时**，避免 FFmpeg 与 VMAF 等 C/C++ 依赖之间出现 `RuntimeLibrary mismatch`。
+
+### Windows ARM64 汇编
+
+ARM64 构建使用 [gas-preprocessor](https://github.com/FFmpeg/gas-preprocessor) 将 FFmpeg 的 GNU 汇编语法转换为 MSVC `armasm64.exe` 可识别的语法，从而保留 NEON 优化。
 
 ### Windows pkg-config 路径分隔符
 
