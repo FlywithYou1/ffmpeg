@@ -313,7 +313,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
+          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -335,14 +335,15 @@ jobs:
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
           $srcFiles = @()
-          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
+          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -923,7 +924,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
+          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -945,14 +946,15 @@ jobs:
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
           $srcFiles = @()
-          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
+          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -1419,7 +1421,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
+          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -1441,14 +1443,15 @@ jobs:
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
           $srcFiles = @()
-          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
+          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -2048,7 +2051,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
+          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -2070,14 +2073,15 @@ jobs:
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
           $srcFiles = @()
-          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
+          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
+          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
