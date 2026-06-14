@@ -317,9 +317,14 @@ jobs:
 
           function Find-ImportLib($candidates) {
             foreach ($name in $candidates) {
-              $p = Join-Path "$inst\lib" "$name.lib"
-              if (Test-Path $p) { return "$name.lib" }
+              foreach ($suffix in @('', '-static', '_static')) {
+                $p = Join-Path "$inst\lib" "${name}${suffix}.lib"
+                if (Test-Path $p) { return "${name}${suffix}.lib" }
+              }
             }
+            # Diagnostic: show available .lib files to help name mismatches
+            Write-Host "Available .lib files under ${inst}\lib:"
+            Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
             return $null
           }
           function Write-Utf8($path, $lines) {
@@ -361,7 +366,7 @@ jobs:
           $sdl2Lib = Find-ImportLib @('SDL2')
           if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
           $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
           Write-Utf8 "$pcDir/sdl2.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -864,9 +869,14 @@ jobs:
 
           function Find-ImportLib($candidates) {
             foreach ($name in $candidates) {
-              $p = Join-Path "$inst\lib" "$name.lib"
-              if (Test-Path $p) { return "$name.lib" }
+              foreach ($suffix in @('', '-static', '_static')) {
+                $p = Join-Path "$inst\lib" "${name}${suffix}.lib"
+                if (Test-Path $p) { return "${name}${suffix}.lib" }
+              }
             }
+            # Diagnostic: show available .lib files to help name mismatches
+            Write-Host "Available .lib files under ${inst}\lib:"
+            Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
             return $null
           }
           function Write-Utf8($path, $lines) {
@@ -908,7 +918,7 @@ jobs:
           $sdl2Lib = Find-ImportLib @('SDL2')
           if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
           $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
           Write-Utf8 "$pcDir/sdl2.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -1297,9 +1307,14 @@ jobs:
 
           function Find-ImportLib($candidates) {
             foreach ($name in $candidates) {
-              $p = Join-Path "$inst\lib" "$name.lib"
-              if (Test-Path $p) { return "$name.lib" }
+              foreach ($suffix in @('', '-static', '_static')) {
+                $p = Join-Path "$inst\lib" "${name}${suffix}.lib"
+                if (Test-Path $p) { return "${name}${suffix}.lib" }
+              }
             }
+            # Diagnostic: show available .lib files to help name mismatches
+            Write-Host "Available .lib files under ${inst}\lib:"
+            Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
             return $null
           }
           function Write-Utf8($path, $lines) {
@@ -1341,7 +1356,7 @@ jobs:
           $sdl2Lib = Find-ImportLib @('SDL2')
           if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
           $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
           Write-Utf8 "$pcDir/sdl2.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -1863,9 +1878,14 @@ jobs:
 
           function Find-ImportLib($candidates) {
             foreach ($name in $candidates) {
-              $p = Join-Path "$inst\lib" "$name.lib"
-              if (Test-Path $p) { return "$name.lib" }
+              foreach ($suffix in @('', '-static', '_static')) {
+                $p = Join-Path "$inst\lib" "${name}${suffix}.lib"
+                if (Test-Path $p) { return "${name}${suffix}.lib" }
+              }
             }
+            # Diagnostic: show available .lib files to help name mismatches
+            Write-Host "Available .lib files under ${inst}\lib:"
+            Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
             return $null
           }
           function Write-Utf8($path, $lines) {
@@ -1907,7 +1927,7 @@ jobs:
           $sdl2Lib = Find-ImportLib @('SDL2')
           if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
           $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "-lSDL2main -lSDL2" } else { "-lSDL2" }
+          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
           Write-Utf8 "$pcDir/sdl2.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',

@@ -68,10 +68,12 @@ if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; the
 
   find_import_lib() {
     for name in "$@"; do
-      if [ -f "${VCPKG_INSTALLED}/lib/${name}.lib" ]; then
-        echo "${name}.lib"
-        return 0
-      fi
+      for suffix in "" "-static" "_static"; do
+        if [ -f "${VCPKG_INSTALLED}/lib/${name}${suffix}.lib" ]; then
+          echo "${name}${suffix}.lib"
+          return 0
+        fi
+      done
     done
     return 1
   }
@@ -116,7 +118,7 @@ includedir=\${prefix}/include
 Name: sdl2
 Description: Simple DirectMedia Layer
 Version: 2.30.0
-Libs: ${sdl2main_lib:+-lSDL2main }-lSDL2
+Libs: ${sdl2main_lib:+$sdl2main_lib }$sdl2_lib
 Cflags: -I\${includedir} -I\${includedir}/SDL2
 EOF
 
