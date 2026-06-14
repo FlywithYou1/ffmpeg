@@ -427,23 +427,28 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
-          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
-          $sdl2Lib = Find-ImportLib @('SDL2')
-          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
-          $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
-          Write-Utf8 "$pcDir/sdl2.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: sdl2',
-            'Description: Simple DirectMedia Layer',
-            'Version: 2.30.0',
-            "Libs: $sdl2Libs",
-            'Cflags: -I${includedir} -I${includedir}/SDL2'
-          )
+          # SDL2 is required by ffplay; vcpkg newer ports ship sdl2.pc, only create a fallback.
+          if (-not (Test-Path "$pcDir/sdl2.pc")) {
+            $sdl2Lib = Find-ImportLib @('SDL2')
+            if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+            $sdl2mainLib = Find-ImportLib @('SDL2main')
+            $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+            Write-Utf8 "$pcDir/sdl2.pc" @(
+              "prefix=$instMixed",
+              'exec_prefix=${prefix}',
+              'libdir=${prefix}/lib',
+              'includedir=${prefix}/include',
+              '',
+              'Name: sdl2',
+              'Description: Simple DirectMedia Layer',
+              'Version: 2.30.0',
+              "Libs: $sdl2Libs",
+              'Cflags: -I${includedir} -I${includedir}/SDL2'
+            )
+            Write-Host "Created fallback sdl2.pc"
+          } else {
+            Write-Host "Using vcpkg-provided sdl2.pc"
+          }
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -1046,23 +1051,28 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
-          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
-          $sdl2Lib = Find-ImportLib @('SDL2')
-          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
-          $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
-          Write-Utf8 "$pcDir/sdl2.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: sdl2',
-            'Description: Simple DirectMedia Layer',
-            'Version: 2.30.0',
-            "Libs: $sdl2Libs",
-            'Cflags: -I${includedir} -I${includedir}/SDL2'
-          )
+          # SDL2 is required by ffplay; vcpkg newer ports ship sdl2.pc, only create a fallback.
+          if (-not (Test-Path "$pcDir/sdl2.pc")) {
+            $sdl2Lib = Find-ImportLib @('SDL2')
+            if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+            $sdl2mainLib = Find-ImportLib @('SDL2main')
+            $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+            Write-Utf8 "$pcDir/sdl2.pc" @(
+              "prefix=$instMixed",
+              'exec_prefix=${prefix}',
+              'libdir=${prefix}/lib',
+              'includedir=${prefix}/include',
+              '',
+              'Name: sdl2',
+              'Description: Simple DirectMedia Layer',
+              'Version: 2.30.0',
+              "Libs: $sdl2Libs",
+              'Cflags: -I${includedir} -I${includedir}/SDL2'
+            )
+            Write-Host "Created fallback sdl2.pc"
+          } else {
+            Write-Host "Using vcpkg-provided sdl2.pc"
+          }
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -1551,23 +1561,28 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
-          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
-          $sdl2Lib = Find-ImportLib @('SDL2')
-          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
-          $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
-          Write-Utf8 "$pcDir/sdl2.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: sdl2',
-            'Description: Simple DirectMedia Layer',
-            'Version: 2.30.0',
-            "Libs: $sdl2Libs",
-            'Cflags: -I${includedir} -I${includedir}/SDL2'
-          )
+          # SDL2 is required by ffplay; vcpkg newer ports ship sdl2.pc, only create a fallback.
+          if (-not (Test-Path "$pcDir/sdl2.pc")) {
+            $sdl2Lib = Find-ImportLib @('SDL2')
+            if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+            $sdl2mainLib = Find-ImportLib @('SDL2main')
+            $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+            Write-Utf8 "$pcDir/sdl2.pc" @(
+              "prefix=$instMixed",
+              'exec_prefix=${prefix}',
+              'libdir=${prefix}/lib',
+              'includedir=${prefix}/include',
+              '',
+              'Name: sdl2',
+              'Description: Simple DirectMedia Layer',
+              'Version: 2.30.0',
+              "Libs: $sdl2Libs",
+              'Cflags: -I${includedir} -I${includedir}/SDL2'
+            )
+            Write-Host "Created fallback sdl2.pc"
+          } else {
+            Write-Host "Using vcpkg-provided sdl2.pc"
+          }
 
           # vpl.pc — vcpkg libvpl uses cmake-config, ffmpeg needs pkg-config
           # oneVPL 2.x headers live under include/vpl/; include parent too for compat
@@ -2189,23 +2204,28 @@ jobs:
             'Version: 2.0.2',
             "Libs: $fdkLib"
           )
-          # SDL2 is required by ffplay; vcpkg does not always ship sdl2.pc
-          $sdl2Lib = Find-ImportLib @('SDL2')
-          if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
-          $sdl2mainLib = Find-ImportLib @('SDL2main')
-          $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
-          Write-Utf8 "$pcDir/sdl2.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: sdl2',
-            'Description: Simple DirectMedia Layer',
-            'Version: 2.30.0',
-            "Libs: $sdl2Libs",
-            'Cflags: -I${includedir} -I${includedir}/SDL2'
-          )
+          # SDL2 is required by ffplay; vcpkg newer ports ship sdl2.pc, only create a fallback.
+          if (-not (Test-Path "$pcDir/sdl2.pc")) {
+            $sdl2Lib = Find-ImportLib @('SDL2')
+            if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+            $sdl2mainLib = Find-ImportLib @('SDL2main')
+            $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+            Write-Utf8 "$pcDir/sdl2.pc" @(
+              "prefix=$instMixed",
+              'exec_prefix=${prefix}',
+              'libdir=${prefix}/lib',
+              'includedir=${prefix}/include',
+              '',
+              'Name: sdl2',
+              'Description: Simple DirectMedia Layer',
+              'Version: 2.30.0',
+              "Libs: $sdl2Libs",
+              'Cflags: -I${includedir} -I${includedir}/SDL2'
+            )
+            Write-Host "Created fallback sdl2.pc"
+          } else {
+            Write-Host "Using vcpkg-provided sdl2.pc"
+          }
 
           # Also create alternate import-library names so ffmpeg's non-pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.

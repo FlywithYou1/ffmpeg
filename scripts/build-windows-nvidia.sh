@@ -150,9 +150,10 @@ Libs: ${fdk_lib}
 EOF
 
   # SDL2 (ffplay 需要)
-  sdl2_lib="$(find_import_lib SDL2)" || { echo "错误：未找到 SDL2 import library"; exit 1; }
-  sdl2main_lib="$(find_import_lib SDL2main)" || sdl2main_lib=""
-  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/sdl2.pc" <<EOF
+  if [ ! -f "${VCPKG_INSTALLED}/lib/pkgconfig/sdl2.pc" ]; then
+    sdl2_lib="$(find_import_lib SDL2)" || { echo "错误：未找到 SDL2 import library"; exit 1; }
+    sdl2main_lib="$(find_import_lib SDL2main)" || sdl2main_lib=""
+    cat > "${VCPKG_INSTALLED}/lib/pkgconfig/sdl2.pc" <<EOF
 prefix=${VCPKG_INSTALLED_MIXED}
 exec_prefix=\${prefix}
 libdir=\${prefix}/lib
@@ -164,6 +165,7 @@ Version: 2.30.0
 Libs: ${sdl2main_lib:+$sdl2main_lib }$sdl2_lib
 Cflags: -I\${includedir} -I\${includedir}/SDL2
 EOF
+  fi
 
   # 创建库名别名，避免 ffmpeg fallback 找不到文件
   ensure_lib_alias() {
