@@ -313,7 +313,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
+          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -923,7 +923,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
+          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -1419,7 +1419,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
+          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
@@ -2048,7 +2048,7 @@ jobs:
 
           cd "$env:TEMP"
           Remove-Item -Recurse -Force lame-src -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/TimothyGu/lame.git lame-src
+          git clone --depth 1 https://git.code.sf.net/p/lame/lame lame-src
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone LAME source" }
           cd lame-src
 
