@@ -334,16 +334,24 @@ jobs:
           $buildDir = "$env:TEMP\lame-src\build"
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
+          # Patch vector sources for MSVC: ensure stdint.h is included first
+          Get-ChildItem libmp3lame\vector\*.c -ErrorAction SilentlyContinue | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -notmatch '#include\s+<stdint\.h>') {
+              Set-Content $_.FullName "#include <stdint.h>`n$content" -NoNewline
+              Write-Host "Patched $($_.Name) to include stdint.h"
+            }
+          }
+
           $srcFiles = @()
-          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
-          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /FIstdint.h /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -945,16 +953,24 @@ jobs:
           $buildDir = "$env:TEMP\lame-src\build"
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
+          # Patch vector sources for MSVC: ensure stdint.h is included first
+          Get-ChildItem libmp3lame\vector\*.c -ErrorAction SilentlyContinue | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -notmatch '#include\s+<stdint\.h>') {
+              Set-Content $_.FullName "#include <stdint.h>`n$content" -NoNewline
+              Write-Host "Patched $($_.Name) to include stdint.h"
+            }
+          }
+
           $srcFiles = @()
-          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
-          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /FIstdint.h /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -1442,16 +1458,24 @@ jobs:
           $buildDir = "$env:TEMP\lame-src\build"
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
+          # Patch vector sources for MSVC: ensure stdint.h is included first
+          Get-ChildItem libmp3lame\vector\*.c -ErrorAction SilentlyContinue | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -notmatch '#include\s+<stdint\.h>') {
+              Set-Content $_.FullName "#include <stdint.h>`n$content" -NoNewline
+              Write-Host "Patched $($_.Name) to include stdint.h"
+            }
+          }
+
           $srcFiles = @()
-          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
-          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /FIstdint.h /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
@@ -2072,16 +2096,24 @@ jobs:
           $buildDir = "$env:TEMP\lame-src\build"
           New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
+          # Patch vector sources for MSVC: ensure stdint.h is included first
+          Get-ChildItem libmp3lame\vector\*.c -ErrorAction SilentlyContinue | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -notmatch '#include\s+<stdint\.h>') {
+              Set-Content $_.FullName "#include <stdint.h>`n$content" -NoNewline
+              Write-Host "Patched $($_.Name) to include stdint.h"
+            }
+          }
+
           $srcFiles = @()
-          # NOTE: exclude libmp3lame/vector/*.c; it requires extra intrinsics setup and is optional
-          Get-ChildItem libmp3lame\*.c | ForEach-Object { $srcFiles += $_.FullName }
+          Get-ChildItem libmp3lame\*.c -Recurse | ForEach-Object { $srcFiles += $_.FullName }
           Get-ChildItem mpglib\*.c | ForEach-Object { $srcFiles += $_.FullName }
 
           $objs = @()
           foreach ($src in $srcFiles) {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($src)
             $obj = Join-Path $buildDir "$base.obj"
-            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
+            cl.exe /nologo /MT /O2 /c /W0 /DHAVE_CONFIG_H /FIstdint.h /Iinclude /Ilibmp3lame /Impglib /I. "$src" /Fo"$obj"
             if ($LASTEXITCODE -ne 0) { throw "Failed to compile $src" }
             $objs += $obj
           }
