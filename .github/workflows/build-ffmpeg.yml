@@ -830,17 +830,6 @@ jobs:
           echo "=== pkg-config vpl ==="
           $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
-      - name: Copy DLLs
-        shell: powershell
-        run: |
-          $src = "$env:VCPKG_INSTALLED\bin"
-          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path $dst -Force | Out-Null
-          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName $dst -Force
-            Write-Host "  copied $($_.Name)"
-          }
-
       - name: Verify
         shell: bash
         run: |
@@ -855,7 +844,7 @@ jobs:
         run: |
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-nvidia.zip -Force
 
       - uses: actions/upload-artifact@v4
@@ -1340,17 +1329,6 @@ jobs:
           echo "=== pkg-config vpl ==="
           $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
-      - name: Copy DLLs
-        shell: powershell
-        run: |
-          $src = "$env:VCPKG_INSTALLED\bin"
-          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path $dst -Force | Out-Null
-          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName $dst -Force
-            Write-Host "  copied $($_.Name)"
-          }
-
       - name: Verify
         shell: bash
         run: |
@@ -1365,7 +1343,7 @@ jobs:
         run: |
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-amd-amf.zip -Force
 
       - uses: actions/upload-artifact@v4
@@ -1880,17 +1858,6 @@ jobs:
           echo "=== pkg-config vpl ==="
           $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
-      - name: Copy DLLs
-        shell: powershell
-        run: |
-          $src = "$env:VCPKG_INSTALLED\bin"
-          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path $dst -Force | Out-Null
-          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName $dst -Force
-            Write-Host "  copied $($_.Name)"
-          }
-
       - name: Verify
         shell: bash
         run: |
@@ -1905,7 +1872,7 @@ jobs:
         run: |
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-intel-qsv.zip -Force
 
       - uses: actions/upload-artifact@v4
@@ -2491,17 +2458,6 @@ jobs:
           echo "=== pkg-config vpl ==="
           $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
 
-      - name: Copy DLLs
-        shell: powershell
-        run: |
-          $src = "$env:VCPKG_INSTALLED\bin"
-          $dst = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path $dst -Force | Out-Null
-          Get-ChildItem "$src\*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName $dst -Force
-            Write-Host "  copied $($_.Name)"
-          }
-
       - name: Verify
         shell: bash
         run: |
@@ -2522,7 +2478,7 @@ jobs:
         run: |
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe","$b\*.dll" dist\ -ErrorAction SilentlyContinue
+          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-arm64.zip -Force
 
       - uses: actions/upload-artifact@v4
