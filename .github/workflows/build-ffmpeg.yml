@@ -309,8 +309,15 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows-static"
+          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
+          $lameSrc = "$v\installed\x64-windows"
+          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
+          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -333,7 +340,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
           # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
           # so the .pc files only need to declare the library name. This avoids -L
@@ -862,8 +869,15 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\x64-windows-static"
+          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
+          $lameSrc = "$v\installed\x64-windows"
+          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
+          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -886,7 +900,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
           # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
           # so the .pc files only need to declare the library name. This avoids -L
@@ -1301,8 +1315,15 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl
           $inst = "$v\installed\x64-windows-static"
+          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl
+          & "$v\vcpkg.exe" install --triplet x64-windows mp3lame
+          $lameSrc = "$v\installed\x64-windows"
+          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
+          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1325,7 +1346,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
           # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
           # so the .pc files only need to declare the library name. This avoids -L
@@ -1873,8 +1894,15 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads
           $inst = "$v\installed\arm64-windows-static"
+          # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads
+          & "$v\vcpkg.exe" install --triplet arm64-windows mp3lame
+          $lameSrc = "$v\installed\arm64-windows"
+          Copy-Item "$lameSrc\lib\libmp3lame.lib" "$inst\lib\libmp3lame.lib" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$lameSrc\lib\mp3lame.lib" "$inst\lib\mp3lame.lib" -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path "$inst\bin" -Force | Out-Null
+          Copy-Item "$lameSrc\bin\*.dll" "$inst\bin\" -Force -ErrorAction SilentlyContinue
           # Convert to forward slashes so pkg-config (bash) can use the path
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1897,7 +1925,7 @@ jobs:
           }
 
           # vcpkg ports do not always ship pkg-config files; create the ones ffmpeg expects.
-          $lameLib = Find-ImportLib @('mp3lame','libmp3lame')
+          $lameLib = Find-ImportLib @('libmp3lame','mp3lame')
           if (-not $lameLib) { throw "mp3lame import library not found under $inst\lib" }
           # For MSVC we already pass -I/-LIBPATH via --extra-cflags/--extra-ldflags,
           # so the .pc files only need to declare the library name. This avoids -L

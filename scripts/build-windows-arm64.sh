@@ -80,7 +80,16 @@ if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; the
 
   mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
 
-  lame_lib="$(find_import_lib mp3lame libmp3lame)" || { echo "错误：未找到 mp3lame import library"; exit 1; }
+  # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet 的 import lib + DLL
+  VCPKG_INSTALLED_DYNAMIC="${VCPKG_INSTALLED/%static/dynamic}"
+  if [ -d "${VCPKG_INSTALLED_DYNAMIC}/lib" ]; then
+    cp "${VCPKG_INSTALLED_DYNAMIC}/lib/libmp3lame.lib" "${VCPKG_INSTALLED}/lib/libmp3lame.lib" 2>/dev/null || true
+    cp "${VCPKG_INSTALLED_DYNAMIC}/lib/mp3lame.lib" "${VCPKG_INSTALLED}/lib/mp3lame.lib" 2>/dev/null || true
+    mkdir -p "${VCPKG_INSTALLED}/bin"
+    cp "${VCPKG_INSTALLED_DYNAMIC}/bin/"*.dll "${VCPKG_INSTALLED}/bin/" 2>/dev/null || true
+  fi
+
+  lame_lib="$(find_import_lib libmp3lame mp3lame)" || { echo "错误：未找到 mp3lame import library"; exit 1; }
   cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
 prefix=${VCPKG_INSTALLED_MIXED}
 exec_prefix=\${prefix}
