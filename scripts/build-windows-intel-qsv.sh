@@ -333,7 +333,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --pkg-config-flags="--static" \
   --extra-cflags="-I${P_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
-  --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libvpl \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
