@@ -415,9 +415,10 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
           Write-Host "nuget: $nuget"
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
@@ -1524,9 +1525,10 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
           Write-Host "nuget: $nuget"
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
@@ -2525,9 +2527,10 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
           Write-Host "nuget: $nuget"
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
@@ -3679,9 +3682,10 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
           Write-Host "nuget: $nuget"
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
@@ -4796,9 +4800,10 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
           Write-Host "nuget: $nuget"
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
