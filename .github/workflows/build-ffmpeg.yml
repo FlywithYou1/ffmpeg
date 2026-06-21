@@ -33,7 +33,7 @@ jobs:
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev
+            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc
 
       - name: 安装 CUDA 工具包
         run: |
@@ -94,7 +94,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl -lstdc++" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc \
+            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -140,7 +140,7 @@ jobs:
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev
+            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -167,7 +167,7 @@ jobs:
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libvpl --enable-vaapi \
+            --enable-libvmaf --enable-libvpl --enable-vaapi --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -214,7 +214,7 @@ jobs:
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev
+            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -245,7 +245,7 @@ jobs:
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-vaapi \
+            --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -413,7 +413,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -954,6 +954,8 @@ jobs:
           $lamePc = $env:LAME_PKG_CONFIG_PATH
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $shadercTools = "$inst\tools\shaderc"
+          if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
 
       - name: 从源码编译 zimg
         shell: powershell
@@ -1320,7 +1322,7 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc \
+            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -1507,7 +1509,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -2048,6 +2050,8 @@ jobs:
           $lamePc = $env:LAME_PKG_CONFIG_PATH
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $shadercTools = "$inst\tools\shaderc"
+          if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
 
       - name: 从源码编译 zimg
         shell: powershell
@@ -2293,7 +2297,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-amf \
+            --enable-libvmaf --enable-amf --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -2480,7 +2484,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -3038,6 +3042,8 @@ jobs:
           $lamePc = $env:LAME_PKG_CONFIG_PATH
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $shadercTools = "$inst\tools\shaderc"
+          if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
 
       - name: 从源码编译 zimg
         shell: powershell
@@ -3296,7 +3302,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libvpl \
+            --enable-libvmaf --enable-libvpl --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -3351,7 +3357,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -3385,6 +3391,14 @@ jobs:
           # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
           [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
           BREW_PREFIX="$(brew --prefix)"
+          MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
+          if [ -d "${MVK_PREFIX}/include" ]; then
+            MVK_CFLAGS="-I${MVK_PREFIX}/include"
+            MVK_LDFLAGS="-L${MVK_PREFIX}/lib -Wl,-rpath,${MVK_PREFIX}/lib"
+          else
+            MVK_CFLAGS=""
+            MVK_LDFLAGS=""
+          fi
           # 复制并修复 Homebrew 的 .pc（macOS 没有 libstdc++）
           for pc_dir in "${BREW_PREFIX}/lib/pkgconfig" /opt/homebrew/opt/*/lib/pkgconfig; do
             [ -d "$pc_dir" ] || continue
@@ -3404,11 +3418,11 @@ jobs:
           sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           rm -f configure.bak
           ./configure --prefix="$P" \
-            --extra-cflags="-I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
-            --extra-ldflags="-L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
+            --extra-cflags="-I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
+            --extra-ldflags="-L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
             --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
@@ -3598,7 +3612,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -4139,6 +4153,8 @@ jobs:
           $lamePc = $env:LAME_PKG_CONFIG_PATH
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $shadercTools = "$inst\tools\shaderc"
+          if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
 
       - name: 从源码编译 zimg
         shell: powershell
@@ -4381,7 +4397,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
             --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
             --disable-doc
           make -j"$(nproc)" && make install
@@ -4452,7 +4468,7 @@ jobs:
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev
+            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc
 
       - name: 安装 CUDA 工具包
         run: |
@@ -4513,7 +4529,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl -lstdc++" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc \
+            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-vaapi --enable-libvpl \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
@@ -4687,7 +4703,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -5245,6 +5261,8 @@ jobs:
           $lamePc = $env:LAME_PKG_CONFIG_PATH
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $shadercTools = "$inst\tools\shaderc"
+          if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
 
       - name: 从源码编译 zimg
         shell: powershell
@@ -5621,7 +5639,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc \
+            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-amf --enable-libvpl \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install

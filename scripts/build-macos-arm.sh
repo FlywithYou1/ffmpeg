@@ -17,6 +17,11 @@ echo "=========================================="
 
 command -v brew >/dev/null 2>&1 || { echo "请先安装 Homebrew: https://brew.sh"; exit 1; }
 
+# 确保 Vulkan / OpenCL 后端依赖存在
+for pkg in molten-vk shaderc; do
+  brew list "$pkg" &>/dev/null || brew install "$pkg"
+done
+
 export PATH="${P}/bin:${PATH}"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
@@ -56,6 +61,14 @@ LAMEPC
 [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
   ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
 BREW_PREFIX="$(brew --prefix)"
+MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
+if [ -d "${MVK_PREFIX}/include" ]; then
+  MVK_CFLAGS="-I${MVK_PREFIX}/include"
+  MVK_LDFLAGS="-L${MVK_PREFIX}/lib -Wl,-rpath,${MVK_PREFIX}/lib"
+else
+  MVK_CFLAGS=""
+  MVK_LDFLAGS=""
+fi
 # 复制并修复 Homebrew 的 .pc（macOS 没有 libstdc++）
 for pc_dir in "${BREW_PREFIX}/lib/pkgconfig" /opt/homebrew/opt/*/lib/pkgconfig; do
   [ -d "$pc_dir" ] || continue
@@ -73,11 +86,11 @@ cd ffmpeg-src
 sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
 rm -f configure.bak
 ./configure --prefix="$P" \
-  --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
-  --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
+  --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
+  --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
   --extra-libs="-lpthread -lm" \
   --enable-gpl --enable-version3 --enable-nonfree \
-  --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
+  --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
   --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
   --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
   --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
