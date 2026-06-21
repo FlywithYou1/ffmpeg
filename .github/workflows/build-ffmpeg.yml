@@ -431,7 +431,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          git -C $v pull --quiet 2>$null
+          git -C $v pull --quiet 2>&1 | Out-Null
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
@@ -1553,7 +1553,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          git -C $v pull --quiet 2>$null
+          git -C $v pull --quiet 2>&1 | Out-Null
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
@@ -2554,7 +2554,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          git -C $v pull --quiet 2>$null
+          git -C $v pull --quiet 2>&1 | Out-Null
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
@@ -3708,7 +3708,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          git -C $v pull --quiet 2>$null
+          git -C $v pull --quiet 2>&1 | Out-Null
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
@@ -4825,7 +4825,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          git -C $v pull --quiet 2>$null
+          git -C $v pull --quiet 2>&1 | Out-Null
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
