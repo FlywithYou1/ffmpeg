@@ -276,6 +276,11 @@ jobs:
   windows-nvidia:
     name: Windows（NVIDIA NVENC/CUDA）
     runs-on: windows-2025-vs2026
+    permissions:
+      packages: write
+    env:
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -402,6 +407,22 @@ jobs:
 
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 配置 vcpkg NuGet 缓存
+        shell: powershell
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          Write-Host "nuget: $nuget"
+          & $nuget sources Remove -Name GitHubPackages 2>$null
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -973,7 +994,11 @@ jobs:
           $prefix = $env:VCPKG_INSTALLED
           New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
           Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
+          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          }
           Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
           Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
           $pcMixed = ($prefix -replace '\\','/')
@@ -1323,7 +1348,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1372,6 +1397,11 @@ jobs:
   windows-amd-amf:
     name: Windows（AMD AMF）
     runs-on: windows-2025-vs2026
+    permissions:
+      packages: write
+    env:
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -1498,6 +1528,22 @@ jobs:
 
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 配置 vcpkg NuGet 缓存
+        shell: powershell
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          Write-Host "nuget: $nuget"
+          & $nuget sources Remove -Name GitHubPackages 2>$null
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -2069,7 +2115,11 @@ jobs:
           $prefix = $env:VCPKG_INSTALLED
           New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
           Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
+          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          }
           Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
           Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
           $pcMixed = ($prefix -replace '\\','/')
@@ -2298,7 +2348,7 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2347,6 +2397,11 @@ jobs:
   windows-intel-qsv:
     name: Windows（Intel QSV）
     runs-on: windows-2025-vs2026
+    permissions:
+      packages: write
+    env:
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -2473,6 +2528,22 @@ jobs:
 
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 配置 vcpkg NuGet 缓存
+        shell: powershell
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          Write-Host "nuget: $nuget"
+          & $nuget sources Remove -Name GitHubPackages 2>$null
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -3061,7 +3132,11 @@ jobs:
           $prefix = $env:VCPKG_INSTALLED
           New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
           Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
+          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          }
           Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
           Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
           $pcMixed = ($prefix -replace '\\','/')
@@ -3303,7 +3378,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -3475,6 +3550,11 @@ jobs:
   windows-arm64:
     name: Windows ARM64（Snapdragon）
     runs-on: windows-11-vs2026-arm
+    permissions:
+      packages: write
+    env:
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -3601,6 +3681,22 @@ jobs:
 
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 配置 vcpkg NuGet 缓存
+        shell: powershell
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          Write-Host "nuget: $nuget"
+          & $nuget sources Remove -Name GitHubPackages 2>$null
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -4172,7 +4268,11 @@ jobs:
           $prefix = $env:VCPKG_INSTALLED
           New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
           Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
+          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          }
           Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
           Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
           $pcMixed = ($prefix -replace '\\','/')
@@ -4398,7 +4498,7 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
-            --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
+            --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation \
             --disable-doc
           make -j"$(nproc)" && make install
 
@@ -4566,6 +4666,11 @@ jobs:
   windows-x86-all:
     name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
     runs-on: windows-2025-vs2026
+    permissions:
+      packages: write
+    env:
+      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -4692,6 +4797,22 @@ jobs:
 
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: 配置 vcpkg NuGet 缓存
+        shell: powershell
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "无法获取 vcpkg 的 nuget" }
+          Write-Host "nuget: $nuget"
+          & $nuget sources Remove -Name GitHubPackages 2>$null
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -5280,7 +5401,11 @@ jobs:
           $prefix = $env:VCPKG_INSTALLED
           New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
           Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
+          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
+            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          }
           Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
           Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
           $pcMixed = ($prefix -replace '\\','/')
@@ -5641,7 +5766,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
