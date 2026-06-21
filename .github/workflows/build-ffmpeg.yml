@@ -449,7 +449,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads zimg x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -848,7 +848,7 @@ jobs:
                 "Name: zimg",
                 "Description: zimg library",
                 "Version: $(Get-PortVersion 'zimg')",
-                "Libs: $zimgLib",
+                "Libs: ${libdir}/$zimgLib",
                 "Cflags: -I${includedir}"
               )
               Write-Host "已创建回退 zimg.pc"
@@ -992,61 +992,6 @@ jobs:
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           $shadercTools = "$inst\tools\shaderc"
           if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
-
-      - name: 从源码编译 zimg
-        shell: powershell
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
 
       - name: 检查 vcpkg pkg-config
         shell: bash
@@ -1588,7 +1533,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads zimg x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1987,7 +1932,7 @@ jobs:
                 "Name: zimg",
                 "Description: zimg library",
                 "Version: $(Get-PortVersion 'zimg')",
-                "Libs: $zimgLib",
+                "Libs: ${libdir}/$zimgLib",
                 "Cflags: -I${includedir}"
               )
               Write-Host "已创建回退 zimg.pc"
@@ -2131,61 +2076,6 @@ jobs:
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           $shadercTools = "$inst\tools\shaderc"
           if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
-
-      - name: 从源码编译 zimg
-        shell: powershell
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
 
       - name: 检查 vcpkg pkg-config
         shell: bash
@@ -2620,7 +2510,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl zimg x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -3019,7 +2909,7 @@ jobs:
                 "Name: zimg",
                 "Description: zimg library",
                 "Version: $(Get-PortVersion 'zimg')",
-                "Libs: $zimgLib",
+                "Libs: ${libdir}/$zimgLib",
                 "Cflags: -I${includedir}"
               )
               Write-Host "已创建回退 zimg.pc"
@@ -3183,61 +3073,6 @@ jobs:
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           $shadercTools = "$inst\tools\shaderc"
           if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
-
-      - name: 从源码编译 zimg
-        shell: powershell
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
 
       - name: 检查 vcpkg pkg-config
         shell: bash
@@ -3808,7 +3643,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads zimg x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -4207,7 +4042,7 @@ jobs:
                 "Name: zimg",
                 "Description: zimg library",
                 "Version: $(Get-PortVersion 'zimg')",
-                "Libs: $zimgLib",
+                "Libs: ${libdir}/$zimgLib",
                 "Cflags: -I${includedir}"
               )
               Write-Host "已创建回退 zimg.pc"
@@ -4351,61 +4186,6 @@ jobs:
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           $shadercTools = "$inst\tools\shaderc"
           if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
-
-      - name: 从源码编译 zimg
-        shell: powershell
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
 
       - name: 检查 vcpkg pkg-config
         shell: bash
@@ -4956,7 +4736,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl zimg x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -5355,7 +5135,7 @@ jobs:
                 "Name: zimg",
                 "Description: zimg library",
                 "Version: $(Get-PortVersion 'zimg')",
-                "Libs: $zimgLib",
+                "Libs: ${libdir}/$zimgLib",
                 "Cflags: -I${includedir}"
               )
               Write-Host "已创建回退 zimg.pc"
@@ -5519,61 +5299,6 @@ jobs:
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           $shadercTools = "$inst\tools\shaderc"
           if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
-
-      - name: 从源码编译 zimg
-        shell: powershell
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
 
       - name: 检查 vcpkg pkg-config
         shell: bash
