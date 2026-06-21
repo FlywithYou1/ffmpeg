@@ -280,7 +280,6 @@ jobs:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -423,6 +422,8 @@ jobs:
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
           & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -1401,7 +1402,6 @@ jobs:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -1544,6 +1544,8 @@ jobs:
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
           & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -2401,7 +2403,6 @@ jobs:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -2544,6 +2545,8 @@ jobs:
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
           & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -3554,7 +3557,6 @@ jobs:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -3697,6 +3699,8 @@ jobs:
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
           & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: powershell
@@ -4670,7 +4674,6 @@ jobs:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -4813,6 +4816,8 @@ jobs:
           & $nuget sources Remove -Name GitHubPackages 2>$null
           & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
           & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: powershell
