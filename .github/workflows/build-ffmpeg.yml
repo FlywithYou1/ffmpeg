@@ -955,6 +955,41 @@ jobs:
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: 从源码编译 zimg
+        shell: powershell
+        run: |
+          $zimgRoot = "$env:TEMP\zimg-src"
+          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
+          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          cd $zimgRoot
+          git submodule update --init --recursive --depth 1
+          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
+          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
+          if (-not $lib) { throw "z.lib not found after building zimg" }
+          $prefix = $env:VCPKG_INSTALLED
+          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
+          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
+          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
+          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
+          $pcMixed = ($prefix -replace '\\','/')
+          $pc = @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: zimg',
+            'Description: z.lib image processing library',
+            "Version: $ver",
+            'Libs: -L${libdir} -lzimg',
+            'Cflags: -I${includedir}'
+          )
+          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "zimg $ver built for $plat"
+
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
@@ -1286,7 +1321,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-libnpp \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2014,6 +2049,41 @@ jobs:
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: 从源码编译 zimg
+        shell: powershell
+        run: |
+          $zimgRoot = "$env:TEMP\zimg-src"
+          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
+          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          cd $zimgRoot
+          git submodule update --init --recursive --depth 1
+          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
+          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
+          if (-not $lib) { throw "z.lib not found after building zimg" }
+          $prefix = $env:VCPKG_INSTALLED
+          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
+          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
+          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
+          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
+          $pcMixed = ($prefix -replace '\\','/')
+          $pc = @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: zimg',
+            'Description: z.lib image processing library',
+            "Version: $ver",
+            'Libs: -L${libdir} -lzimg',
+            'Cflags: -I${includedir}'
+          )
+          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "zimg $ver built for $plat"
+
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
@@ -2224,7 +2294,7 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2969,6 +3039,41 @@ jobs:
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: 从源码编译 zimg
+        shell: powershell
+        run: |
+          $zimgRoot = "$env:TEMP\zimg-src"
+          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
+          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          cd $zimgRoot
+          git submodule update --init --recursive --depth 1
+          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
+          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
+          if (-not $lib) { throw "z.lib not found after building zimg" }
+          $prefix = $env:VCPKG_INSTALLED
+          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
+          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
+          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
+          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
+          $pcMixed = ($prefix -replace '\\','/')
+          $pc = @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: zimg',
+            'Description: z.lib image processing library',
+            "Version: $ver",
+            'Libs: -L${libdir} -lzimg',
+            'Cflags: -I${includedir}'
+          )
+          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "zimg $ver built for $plat"
+
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
@@ -3192,7 +3297,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -4035,6 +4140,41 @@ jobs:
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: 从源码编译 zimg
+        shell: powershell
+        run: |
+          $zimgRoot = "$env:TEMP\zimg-src"
+          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
+          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          cd $zimgRoot
+          git submodule update --init --recursive --depth 1
+          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
+          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
+          if (-not $lib) { throw "z.lib not found after building zimg" }
+          $prefix = $env:VCPKG_INSTALLED
+          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
+          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
+          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
+          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
+          $pcMixed = ($prefix -replace '\\','/')
+          $pc = @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: zimg',
+            'Description: z.lib image processing library',
+            "Version: $ver",
+            'Libs: -L${libdir} -lzimg',
+            'Cflags: -I${includedir}'
+          )
+          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "zimg $ver built for $plat"
+
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
@@ -4241,7 +4381,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
             --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
             --disable-doc
           make -j"$(nproc)" && make install
@@ -5106,6 +5246,41 @@ jobs:
           $pkgConfigPath = if ($lamePc) { "$pcDir;$lamePc" } else { $pcDir }
           echo "PKG_CONFIG_PATH=$pkgConfigPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: 从源码编译 zimg
+        shell: powershell
+        run: |
+          $zimgRoot = "$env:TEMP\zimg-src"
+          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
+          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          cd $zimgRoot
+          git submodule update --init --recursive --depth 1
+          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
+          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
+          if (-not $lib) { throw "z.lib not found after building zimg" }
+          $prefix = $env:VCPKG_INSTALLED
+          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
+          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
+          Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
+          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
+          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
+          $pcMixed = ($prefix -replace '\\','/')
+          $pc = @(
+            "prefix=$pcMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: zimg',
+            'Description: z.lib image processing library',
+            "Version: $ver",
+            'Libs: -L${libdir} -lzimg',
+            'Cflags: -I${includedir}'
+          )
+          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "zimg $ver built for $plat"
+
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
@@ -5448,7 +5623,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-libnpp \
             --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
