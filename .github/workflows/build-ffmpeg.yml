@@ -35,7 +35,7 @@ jobs:
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
-      - name: 安装 CUDA Toolkit
+      - name: 安装 CUDA 工具包
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y wget
@@ -283,7 +283,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with: { arch: amd64, vsversion: "18.0" }
 
-      - name: Install build tools
+      - name: 安装构建工具
         shell: powershell
         run: |
           # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
@@ -403,7 +403,7 @@ jobs:
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: vcpkg 依赖
+      - name: 安装 vcpkg 依赖
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
@@ -955,7 +955,7 @@ jobs:
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
 
-      - name: 安装 CUDA Toolkit
+      - name: 安装 CUDA 工具包
         shell: powershell
         run: |
           # 检查 CUDA 是否已安装
@@ -1325,7 +1325,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with: { arch: amd64, vsversion: "18.0" }
 
-      - name: Install build tools
+      - name: 安装构建工具
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
@@ -1445,7 +1445,7 @@ jobs:
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: vcpkg 依赖
+      - name: 安装 vcpkg 依赖
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
@@ -2246,7 +2246,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with: { arch: amd64, vsversion: "18.0" }
 
-      - name: Install build tools
+      - name: 安装构建工具
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
@@ -2366,7 +2366,7 @@ jobs:
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: vcpkg 依赖
+      - name: 安装 vcpkg 依赖
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
@@ -3259,7 +3259,7 @@ jobs:
             --enable-hwaccel=av1_videotoolbox --disable-doc
           make -j"$(sysctl -n hw.logicalcpu)" && make install
 
-      - name: Dump config.log (on failure)
+      - name: 失败时导出 ffbuild/config.log
         if: failure()
         run: |
           echo "=== ffbuild/config.log ==="
@@ -3267,7 +3267,7 @@ jobs:
           echo "=== ffbuild/config.log (LAME section) ==="
           grep -A20 'libmp3lame' /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(no libmp3lame section)"
 
-      - name: Strip, sign & verify
+      - name: 裁剪、签名与验证
         run: |
           FF="${HOME}/ffmpeg-install/bin/ffmpeg"
           strip "${FF}" "${FF/%ffmpeg/ffprobe}" "${FF/%ffmpeg/ffplay}" 2>/dev/null || true
@@ -3308,11 +3308,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup MSVC (VS 2026 ARM64)
+      - name: 配置 MSVC（VS 2026 ARM64）
         uses: ilammy/msvc-dev-cmd@v1
         with: { arch: amd64_arm64, vsversion: "18.0" }
 
-      - name: Install build tools
+      - name: 安装构建工具
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
@@ -3432,7 +3432,7 @@ jobs:
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: vcpkg 依赖
+      - name: 安装 vcpkg 依赖
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
@@ -4246,7 +4246,7 @@ jobs:
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
-      - name: 安装 CUDA Toolkit
+      - name: 安装 CUDA 工具包
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y wget
@@ -4349,7 +4349,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with: { arch: amd64, vsversion: "18.0" }
 
-      - name: Install build tools
+      - name: 安装构建工具
         shell: powershell
         run: |
           # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
@@ -4469,7 +4469,7 @@ jobs:
           echo "LAME_PREFIX=$lamePrefixMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           echo "LAME_PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: vcpkg 依赖
+      - name: 安装 vcpkg 依赖
         shell: powershell
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
@@ -5038,7 +5038,7 @@ jobs:
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
 
-      - name: 安装 CUDA Toolkit
+      - name: 安装 CUDA 工具包
         shell: powershell
         run: |
           # 检查 CUDA 是否已安装
