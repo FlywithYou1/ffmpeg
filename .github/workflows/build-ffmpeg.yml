@@ -431,9 +431,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          cmd /c "git -C %VCPKG_ROOT% pull --quiet 2>nul || exit /b 0"
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          # 主动更新 vcpkg 到最新 baseline
+          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -1541,9 +1540,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          cmd /c "git -C %VCPKG_ROOT% pull --quiet 2>nul || exit /b 0"
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          # 主动更新 vcpkg 到最新 baseline
+          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -2544,9 +2542,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          cmd /c "git -C %VCPKG_ROOT% pull --quiet 2>nul || exit /b 0"
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          # 主动更新 vcpkg 到最新 baseline
+          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -3702,9 +3699,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          cmd /c "git -C %VCPKG_ROOT% pull --quiet 2>nul || exit /b 0"
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          # 主动更新 vcpkg 到最新 baseline
+          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
           & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -4821,9 +4817,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 更新 vcpkg 注册表，旧 runner 镜像缺少 zimg 等端口
-          cmd /c "git -C %VCPKG_ROOT% pull --quiet 2>nul || exit /b 0"
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          # 主动更新 vcpkg 到最新 baseline
+          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
