@@ -984,9 +984,8 @@ jobs:
         run: |
           $zimgRoot = "$env:TEMP\zimg-src"
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          git submodule update --init --recursive --depth 1
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
@@ -1012,7 +1011,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: -L${libdir} -lzimg',
+            'Libs: zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -1034,6 +1033,7 @@ jobs:
           $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -2093,9 +2093,8 @@ jobs:
         run: |
           $zimgRoot = "$env:TEMP\zimg-src"
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          git submodule update --init --recursive --depth 1
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
@@ -2121,7 +2120,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: -L${libdir} -lzimg',
+            'Libs: zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -2143,6 +2142,7 @@ jobs:
           $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 编译 VMAF（CPU）
         shell: bash
@@ -3111,9 +3111,8 @@ jobs:
         run: |
           $zimgRoot = "$env:TEMP\zimg-src"
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          git submodule update --init --recursive --depth 1
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
@@ -3139,7 +3138,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: -L${libdir} -lzimg',
+            'Libs: zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -3161,6 +3160,7 @@ jobs:
           $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 编译 VMAF（CPU）
         shell: bash
@@ -4248,9 +4248,8 @@ jobs:
         run: |
           $zimgRoot = "$env:TEMP\zimg-src"
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          git submodule update --init --recursive --depth 1
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
@@ -4276,7 +4275,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: -L${libdir} -lzimg',
+            'Libs: zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -4298,6 +4297,7 @@ jobs:
           $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 编译 VMAF（CPU）
         shell: bash
@@ -5382,9 +5382,8 @@ jobs:
         run: |
           $zimgRoot = "$env:TEMP\zimg-src"
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 https://github.com/sekrit-twc/zimg.git $zimgRoot
+          git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          git submodule update --init --recursive --depth 1
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
@@ -5410,7 +5409,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: -L${libdir} -lzimg',
+            'Libs: zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -5432,6 +5431,7 @@ jobs:
           $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
           $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
         uses: Jimver/cuda-toolkit@v0.2.35
