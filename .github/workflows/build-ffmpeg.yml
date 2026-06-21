@@ -282,8 +282,7 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          }
-          if (-not $nasmDir) {
+          } else {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -315,8 +314,7 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-          if (-not $clangDir) {
+          } else {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -1250,6 +1248,8 @@ jobs:
           # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
+          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
+          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -1330,8 +1330,7 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          }
-          if (-not $nasmDir) {
+          } else {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -1363,8 +1362,7 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-          if (-not $clangDir) {
+          } else {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -2178,6 +2176,8 @@ jobs:
             cp -r "$AMF_INCLUDE_DIR/core" "$AMF_INCLUDE_DIR/components" "$AMF_INCLUDE_DIR/AMF/"
           fi
           AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
+          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
+          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -2257,8 +2257,7 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          }
-          if (-not $nasmDir) {
+          } else {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -2290,8 +2289,7 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-          if (-not $clangDir) {
+          } else {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -3135,6 +3133,8 @@ jobs:
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
+          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -3317,8 +3317,7 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          }
-          if (-not $nasmDir) {
+          } else {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -3350,8 +3349,7 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-          if (-not $clangDir) {
+          } else {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -4162,6 +4160,8 @@ jobs:
           python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
           # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
+          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
+          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -4356,8 +4356,7 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          }
-          if (-not $nasmDir) {
+          } else {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -4389,8 +4388,7 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          }
-          if (-not $clangDir) {
+          } else {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -5351,6 +5349,8 @@ jobs:
           fi
           AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
+          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
+          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
