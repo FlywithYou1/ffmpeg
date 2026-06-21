@@ -94,7 +94,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl -lstdc++" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-libnpp \
+            --enable-cuvid --enable-nvenc \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -1317,10 +1317,10 @@ jobs:
             --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
-            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib gdi32.lib shell32.lib libcpmt.lib" \
+            --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-libnpp \
+            --enable-cuvid --enable-nvenc \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
@@ -4513,7 +4513,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl -lstdc++" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-libnpp \
+            --enable-cuvid --enable-nvenc \
             --enable-vaapi --enable-libvpl \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
@@ -5618,10 +5618,10 @@ jobs:
             --pkg-config-flags="--static" \
             --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
-            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib gdi32.lib shell32.lib libcpmt.lib" \
+            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-libnpp \
+            --enable-cuvid --enable-nvenc \
             --enable-amf --enable-libvpl \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
