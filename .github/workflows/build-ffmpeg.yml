@@ -287,7 +287,7 @@ jobs:
         shell: powershell
         run: |
           # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
-          choco install -y --no-progress nasm make activeperl ninja
+          choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
           # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
@@ -1383,7 +1383,7 @@ jobs:
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make activeperl ninja
+          choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
           # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
@@ -2358,7 +2358,7 @@ jobs:
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make activeperl ninja
+          choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
           # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
@@ -3486,7 +3486,7 @@ jobs:
         shell: powershell
         run: |
           # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make activeperl ninja
+          choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
           # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
@@ -4577,7 +4577,7 @@ jobs:
         shell: powershell
         run: |
           # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
-          choco install -y --no-progress nasm make activeperl ninja
+          choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
           # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
