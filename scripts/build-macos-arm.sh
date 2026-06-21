@@ -55,6 +55,16 @@ LAMEPC
 # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
 [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
   ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+BREW_PREFIX="$(brew --prefix)"
+# 复制并修复 Homebrew 的 .pc（macOS 没有 libstdc++）
+for pc_dir in "${BREW_PREFIX}/lib/pkgconfig" /opt/homebrew/opt/*/lib/pkgconfig; do
+  [ -d "$pc_dir" ] || continue
+  for pc in "$pc_dir"/*.pc; do
+    [ -f "$pc" ] || continue
+    base=$(basename "$pc")
+    sed 's/-lstdc++/-lc++/g' "$pc" > "${P}/lib/pkgconfig/$base"
+  done
+done
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
@@ -63,8 +73,8 @@ cd ffmpeg-src
 sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
 rm -f configure.bak
 ./configure --prefix="$P" \
-  --extra-cflags="-I${P}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
-  --extra-ldflags="-L${P}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
+  --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
+  --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
   --extra-libs="-lpthread -lm" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-libmp3lame --enable-libfdk-aac \
