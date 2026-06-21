@@ -60,7 +60,7 @@ cd ffmpeg-src
   --extra-libs="-lpthread -lm -ldl -lstdc++" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-  --enable-cuvid --enable-nvenc --disable-libnpp \
+  --enable-cuvid --enable-nvenc --enable-libnpp \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
 make -j"$THREADS" && make install
 

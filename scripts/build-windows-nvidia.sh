@@ -391,10 +391,10 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --pkg-config-flags="--static" \
   --extra-cflags="-I${P_MIXED}/include -I${CUDA_HOME_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
-  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib" \
+  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-  --enable-cuvid --enable-nvenc --disable-libnpp \
+  --enable-cuvid --enable-nvenc --enable-libnpp \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
 make -j"$THREADS" && make install
 

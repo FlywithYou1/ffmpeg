@@ -168,7 +168,7 @@ RANLIB="${RANLIB_BIN}" \
   --enable-cuda-nvcc \
   --enable-cuvid \
   --enable-nvenc \
-  --disable-libnpp \
+  --enable-libnpp \
   --enable-libmp3lame \
   --enable-libfdk-aac
 
