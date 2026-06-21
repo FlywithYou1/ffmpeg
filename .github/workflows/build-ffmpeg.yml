@@ -1036,24 +1036,11 @@ jobs:
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
 
       - name: 安装 CUDA 工具包
-        shell: powershell
-        run: |
-          # 检查 CUDA 是否已安装
-          $nvcc = Get-Command nvcc -ErrorAction SilentlyContinue
-          if ($nvcc) { Write-Host "找到 CUDA: $($nvcc.Source)"; exit 0 }
-          Write-Host "通过 winget 安装 CUDA..."
-          winget install --id=NVIDIA.CUDA -e --accept-package-agreements --accept-source-agreements
-          # 刷新当前会话的 PATH
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-          # 将最新版 CUDA bin 加入当前 PATH
-          $cudaRoot = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
-          if (Test-Path $cudaRoot) {
-            $latest = Get-ChildItem -Path $cudaRoot -Directory | Where-Object { $_.Name -match "^v\d+\.\d+$" } | Sort-Object Name -Descending | Select-Object -First 1
-            if ($latest) {
-              $cudaBin = Join-Path $latest.FullName "bin"
-              if (Test-Path $cudaBin) { $env:PATH = "$cudaBin;$env:PATH" }
-            }
-          }
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: '13.2.0'
+          method: 'network'
+          use-github-cache: true
 
       - name: 检测 CUDA
         shell: bash
@@ -5447,24 +5434,11 @@ jobs:
           $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
 
       - name: 安装 CUDA 工具包
-        shell: powershell
-        run: |
-          # 检查 CUDA 是否已安装
-          $nvcc = Get-Command nvcc -ErrorAction SilentlyContinue
-          if ($nvcc) { Write-Host "找到 CUDA: $($nvcc.Source)"; exit 0 }
-          Write-Host "通过 winget 安装 CUDA..."
-          winget install --id=NVIDIA.CUDA -e --accept-package-agreements --accept-source-agreements
-          # 刷新当前会话的 PATH
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-          # 将最新版 CUDA bin 加入当前 PATH
-          $cudaRoot = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
-          if (Test-Path $cudaRoot) {
-            $latest = Get-ChildItem -Path $cudaRoot -Directory | Where-Object { $_.Name -match "^v\d+\.\d+$" } | Sort-Object Name -Descending | Select-Object -First 1
-            if ($latest) {
-              $cudaBin = Join-Path $latest.FullName "bin"
-              if (Test-Path $cudaBin) { $env:PATH = "$cudaBin;$env:PATH" }
-            }
-          }
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: '13.2.0'
+          method: 'network'
+          use-github-cache: true
 
       - name: 检测 CUDA
         shell: bash
