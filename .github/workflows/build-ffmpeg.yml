@@ -409,7 +409,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora libaom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1447,7 +1447,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora libaom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -2364,7 +2364,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora libaom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -3426,7 +3426,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora libaom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -4459,7 +4459,7 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora libaom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
