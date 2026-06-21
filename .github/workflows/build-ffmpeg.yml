@@ -988,6 +988,7 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
@@ -1012,7 +1013,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: zimg.lib',
+            'Libs: ${libdir}/zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -1037,11 +1038,10 @@ jobs:
           $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
-        uses: Jimver/cuda-toolkit@v0.2.35
+        uses: mjun0812/setup-cuda@v1
         with:
-          cuda: '13.2.0'
-          method: 'network'
-          use-github-cache: true
+          version: latest
+          method: network
 
       - name: 检测 CUDA
         shell: bash
@@ -2098,6 +2098,7 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
@@ -2122,7 +2123,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: zimg.lib',
+            'Libs: ${libdir}/zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -3029,6 +3030,8 @@ jobs:
           # oneVPL 2.x 头文件位于 include/vpl/ 下；为兼容性同时包含父目录
           $vplLib = Find-ImportLib @('vpl','libvpl')
           if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
+          $vplVer = Get-PortVersion 'libvpl'
+          if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
           Write-Utf8 "$pcDir/vpl.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -3037,8 +3040,8 @@ jobs:
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
-            "Version: $(Get-PortVersion 'libvpl')",
-            "Libs: -lvpl",
+            "Version: $vplVer",
+            "Libs: ${libdir}/vpl.lib",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
 
@@ -3117,6 +3120,7 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
@@ -3141,7 +3145,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: zimg.lib',
+            'Libs: ${libdir}/zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -4255,6 +4259,7 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
@@ -4279,7 +4284,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: zimg.lib',
+            'Libs: ${libdir}/zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -5302,6 +5307,8 @@ jobs:
           # oneVPL 2.x 头文件位于 include/vpl/ 下；为兼容性同时包含父目录
           $vplLib = Find-ImportLib @('vpl','libvpl')
           if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
+          $vplVer = Get-PortVersion 'libvpl'
+          if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
           Write-Utf8 "$pcDir/vpl.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -5310,8 +5317,8 @@ jobs:
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
-            "Version: $(Get-PortVersion 'libvpl')",
-            "Libs: -lvpl",
+            "Version: $vplVer",
+            "Libs: ${libdir}/vpl.lib",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
 
@@ -5390,6 +5397,7 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch release-3.0.6 https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
+          if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
@@ -5414,7 +5422,7 @@ jobs:
             'Name: zimg',
             'Description: z.lib image processing library',
             "Version: $ver",
-            'Libs: zimg.lib',
+            'Libs: ${libdir}/zimg.lib',
             'Cflags: -I${includedir}'
           )
           [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
@@ -5439,11 +5447,10 @@ jobs:
           $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
-        uses: Jimver/cuda-toolkit@v0.2.35
+        uses: mjun0812/setup-cuda@v1
         with:
-          cuda: '13.2.0'
-          method: 'network'
-          use-github-cache: true
+          version: latest
+          method: network
 
       - name: 检测 CUDA
         shell: bash
@@ -5799,6 +5806,85 @@ jobs:
 
 
   # ============================================================
+  # LINUX — ARM64（VAAPI / CPU）
+  # ============================================================
+  linux-arm:
+    name: Linux（ARM64 VAAPI）
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential yasm nasm pkg-config meson ninja-build \
+            cmake git wget curl ca-certificates python3 xxd \
+            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+            libva-dev libdrm-dev \
+            libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
+            libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
+            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
+            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc
+
+      - name: 编译 VMAF（CPU）
+        run: |
+          P="${HOME}/ffmpeg-install"
+          ARCH_LIBDIR=/usr/lib/aarch64-linux-gnu
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
+          # Fallback x265.pc when the distro does not ship it
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" > "$P/lib/pkgconfig/x265.pc"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
+          cd vmaf/libvmaf && rm -rf build
+          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
+          ninja -vC build && ninja -C build install
+          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: 编译 FFmpeg
+        run: |
+          P="${HOME}/ffmpeg-install"
+          ARCH_LIBDIR=/usr/lib/aarch64-linux-gnu
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
+          # Fallback x265.pc when the distro does not ship it
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" > "$P/lib/pkgconfig/x265.pc"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd ffmpeg-src
+          ./configure --prefix="$P" --pkg-config-flags="--static" \
+            --extra-cflags="-I$P/include" \
+            --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
+            --extra-libs="-lpthread -lm -ldl" \
+            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+          make -j"$(nproc)" && make install
+
+      - name: 裁剪与验证
+        run: |
+          export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
+          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
+          echo "--- VAAPI ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "（无）"
+          echo "--- VMAF ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
+
+      - name: 打包
+        run: |
+          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          cd dist && tar -cJf ../ffmpeg-linux-arm.tar.xz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-arm
+          path: ffmpeg-linux-arm.tar.xz
+          retention-days: 30
+
+
+  # ============================================================
   # RELEASE
   # ============================================================
   release:
@@ -5807,6 +5893,7 @@ jobs:
       - linux-nvidia
       - linux-intel-qsv
       - linux-amd
+      - linux-arm
       - linux-x86-all
       - windows-nvidia
       - windows-amd-amf
@@ -5846,6 +5933,12 @@ jobs:
             | `ffmpeg-linux-intel-qsv.tar.xz` | Intel | QSV (oneVPL) + VAAPI | ✅ CPU |
             | `ffmpeg-linux-amd.tar.xz` | AMD | VAAPI | ✅ CPU |
             | `ffmpeg-linux-x86-all.tar.xz` | NVIDIA + Intel + AMD | NVENC/CUDA + QSV + VAAPI | ✅ CUDA |
+
+            ### 📦 Linux（ARM64）
+
+            | 产物 | GPU | 硬件加速 | VMAF |
+            |---|---|---|---|
+            | `ffmpeg-linux-arm.tar.xz` | — | VAAPI / CPU | ✅ CPU |
 
             ### 📦 Windows（x86_64，MSVC）
 

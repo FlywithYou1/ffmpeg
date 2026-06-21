@@ -21,6 +21,12 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 | `ffmpeg-linux-amd.tar.xz` | AMD | VAAPI | ✅ CPU |
 | `ffmpeg-linux-x86-all.tar.xz` | NVIDIA + Intel + AMD | NVENC/CUDA + QSV + VAAPI | ✅ CUDA |
 
+### Linux (ARM64)
+
+| Artifact | GPU | HW Accel | VMAF |
+|---|---|---|---|
+| `ffmpeg-linux-arm.tar.xz` | — | VAAPI / CPU | ✅ CPU |
+
 ### Windows (x86_64, MSVC 2026)
 
 | Artifact | GPU | HW Accel | VMAF |
@@ -62,7 +68,7 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 - [Git for Windows](https://git-scm.com/) (提供 Bash 环境)
 - [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理)
 - [NASM](https://www.nasm.us/) (x86/x64 汇编优化)
-- [CUDA Toolkit 13.3](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Windows CI 自动安装最新版)
 - [Meson](https://mesonbuild.com/) + [Ninja](https://ninja-build.org/) (VMAF 构建)
 
 ### Windows (VS 2026 Developer Command Prompt + Git Bash)
@@ -85,6 +91,16 @@ bash scripts/build-windows-amd-amf.sh
 bash scripts/build-windows-arm64.sh
 ```
 
+### Linux (Ubuntu 26.04 / ARM64)
+
+```bash
+# AMD VAAPI (x86_64)
+bash scripts/build-linux-amd.sh
+
+# ARM64 VAAPI / CPU
+bash scripts/build-linux-arm.sh
+```
+
 输出在 `output/` 目录。
 
 ### Linux (Ubuntu 26.04)
@@ -102,7 +118,7 @@ bash ffmpeg-archlinux-nvidia.sh
 ## 📁 项目结构
 
 ```
-├── .github/workflows/build-ffmpeg.yml   # CI/CD 工作流 (11 jobs)
+├── .github/workflows/build-ffmpeg.yml   # CI/CD 工作流 (12 jobs)
 ├── scripts/
 │   ├── build-windows-intel-qsv.sh       # Windows Intel QSV
 │   ├── build-windows-nvidia.sh          # Windows NVIDIA NVENC/CUDA
@@ -111,6 +127,7 @@ bash ffmpeg-archlinux-nvidia.sh
 │   ├── build-linux-nvidia.sh            # Linux NVIDIA NVENC/CUDA
 │   ├── build-linux-intel-qsv.sh         # Linux Intel QSV + VAAPI
 │   ├── build-linux-amd.sh               # Linux AMD VAAPI
+│   ├── build-linux-arm.sh               # Linux ARM64 VAAPI / CPU
 │   └── build-macos-arm.sh               # macOS Apple Silicon
 └── ffmpeg-archlinux-nvidia.sh           # Arch Linux NVIDIA NVENC/CUDA
 ```
