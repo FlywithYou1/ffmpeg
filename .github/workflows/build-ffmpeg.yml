@@ -432,7 +432,18 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 主动更新 vcpkg 到最新 baseline
-          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
+          Write-Host "Updating vcpkg baseline..."
+          $before = (git -C $v rev-parse HEAD).Trim()
+          Write-Host "Current vcpkg baseline: $before"
+          git -C $v fetch origin --unshallow 2>&1 | Out-Null
+          git -C $v pull --ff-only origin master
+          $after = (git -C $v rev-parse HEAD).Trim()
+          if ($before -ne $after) {
+            Write-Host "vcpkg baseline updated: $before -> $after"
+          } else {
+            Write-Host "vcpkg baseline is already up to date."
+          }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -989,6 +1000,18 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
+          $props = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+            '  <ItemDefinitionGroup>',
+            '    <ClCompile>',
+            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
+            '    </ClCompile>',
+            '  </ItemDefinitionGroup>',
+            '</Project>'
+          )
+          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
@@ -1541,7 +1564,18 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 主动更新 vcpkg 到最新 baseline
-          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
+          Write-Host "Updating vcpkg baseline..."
+          $before = (git -C $v rev-parse HEAD).Trim()
+          Write-Host "Current vcpkg baseline: $before"
+          git -C $v fetch origin --unshallow 2>&1 | Out-Null
+          git -C $v pull --ff-only origin master
+          $after = (git -C $v rev-parse HEAD).Trim()
+          if ($before -ne $after) {
+            Write-Host "vcpkg baseline updated: $before -> $after"
+          } else {
+            Write-Host "vcpkg baseline is already up to date."
+          }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -2098,6 +2132,18 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
+          $props = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+            '  <ItemDefinitionGroup>',
+            '    <ClCompile>',
+            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
+            '    </ClCompile>',
+            '  </ItemDefinitionGroup>',
+            '</Project>'
+          )
+          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
@@ -2543,7 +2589,18 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 主动更新 vcpkg 到最新 baseline
-          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
+          Write-Host "Updating vcpkg baseline..."
+          $before = (git -C $v rev-parse HEAD).Trim()
+          Write-Host "Current vcpkg baseline: $before"
+          git -C $v fetch origin --unshallow 2>&1 | Out-Null
+          git -C $v pull --ff-only origin master
+          $after = (git -C $v rev-parse HEAD).Trim()
+          if ($before -ne $after) {
+            Write-Host "vcpkg baseline updated: $before -> $after"
+          } else {
+            Write-Host "vcpkg baseline is already up to date."
+          }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -3029,17 +3086,18 @@ jobs:
           if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
           $vplVer = Get-PortVersion 'libvpl'
           if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
+          Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
           Write-Utf8 "$pcDir/vpl.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
+            "libdir=$instMixed/lib",
+            "includedir=$instMixed/include",
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             "Version: $vplVer",
-            "Libs: ${libdir}/vpl.lib",
-            'Cflags: -I${includedir} -I${includedir}/vpl'
+            "Libs: $instMixed/lib/vpl.lib",
+            "Cflags: -I$instMixed/include -I$instMixed/include/vpl"
           )
 
           # 同时创建备用导入库名称，以便 ffmpeg 的非 pkg-config
@@ -3119,6 +3177,18 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
+          $props = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+            '  <ItemDefinitionGroup>',
+            '    <ClCompile>',
+            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
+            '    </ClCompile>',
+            '  </ItemDefinitionGroup>',
+            '</Project>'
+          )
+          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
@@ -3700,7 +3770,18 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 主动更新 vcpkg 到最新 baseline
-          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
+          Write-Host "Updating vcpkg baseline..."
+          $before = (git -C $v rev-parse HEAD).Trim()
+          Write-Host "Current vcpkg baseline: $before"
+          git -C $v fetch origin --unshallow 2>&1 | Out-Null
+          git -C $v pull --ff-only origin master
+          $after = (git -C $v rev-parse HEAD).Trim()
+          if ($before -ne $after) {
+            Write-Host "vcpkg baseline updated: $before -> $after"
+          } else {
+            Write-Host "vcpkg baseline is already up to date."
+          }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
           & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -4257,6 +4338,18 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
+          $props = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+            '  <ItemDefinitionGroup>',
+            '    <ClCompile>',
+            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
+            '    </ClCompile>',
+            '  </ItemDefinitionGroup>',
+            '</Project>'
+          )
+          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
@@ -4818,7 +4911,18 @@ jobs:
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           # 主动更新 vcpkg 到最新 baseline
-          & "$env:GITHUB_WORKSPACE\scripts\update-vcpkg-baseline.ps1" -VcpkgRoot $v
+          Write-Host "Updating vcpkg baseline..."
+          $before = (git -C $v rev-parse HEAD).Trim()
+          Write-Host "Current vcpkg baseline: $before"
+          git -C $v fetch origin --unshallow 2>&1 | Out-Null
+          git -C $v pull --ff-only origin master
+          $after = (git -C $v rev-parse HEAD).Trim()
+          if ($before -ne $after) {
+            Write-Host "vcpkg baseline updated: $before -> $after"
+          } else {
+            Write-Host "vcpkg baseline is already up to date."
+          }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers shaderc
@@ -5304,17 +5408,18 @@ jobs:
           if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
           $vplVer = Get-PortVersion 'libvpl'
           if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
+          Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
           Write-Utf8 "$pcDir/vpl.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
+            "libdir=$instMixed/lib",
+            "includedir=$instMixed/include",
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
             "Version: $vplVer",
-            "Libs: ${libdir}/vpl.lib",
-            'Cflags: -I${includedir} -I${includedir}/vpl'
+            "Libs: $instMixed/lib/vpl.lib",
+            "Cflags: -I$instMixed/include -I$instMixed/include/vpl"
           )
 
           # 同时创建备用导入库名称，以便 ffmpeg 的非 pkg-config
@@ -5394,6 +5499,18 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
+          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
+          $props = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
+            '  <ItemDefinitionGroup>',
+            '    <ClCompile>',
+            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
+            '    </ClCompile>',
+            '  </ItemDefinitionGroup>',
+            '</Project>'
+          )
+          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
           msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
