@@ -59,6 +59,9 @@ export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PR
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
+# macOS 使用 libc++，configure 里 libsnappy 的 -lstdc++ 会导致检测失败
+sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+rm -f configure.bak
 ./configure --prefix="$P" \
   --extra-cflags="-I${P}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
   --extra-ldflags="-L${P}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \

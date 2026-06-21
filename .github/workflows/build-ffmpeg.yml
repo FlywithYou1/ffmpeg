@@ -81,6 +81,8 @@ jobs:
         run: |
           P="${HOME}/ffmpeg-install"
           export PATH="${CUDA_HOME}/bin:${PATH}"
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -151,6 +153,8 @@ jobs:
       - name: 编译 FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -211,6 +215,8 @@ jobs:
       - name: 编译 VMAF（CPU）
         run: |
           P="${HOME}/ffmpeg-install"
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
@@ -221,6 +227,8 @@ jobs:
       - name: 编译 FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -279,12 +287,8 @@ jobs:
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
-          if ($nasmDir) {
-            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "nasm 位于 $nasmDir"
-          } else {
-            Write-Host "::warning::在预期位置未找到 nasm.exe"
-          }
+          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm 位于 $nasmDir" }
+          if (-not $nasmDir) { Write-Host "::warning::在预期位置未找到 nasm.exe" }
           # 确保 nasm 在 bash 步骤的 PATH 中。
           # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -306,17 +310,8 @@ jobs:
               if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
             }
           }
-          if ($clangDir) {
-            Write-Host "VS Clang 位于 $clangDir"
-            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            # 将 VS Clang 目录暴露给 bash 步骤，以便使用绝对路径
-            # 并避免提前选到不同的 clang（例如来自 MinGW/LLVM）
-            # 在 PATH 中。
-            $clangDirUnix = $clangDir -replace '\\','/'
-            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
-          }
+          if ($clangDir) { Write-Host "VS Clang 位于 $clangDir"; echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; $clangDirUnix = $clangDir -replace '\\','/'; echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
+          if (-not $clangDir) { Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false" }
 
       - name: 编译 libmp3lame（静态）
         shell: powershell
@@ -1327,12 +1322,8 @@ jobs:
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
-          if ($nasmDir) {
-            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "nasm 位于 $nasmDir"
-          } else {
-            Write-Host "::warning::在预期位置未找到 nasm.exe"
-          }
+          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm 位于 $nasmDir" }
+          if (-not $nasmDir) { Write-Host "::warning::在预期位置未找到 nasm.exe" }
           # 确保 nasm 在 bash 步骤的 PATH 中。
           # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -1354,17 +1345,8 @@ jobs:
               if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
             }
           }
-          if ($clangDir) {
-            Write-Host "VS Clang 位于 $clangDir"
-            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            # 将 VS Clang 目录暴露给 bash 步骤，以便使用绝对路径
-            # 并避免提前选到不同的 clang（例如来自 MinGW/LLVM）
-            # 在 PATH 中。
-            $clangDirUnix = $clangDir -replace '\\','/'
-            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
-          }
+          if ($clangDir) { Write-Host "VS Clang 位于 $clangDir"; echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; $clangDirUnix = $clangDir -replace '\\','/'; echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
+          if (-not $clangDir) { Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false" }
 
       - name: 编译 libmp3lame（静态）
         shell: powershell
@@ -2254,12 +2236,8 @@ jobs:
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
-          if ($nasmDir) {
-            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "nasm 位于 $nasmDir"
-          } else {
-            Write-Host "::warning::在预期位置未找到 nasm.exe"
-          }
+          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm 位于 $nasmDir" }
+          if (-not $nasmDir) { Write-Host "::warning::在预期位置未找到 nasm.exe" }
           # 确保 nasm 在 bash 步骤的 PATH 中。
           # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -2281,17 +2259,8 @@ jobs:
               if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
             }
           }
-          if ($clangDir) {
-            Write-Host "VS Clang 位于 $clangDir"
-            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            # 将 VS Clang 目录暴露给 bash 步骤，以便使用绝对路径
-            # 并避免提前选到不同的 clang（例如来自 MinGW/LLVM）
-            # 在 PATH 中。
-            $clangDirUnix = $clangDir -replace '\\','/'
-            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
-          }
+          if ($clangDir) { Write-Host "VS Clang 位于 $clangDir"; echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; $clangDirUnix = $clangDir -replace '\\','/'; echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
+          if (-not $clangDir) { Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false" }
 
       - name: 编译 libmp3lame（静态）
         shell: powershell
@@ -3237,6 +3206,9 @@ jobs:
           pkg-config --exists libfdk-aac  && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))"   || echo "pkg-config libfdk-aac: FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
+          # macOS 使用 libc++，configure 里 libsnappy 的 -lstdc++ 会导致检测失败
+          sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          rm -f configure.bak
           ./configure --prefix="$P" \
             --extra-cflags="-I$P/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include" \
             --extra-ldflags="-L$P/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib" \
@@ -3314,12 +3286,8 @@ jobs:
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
-          if ($nasmDir) {
-            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "nasm 位于 $nasmDir"
-          } else {
-            Write-Host "::warning::在预期位置未找到 nasm.exe"
-          }
+          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm 位于 $nasmDir" }
+          if (-not $nasmDir) { Write-Host "::warning::在预期位置未找到 nasm.exe" }
           # 确保 nasm 在 bash 步骤的 PATH 中。
           # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -3341,17 +3309,8 @@ jobs:
               if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
             }
           }
-          if ($clangDir) {
-            Write-Host "VS Clang 位于 $clangDir"
-            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            # 将 VS Clang 目录暴露给 bash 步骤，以便使用绝对路径
-            # 并避免提前选到不同的 clang（例如来自 MinGW/LLVM）
-            # 在 PATH 中。
-            $clangDirUnix = $clangDir -replace '\\','/'
-            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
-          }
+          if ($clangDir) { Write-Host "VS Clang 位于 $clangDir"; echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; $clangDirUnix = $clangDir -replace '\\','/'; echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
+          if (-not $clangDir) { Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false" }
 
       - name: 编译 libmp3lame（静态）
         shell: powershell
@@ -4288,6 +4247,8 @@ jobs:
         run: |
           P="${HOME}/ffmpeg-install"
           export PATH="${CUDA_HOME}/bin:${PATH}"
+          mkdir -p "$P/lib/pkgconfig"
+          printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)" > "$P/lib/pkgconfig/libopenjp2.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
@@ -4353,12 +4314,8 @@ jobs:
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
-          if ($nasmDir) {
-            echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            Write-Host "nasm 位于 $nasmDir"
-          } else {
-            Write-Host "::warning::在预期位置未找到 nasm.exe"
-          }
+          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm 位于 $nasmDir" }
+          if (-not $nasmDir) { Write-Host "::warning::在预期位置未找到 nasm.exe" }
           # 确保 nasm 在 bash 步骤的 PATH 中。
           # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
@@ -4380,17 +4337,8 @@ jobs:
               if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
             }
           }
-          if ($clangDir) {
-            Write-Host "VS Clang 位于 $clangDir"
-            echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-            # 将 VS Clang 目录暴露给 bash 步骤，以便使用绝对路径
-            # 并避免提前选到不同的 clang（例如来自 MinGW/LLVM）
-            # 在 PATH 中。
-            $clangDirUnix = $clangDir -replace '\\','/'
-            echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
-          }
+          if ($clangDir) { Write-Host "VS Clang 位于 $clangDir"; echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; $clangDirUnix = $clangDir -replace '\\','/'; echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
+          if (-not $clangDir) { Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false" }
 
       - name: 编译 libmp3lame（静态）
         shell: powershell
