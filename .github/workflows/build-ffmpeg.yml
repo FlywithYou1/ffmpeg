@@ -413,7 +413,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -434,6 +434,23 @@ jobs:
           function Write-Utf8($path, $lines) {
             [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
           }
+          function Get-PortVersion($portName) {
+            $json = "$inst\share\$portName\vcpkg.json"
+            $control = "$inst\share\$portName\CONTROL"
+            $ver = $null
+            if (Test-Path $json) {
+              $data = Get-Content $json -Raw | ConvertFrom-Json
+              $ver = $data.version
+              if (-not $ver) { $ver = $data.'version-semver' }
+              if (-not $ver) { $ver = $data.'version-string' }
+              if (-not $ver) { $ver = $data.'version-date' }
+            } elseif (Test-Path $control) {
+              $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) { $ver = 'unknown' }
+            return $ver
+          }
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
@@ -448,7 +465,7 @@ jobs:
             '',
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
-            'Version: 2.0.2',
+            "Version: $(Get-PortVersion 'fdk-aac')",
             "Libs: $fdkLib"
           )
           # ffplay 需要 SDL2；较新的 vcpkg 端口提供 sdl2.pc，仅在缺失时创建回退。
@@ -465,7 +482,7 @@ jobs:
               '',
               'Name: sdl2',
               'Description: Simple DirectMedia Layer',
-              'Version: 2.30.0',
+              "Version: $(Get-PortVersion 'sdl2')",
               "Libs: $sdl2Libs",
               'Cflags: -I${includedir} -I${includedir}/SDL2'
             )
@@ -485,7 +502,7 @@ jobs:
                 '',
                 "Name: libx264",
                 "Description: libx264 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x264')",
                 "Libs: $libx264Lib",
                 "Cflags: -I${includedir}"
               )
@@ -507,7 +524,7 @@ jobs:
                 '',
                 "Name: libx265",
                 "Description: libx265 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x265')",
                 "Libs: $libx265Lib",
                 "Cflags: -I${includedir}"
               )
@@ -529,7 +546,7 @@ jobs:
                 '',
                 "Name: libvpx",
                 "Description: libvpx library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvpx')",
                 "Libs: $libvpxLib",
                 "Cflags: -I${includedir}"
               )
@@ -551,7 +568,7 @@ jobs:
                 '',
                 "Name: opus",
                 "Description: opus library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'opus')",
                 "Libs: $opusLib",
                 "Cflags: -I${includedir}"
               )
@@ -573,7 +590,7 @@ jobs:
                 '',
                 "Name: vorbis",
                 "Description: vorbis library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Libs: $vorbisLib",
                 "Cflags: -I${includedir}"
               )
@@ -595,7 +612,7 @@ jobs:
                 '',
                 "Name: vorbisenc",
                 "Description: vorbisenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Requires: vorbis",
                 "Libs: $vorbisencLib",
                 "Cflags: -I${includedir}"
@@ -618,7 +635,7 @@ jobs:
                 '',
                 "Name: theora",
                 "Description: theora library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraLib",
                 "Cflags: -I${includedir}"
               )
@@ -640,7 +657,7 @@ jobs:
                 '',
                 "Name: theoradec",
                 "Description: theoradec library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoradecLib",
                 "Cflags: -I${includedir}"
               )
@@ -662,7 +679,7 @@ jobs:
                 '',
                 "Name: theoraenc",
                 "Description: theoraenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraencLib",
                 "Cflags: -I${includedir}"
               )
@@ -684,7 +701,7 @@ jobs:
                 '',
                 "Name: libaom",
                 "Description: libaom library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'aom')",
                 "Libs: $libaomLib",
                 "Cflags: -I${includedir}"
               )
@@ -706,7 +723,7 @@ jobs:
                 '',
                 "Name: libwebp",
                 "Description: libwebp library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libwebp')",
                 "Libs: $libwebpLib",
                 "Cflags: -I${includedir}"
               )
@@ -728,7 +745,7 @@ jobs:
                 '',
                 "Name: libass",
                 "Description: libass library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libass')",
                 "Libs: $libassLib",
                 "Cflags: -I${includedir}"
               )
@@ -750,7 +767,7 @@ jobs:
                 '',
                 "Name: freetype2",
                 "Description: freetype2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'freetype')",
                 "Libs: $freetype2Lib",
                 "Cflags: -I${includedir} -I${includedir}/freetype2"
               )
@@ -772,7 +789,7 @@ jobs:
                 '',
                 "Name: fontconfig",
                 "Description: fontconfig library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'fontconfig')",
                 "Libs: $fontconfigLib",
                 "Cflags: -I${includedir}"
               )
@@ -794,7 +811,7 @@ jobs:
                 '',
                 "Name: zimg",
                 "Description: zimg library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'zimg')",
                 "Libs: $zimgLib",
                 "Cflags: -I${includedir}"
               )
@@ -816,7 +833,7 @@ jobs:
                 '',
                 "Name: soxr",
                 "Description: soxr library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'soxr')",
                 "Libs: $soxrLib",
                 "Cflags: -I${includedir}"
               )
@@ -838,7 +855,7 @@ jobs:
                 '',
                 "Name: libopenjp2",
                 "Description: libopenjp2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'openjpeg')",
                 "Libs: $libopenjp2Lib",
                 "Cflags: -I${includedir}"
               )
@@ -860,7 +877,7 @@ jobs:
                 '',
                 "Name: snappy",
                 "Description: snappy library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'snappy')",
                 "Libs: $snappyLib",
                 "Cflags: -I${includedir}"
               )
@@ -1269,7 +1286,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-libnpp \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1455,7 +1472,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1476,6 +1493,23 @@ jobs:
           function Write-Utf8($path, $lines) {
             [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
           }
+          function Get-PortVersion($portName) {
+            $json = "$inst\share\$portName\vcpkg.json"
+            $control = "$inst\share\$portName\CONTROL"
+            $ver = $null
+            if (Test-Path $json) {
+              $data = Get-Content $json -Raw | ConvertFrom-Json
+              $ver = $data.version
+              if (-not $ver) { $ver = $data.'version-semver' }
+              if (-not $ver) { $ver = $data.'version-string' }
+              if (-not $ver) { $ver = $data.'version-date' }
+            } elseif (Test-Path $control) {
+              $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) { $ver = 'unknown' }
+            return $ver
+          }
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
@@ -1490,7 +1524,7 @@ jobs:
             '',
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
-            'Version: 2.0.2',
+            "Version: $(Get-PortVersion 'fdk-aac')",
             "Libs: $fdkLib"
           )
           # ffplay 需要 SDL2；较新的 vcpkg 端口提供 sdl2.pc，仅在缺失时创建回退。
@@ -1507,7 +1541,7 @@ jobs:
               '',
               'Name: sdl2',
               'Description: Simple DirectMedia Layer',
-              'Version: 2.30.0',
+              "Version: $(Get-PortVersion 'sdl2')",
               "Libs: $sdl2Libs",
               'Cflags: -I${includedir} -I${includedir}/SDL2'
             )
@@ -1527,7 +1561,7 @@ jobs:
                 '',
                 "Name: libx264",
                 "Description: libx264 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x264')",
                 "Libs: $libx264Lib",
                 "Cflags: -I${includedir}"
               )
@@ -1549,7 +1583,7 @@ jobs:
                 '',
                 "Name: libx265",
                 "Description: libx265 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x265')",
                 "Libs: $libx265Lib",
                 "Cflags: -I${includedir}"
               )
@@ -1571,7 +1605,7 @@ jobs:
                 '',
                 "Name: libvpx",
                 "Description: libvpx library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvpx')",
                 "Libs: $libvpxLib",
                 "Cflags: -I${includedir}"
               )
@@ -1593,7 +1627,7 @@ jobs:
                 '',
                 "Name: opus",
                 "Description: opus library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'opus')",
                 "Libs: $opusLib",
                 "Cflags: -I${includedir}"
               )
@@ -1615,7 +1649,7 @@ jobs:
                 '',
                 "Name: vorbis",
                 "Description: vorbis library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Libs: $vorbisLib",
                 "Cflags: -I${includedir}"
               )
@@ -1637,7 +1671,7 @@ jobs:
                 '',
                 "Name: vorbisenc",
                 "Description: vorbisenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Requires: vorbis",
                 "Libs: $vorbisencLib",
                 "Cflags: -I${includedir}"
@@ -1660,7 +1694,7 @@ jobs:
                 '',
                 "Name: theora",
                 "Description: theora library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraLib",
                 "Cflags: -I${includedir}"
               )
@@ -1682,7 +1716,7 @@ jobs:
                 '',
                 "Name: theoradec",
                 "Description: theoradec library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoradecLib",
                 "Cflags: -I${includedir}"
               )
@@ -1704,7 +1738,7 @@ jobs:
                 '',
                 "Name: theoraenc",
                 "Description: theoraenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraencLib",
                 "Cflags: -I${includedir}"
               )
@@ -1726,7 +1760,7 @@ jobs:
                 '',
                 "Name: libaom",
                 "Description: libaom library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'aom')",
                 "Libs: $libaomLib",
                 "Cflags: -I${includedir}"
               )
@@ -1748,7 +1782,7 @@ jobs:
                 '',
                 "Name: libwebp",
                 "Description: libwebp library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libwebp')",
                 "Libs: $libwebpLib",
                 "Cflags: -I${includedir}"
               )
@@ -1770,7 +1804,7 @@ jobs:
                 '',
                 "Name: libass",
                 "Description: libass library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libass')",
                 "Libs: $libassLib",
                 "Cflags: -I${includedir}"
               )
@@ -1792,7 +1826,7 @@ jobs:
                 '',
                 "Name: freetype2",
                 "Description: freetype2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'freetype')",
                 "Libs: $freetype2Lib",
                 "Cflags: -I${includedir} -I${includedir}/freetype2"
               )
@@ -1814,7 +1848,7 @@ jobs:
                 '',
                 "Name: fontconfig",
                 "Description: fontconfig library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'fontconfig')",
                 "Libs: $fontconfigLib",
                 "Cflags: -I${includedir}"
               )
@@ -1836,7 +1870,7 @@ jobs:
                 '',
                 "Name: zimg",
                 "Description: zimg library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'zimg')",
                 "Libs: $zimgLib",
                 "Cflags: -I${includedir}"
               )
@@ -1858,7 +1892,7 @@ jobs:
                 '',
                 "Name: soxr",
                 "Description: soxr library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'soxr')",
                 "Libs: $soxrLib",
                 "Cflags: -I${includedir}"
               )
@@ -1880,7 +1914,7 @@ jobs:
                 '',
                 "Name: libopenjp2",
                 "Description: libopenjp2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'openjpeg')",
                 "Libs: $libopenjp2Lib",
                 "Cflags: -I${includedir}"
               )
@@ -1902,7 +1936,7 @@ jobs:
                 '',
                 "Name: snappy",
                 "Description: snappy library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'snappy')",
                 "Libs: $snappyLib",
                 "Cflags: -I${includedir}"
               )
@@ -2190,7 +2224,7 @@ jobs:
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2376,7 +2410,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -2397,6 +2431,23 @@ jobs:
           function Write-Utf8($path, $lines) {
             [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
           }
+          function Get-PortVersion($portName) {
+            $json = "$inst\share\$portName\vcpkg.json"
+            $control = "$inst\share\$portName\CONTROL"
+            $ver = $null
+            if (Test-Path $json) {
+              $data = Get-Content $json -Raw | ConvertFrom-Json
+              $ver = $data.version
+              if (-not $ver) { $ver = $data.'version-semver' }
+              if (-not $ver) { $ver = $data.'version-string' }
+              if (-not $ver) { $ver = $data.'version-date' }
+            } elseif (Test-Path $control) {
+              $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) { $ver = 'unknown' }
+            return $ver
+          }
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
@@ -2411,7 +2462,7 @@ jobs:
             '',
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
-            'Version: 2.0.2',
+            "Version: $(Get-PortVersion 'fdk-aac')",
             "Libs: $fdkLib"
           )
           # ffplay 需要 SDL2；较新的 vcpkg 端口提供 sdl2.pc，仅在缺失时创建回退。
@@ -2428,7 +2479,7 @@ jobs:
               '',
               'Name: sdl2',
               'Description: Simple DirectMedia Layer',
-              'Version: 2.30.0',
+              "Version: $(Get-PortVersion 'sdl2')",
               "Libs: $sdl2Libs",
               'Cflags: -I${includedir} -I${includedir}/SDL2'
             )
@@ -2448,7 +2499,7 @@ jobs:
                 '',
                 "Name: libx264",
                 "Description: libx264 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x264')",
                 "Libs: $libx264Lib",
                 "Cflags: -I${includedir}"
               )
@@ -2470,7 +2521,7 @@ jobs:
                 '',
                 "Name: libx265",
                 "Description: libx265 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x265')",
                 "Libs: $libx265Lib",
                 "Cflags: -I${includedir}"
               )
@@ -2492,7 +2543,7 @@ jobs:
                 '',
                 "Name: libvpx",
                 "Description: libvpx library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvpx')",
                 "Libs: $libvpxLib",
                 "Cflags: -I${includedir}"
               )
@@ -2514,7 +2565,7 @@ jobs:
                 '',
                 "Name: opus",
                 "Description: opus library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'opus')",
                 "Libs: $opusLib",
                 "Cflags: -I${includedir}"
               )
@@ -2536,7 +2587,7 @@ jobs:
                 '',
                 "Name: vorbis",
                 "Description: vorbis library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Libs: $vorbisLib",
                 "Cflags: -I${includedir}"
               )
@@ -2558,7 +2609,7 @@ jobs:
                 '',
                 "Name: vorbisenc",
                 "Description: vorbisenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Requires: vorbis",
                 "Libs: $vorbisencLib",
                 "Cflags: -I${includedir}"
@@ -2581,7 +2632,7 @@ jobs:
                 '',
                 "Name: theora",
                 "Description: theora library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraLib",
                 "Cflags: -I${includedir}"
               )
@@ -2603,7 +2654,7 @@ jobs:
                 '',
                 "Name: theoradec",
                 "Description: theoradec library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoradecLib",
                 "Cflags: -I${includedir}"
               )
@@ -2625,7 +2676,7 @@ jobs:
                 '',
                 "Name: theoraenc",
                 "Description: theoraenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraencLib",
                 "Cflags: -I${includedir}"
               )
@@ -2647,7 +2698,7 @@ jobs:
                 '',
                 "Name: libaom",
                 "Description: libaom library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'aom')",
                 "Libs: $libaomLib",
                 "Cflags: -I${includedir}"
               )
@@ -2669,7 +2720,7 @@ jobs:
                 '',
                 "Name: libwebp",
                 "Description: libwebp library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libwebp')",
                 "Libs: $libwebpLib",
                 "Cflags: -I${includedir}"
               )
@@ -2691,7 +2742,7 @@ jobs:
                 '',
                 "Name: libass",
                 "Description: libass library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libass')",
                 "Libs: $libassLib",
                 "Cflags: -I${includedir}"
               )
@@ -2713,7 +2764,7 @@ jobs:
                 '',
                 "Name: freetype2",
                 "Description: freetype2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'freetype')",
                 "Libs: $freetype2Lib",
                 "Cflags: -I${includedir} -I${includedir}/freetype2"
               )
@@ -2735,7 +2786,7 @@ jobs:
                 '',
                 "Name: fontconfig",
                 "Description: fontconfig library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'fontconfig')",
                 "Libs: $fontconfigLib",
                 "Cflags: -I${includedir}"
               )
@@ -2757,7 +2808,7 @@ jobs:
                 '',
                 "Name: zimg",
                 "Description: zimg library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'zimg')",
                 "Libs: $zimgLib",
                 "Cflags: -I${includedir}"
               )
@@ -2779,7 +2830,7 @@ jobs:
                 '',
                 "Name: soxr",
                 "Description: soxr library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'soxr')",
                 "Libs: $soxrLib",
                 "Cflags: -I${includedir}"
               )
@@ -2801,7 +2852,7 @@ jobs:
                 '',
                 "Name: libopenjp2",
                 "Description: libopenjp2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'openjpeg')",
                 "Libs: $libopenjp2Lib",
                 "Cflags: -I${includedir}"
               )
@@ -2823,7 +2874,7 @@ jobs:
                 '',
                 "Name: snappy",
                 "Description: snappy library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'snappy')",
                 "Libs: $snappyLib",
                 "Cflags: -I${includedir}"
               )
@@ -2848,7 +2899,7 @@ jobs:
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
-            'Version: 2.16.0',
+            "Version: $(Get-PortVersion 'libvpl')",
             "Libs: -lvpl",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
@@ -3141,7 +3192,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -3442,7 +3493,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -3463,6 +3514,23 @@ jobs:
           function Write-Utf8($path, $lines) {
             [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
           }
+          function Get-PortVersion($portName) {
+            $json = "$inst\share\$portName\vcpkg.json"
+            $control = "$inst\share\$portName\CONTROL"
+            $ver = $null
+            if (Test-Path $json) {
+              $data = Get-Content $json -Raw | ConvertFrom-Json
+              $ver = $data.version
+              if (-not $ver) { $ver = $data.'version-semver' }
+              if (-not $ver) { $ver = $data.'version-string' }
+              if (-not $ver) { $ver = $data.'version-date' }
+            } elseif (Test-Path $control) {
+              $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) { $ver = 'unknown' }
+            return $ver
+          }
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
@@ -3477,7 +3545,7 @@ jobs:
             '',
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
-            'Version: 2.0.2',
+            "Version: $(Get-PortVersion 'fdk-aac')",
             "Libs: $fdkLib"
           )
           # ffplay 需要 SDL2；较新的 vcpkg 端口提供 sdl2.pc，仅在缺失时创建回退。
@@ -3494,7 +3562,7 @@ jobs:
               '',
               'Name: sdl2',
               'Description: Simple DirectMedia Layer',
-              'Version: 2.30.0',
+              "Version: $(Get-PortVersion 'sdl2')",
               "Libs: $sdl2Libs",
               'Cflags: -I${includedir} -I${includedir}/SDL2'
             )
@@ -3514,7 +3582,7 @@ jobs:
                 '',
                 "Name: libx264",
                 "Description: libx264 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x264')",
                 "Libs: $libx264Lib",
                 "Cflags: -I${includedir}"
               )
@@ -3536,7 +3604,7 @@ jobs:
                 '',
                 "Name: libx265",
                 "Description: libx265 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x265')",
                 "Libs: $libx265Lib",
                 "Cflags: -I${includedir}"
               )
@@ -3558,7 +3626,7 @@ jobs:
                 '',
                 "Name: libvpx",
                 "Description: libvpx library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvpx')",
                 "Libs: $libvpxLib",
                 "Cflags: -I${includedir}"
               )
@@ -3580,7 +3648,7 @@ jobs:
                 '',
                 "Name: opus",
                 "Description: opus library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'opus')",
                 "Libs: $opusLib",
                 "Cflags: -I${includedir}"
               )
@@ -3602,7 +3670,7 @@ jobs:
                 '',
                 "Name: vorbis",
                 "Description: vorbis library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Libs: $vorbisLib",
                 "Cflags: -I${includedir}"
               )
@@ -3624,7 +3692,7 @@ jobs:
                 '',
                 "Name: vorbisenc",
                 "Description: vorbisenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Requires: vorbis",
                 "Libs: $vorbisencLib",
                 "Cflags: -I${includedir}"
@@ -3647,7 +3715,7 @@ jobs:
                 '',
                 "Name: theora",
                 "Description: theora library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraLib",
                 "Cflags: -I${includedir}"
               )
@@ -3669,7 +3737,7 @@ jobs:
                 '',
                 "Name: theoradec",
                 "Description: theoradec library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoradecLib",
                 "Cflags: -I${includedir}"
               )
@@ -3691,7 +3759,7 @@ jobs:
                 '',
                 "Name: theoraenc",
                 "Description: theoraenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraencLib",
                 "Cflags: -I${includedir}"
               )
@@ -3713,7 +3781,7 @@ jobs:
                 '',
                 "Name: libaom",
                 "Description: libaom library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'aom')",
                 "Libs: $libaomLib",
                 "Cflags: -I${includedir}"
               )
@@ -3735,7 +3803,7 @@ jobs:
                 '',
                 "Name: libwebp",
                 "Description: libwebp library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libwebp')",
                 "Libs: $libwebpLib",
                 "Cflags: -I${includedir}"
               )
@@ -3757,7 +3825,7 @@ jobs:
                 '',
                 "Name: libass",
                 "Description: libass library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libass')",
                 "Libs: $libassLib",
                 "Cflags: -I${includedir}"
               )
@@ -3779,7 +3847,7 @@ jobs:
                 '',
                 "Name: freetype2",
                 "Description: freetype2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'freetype')",
                 "Libs: $freetype2Lib",
                 "Cflags: -I${includedir} -I${includedir}/freetype2"
               )
@@ -3801,7 +3869,7 @@ jobs:
                 '',
                 "Name: fontconfig",
                 "Description: fontconfig library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'fontconfig')",
                 "Libs: $fontconfigLib",
                 "Cflags: -I${includedir}"
               )
@@ -3823,7 +3891,7 @@ jobs:
                 '',
                 "Name: zimg",
                 "Description: zimg library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'zimg')",
                 "Libs: $zimgLib",
                 "Cflags: -I${includedir}"
               )
@@ -3845,7 +3913,7 @@ jobs:
                 '',
                 "Name: soxr",
                 "Description: soxr library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'soxr')",
                 "Libs: $soxrLib",
                 "Cflags: -I${includedir}"
               )
@@ -3867,7 +3935,7 @@ jobs:
                 '',
                 "Name: libopenjp2",
                 "Description: libopenjp2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'openjpeg')",
                 "Libs: $libopenjp2Lib",
                 "Cflags: -I${includedir}"
               )
@@ -3889,7 +3957,7 @@ jobs:
                 '',
                 "Name: snappy",
                 "Description: snappy library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'snappy')",
                 "Libs: $snappyLib",
                 "Cflags: -I${includedir}"
               )
@@ -4173,7 +4241,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac \
             --enable-sdl2 --enable-d3d11va --enable-dxva2 --enable-mediafoundation \
             --disable-doc
           make -j"$(nproc)" && make install
@@ -4479,7 +4547,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -4500,6 +4568,23 @@ jobs:
           function Write-Utf8($path, $lines) {
             [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
           }
+          function Get-PortVersion($portName) {
+            $json = "$inst\share\$portName\vcpkg.json"
+            $control = "$inst\share\$portName\CONTROL"
+            $ver = $null
+            if (Test-Path $json) {
+              $data = Get-Content $json -Raw | ConvertFrom-Json
+              $ver = $data.version
+              if (-not $ver) { $ver = $data.'version-semver' }
+              if (-not $ver) { $ver = $data.'version-string' }
+              if (-not $ver) { $ver = $data.'version-date' }
+            } elseif (Test-Path $control) {
+              $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) { $ver = 'unknown' }
+            return $ver
+          }
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
@@ -4514,7 +4599,7 @@ jobs:
             '',
             'Name: libfdk-aac',
             'Description: Fraunhofer FDK AAC codec library',
-            'Version: 2.0.2',
+            "Version: $(Get-PortVersion 'fdk-aac')",
             "Libs: $fdkLib"
           )
           # ffplay 需要 SDL2；较新的 vcpkg 端口提供 sdl2.pc，仅在缺失时创建回退。
@@ -4531,7 +4616,7 @@ jobs:
               '',
               'Name: sdl2',
               'Description: Simple DirectMedia Layer',
-              'Version: 2.30.0',
+              "Version: $(Get-PortVersion 'sdl2')",
               "Libs: $sdl2Libs",
               'Cflags: -I${includedir} -I${includedir}/SDL2'
             )
@@ -4551,7 +4636,7 @@ jobs:
                 '',
                 "Name: libx264",
                 "Description: libx264 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x264')",
                 "Libs: $libx264Lib",
                 "Cflags: -I${includedir}"
               )
@@ -4573,7 +4658,7 @@ jobs:
                 '',
                 "Name: libx265",
                 "Description: libx265 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'x265')",
                 "Libs: $libx265Lib",
                 "Cflags: -I${includedir}"
               )
@@ -4595,7 +4680,7 @@ jobs:
                 '',
                 "Name: libvpx",
                 "Description: libvpx library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvpx')",
                 "Libs: $libvpxLib",
                 "Cflags: -I${includedir}"
               )
@@ -4617,7 +4702,7 @@ jobs:
                 '',
                 "Name: opus",
                 "Description: opus library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'opus')",
                 "Libs: $opusLib",
                 "Cflags: -I${includedir}"
               )
@@ -4639,7 +4724,7 @@ jobs:
                 '',
                 "Name: vorbis",
                 "Description: vorbis library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Libs: $vorbisLib",
                 "Cflags: -I${includedir}"
               )
@@ -4661,7 +4746,7 @@ jobs:
                 '',
                 "Name: vorbisenc",
                 "Description: vorbisenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libvorbis')",
                 "Requires: vorbis",
                 "Libs: $vorbisencLib",
                 "Cflags: -I${includedir}"
@@ -4684,7 +4769,7 @@ jobs:
                 '',
                 "Name: theora",
                 "Description: theora library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraLib",
                 "Cflags: -I${includedir}"
               )
@@ -4706,7 +4791,7 @@ jobs:
                 '',
                 "Name: theoradec",
                 "Description: theoradec library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoradecLib",
                 "Cflags: -I${includedir}"
               )
@@ -4728,7 +4813,7 @@ jobs:
                 '',
                 "Name: theoraenc",
                 "Description: theoraenc library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libtheora')",
                 "Libs: $theoraencLib",
                 "Cflags: -I${includedir}"
               )
@@ -4750,7 +4835,7 @@ jobs:
                 '',
                 "Name: libaom",
                 "Description: libaom library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'aom')",
                 "Libs: $libaomLib",
                 "Cflags: -I${includedir}"
               )
@@ -4772,7 +4857,7 @@ jobs:
                 '',
                 "Name: libwebp",
                 "Description: libwebp library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libwebp')",
                 "Libs: $libwebpLib",
                 "Cflags: -I${includedir}"
               )
@@ -4794,7 +4879,7 @@ jobs:
                 '',
                 "Name: libass",
                 "Description: libass library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'libass')",
                 "Libs: $libassLib",
                 "Cflags: -I${includedir}"
               )
@@ -4816,7 +4901,7 @@ jobs:
                 '',
                 "Name: freetype2",
                 "Description: freetype2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'freetype')",
                 "Libs: $freetype2Lib",
                 "Cflags: -I${includedir} -I${includedir}/freetype2"
               )
@@ -4838,7 +4923,7 @@ jobs:
                 '',
                 "Name: fontconfig",
                 "Description: fontconfig library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'fontconfig')",
                 "Libs: $fontconfigLib",
                 "Cflags: -I${includedir}"
               )
@@ -4860,7 +4945,7 @@ jobs:
                 '',
                 "Name: zimg",
                 "Description: zimg library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'zimg')",
                 "Libs: $zimgLib",
                 "Cflags: -I${includedir}"
               )
@@ -4882,7 +4967,7 @@ jobs:
                 '',
                 "Name: soxr",
                 "Description: soxr library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'soxr')",
                 "Libs: $soxrLib",
                 "Cflags: -I${includedir}"
               )
@@ -4904,7 +4989,7 @@ jobs:
                 '',
                 "Name: libopenjp2",
                 "Description: libopenjp2 library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'openjpeg')",
                 "Libs: $libopenjp2Lib",
                 "Cflags: -I${includedir}"
               )
@@ -4926,7 +5011,7 @@ jobs:
                 '',
                 "Name: snappy",
                 "Description: snappy library",
-                "Version: 1.0.0",
+                "Version: $(Get-PortVersion 'snappy')",
                 "Libs: $snappyLib",
                 "Cflags: -I${includedir}"
               )
@@ -4951,7 +5036,7 @@ jobs:
             '',
             'Name: vpl',
             'Description: Intel oneVPL Dispatcher',
-            'Version: 2.16.0',
+            "Version: $(Get-PortVersion 'libvpl')",
             "Libs: -lvpl",
             'Cflags: -I${includedir} -I${includedir}/vpl'
           )
@@ -5363,7 +5448,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-libnpp \
             --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
