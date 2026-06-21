@@ -1,4 +1,4 @@
-name: FFmpeg 多厂商构建
+﻿name: FFmpeg 多厂商构建
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjpeg2-7-dev \
+            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
       - name: 安装 CUDA Toolkit
@@ -135,7 +135,7 @@ jobs:
             libva-dev libvpl-dev libdrm-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjpeg2-7-dev \
+            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
       - name: 编译 VMAF（CPU）
@@ -205,7 +205,7 @@ jobs:
             libva-dev libdrm-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjpeg2-7-dev \
+            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
       - name: 编译 VMAF（CPU）
@@ -282,7 +282,8 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          } else {
+          }
+          if (-not $nasmDir) {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -314,7 +315,8 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
+          }
+          if (-not $clangDir) {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -1328,7 +1330,8 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          } else {
+          }
+          if (-not $nasmDir) {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -1360,7 +1363,8 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
+          }
+          if (-not $clangDir) {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -2253,7 +2257,8 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          } else {
+          }
+          if (-not $nasmDir) {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -2285,7 +2290,8 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
+          }
+          if (-not $clangDir) {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -3191,7 +3197,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom libwebp libass freetype fontconfig zimg soxr openjpeg snappy
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg soxr openjpeg snappy
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -3311,7 +3317,8 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          } else {
+          }
+          if (-not $nasmDir) {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -3343,7 +3350,8 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
+          }
+          if (-not $clangDir) {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
@@ -4231,7 +4239,7 @@ jobs:
             libva-dev libvpl-dev libdrm-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjpeg2-7-dev \
+            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev
 
       - name: 安装 CUDA Toolkit
@@ -4348,7 +4356,8 @@ jobs:
           if ($nasmDir) {
             echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
             Write-Host "nasm 位于 $nasmDir"
-          } else {
+          }
+          if (-not $nasmDir) {
             Write-Host "::warning::在预期位置未找到 nasm.exe"
           }
           # 确保 nasm 在 bash 步骤的 PATH 中。
@@ -4380,7 +4389,8 @@ jobs:
             # 在 PATH 中。
             $clangDirUnix = $clangDir -replace '\\','/'
             echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
+          }
+          if (-not $clangDir) {
             Write-Host "::warning::未找到 VS Clang；VMAF 将回退到 MSVC 并设置 -Denable_asm=false"
           }
 
