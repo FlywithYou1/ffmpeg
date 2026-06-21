@@ -62,8 +62,8 @@ LAMEPC
   ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
 BREW_PREFIX="$(brew --prefix)"
 MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
-if [ -d "${MVK_PREFIX}/include" ]; then
-  MVK_CFLAGS="-I${MVK_PREFIX}/include"
+if [ -d "${MVK_PREFIX}/libexec/include" ]; then
+  MVK_CFLAGS="-I${MVK_PREFIX}/libexec/include"
   MVK_LDFLAGS="-L${MVK_PREFIX}/lib -Wl,-rpath,${MVK_PREFIX}/lib"
 else
   MVK_CFLAGS=""
