@@ -2,6 +2,9 @@
 
 on:
   workflow_dispatch:
+  schedule:
+    # 北京时间每天 0:00 = UTC 前一天 16:00
+    - cron: '0 16 * * *'
   push:
     branches: [main, master]
     tags: ['v*']
@@ -14,6 +17,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ============================================================
+  # 构建元数据（决定 Release 标签与类型）
+  # ============================================================
+  metadata:
+    name: 构建元数据
+    runs-on: ubuntu-26.04
+    outputs:
+      release_tag: ${{ steps.vars.outputs.release_tag }}
+      prerelease: ${{ steps.vars.outputs.prerelease }}
+      should_release: ${{ steps.vars.outputs.should_release }}
+    steps:
+      - name: 确定 Release 参数
+        id: vars
+        run: |
+          EVENT_NAME="${{ github.event_name }}"
+          if [ "$EVENT_NAME" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "release_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            TAG="nightly-$(date -u +%Y-%m-%d-%H%M%S)"
+            echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="prerelease-$(date -u +%Y-%m-%d-%H%M%S)"
+            echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # ============================================================
   # LINUX — NVIDIA（NVENC/CUDA + VMAF-CUDA）
   # ============================================================
@@ -6037,6 +6075,7 @@ jobs:
   release:
     name: 创建 GitHub Release
     needs:
+      - metadata
       - linux-nvidia
       - linux-intel-qsv
       - linux-amd
@@ -6048,7 +6087,7 @@ jobs:
       - windows-x86-all
       - windows-arm64
       - macos-arm
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: needs.metadata.outputs.should_release == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -6065,8 +6104,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: FFmpeg ${{ github.ref_name }}
+          tag_name: ${{ needs.metadata.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: FFmpeg ${{ needs.metadata.outputs.release_tag }}
           body: |
             ## 🎬 FFmpeg 多厂商构建
 
@@ -6112,5 +6152,5 @@ jobs:
             > Windows 构建使用 MSVC 2026 编译，需要 VC++ 可再发行组件。
           files: release-assets/*
           draft: false
-          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}
           fail_on_unmatched_files: true
