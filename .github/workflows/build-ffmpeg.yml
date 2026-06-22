@@ -76,13 +76,16 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
-            for pc in /usr/lib/x86_64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/aarch64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/pkgconfig/kvazaar.pc; do
-              if [ -f "$pc" ] && grep -q '@PROJECT_VERSION@' "$pc"; then
-                kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-                sed -i "s/^Version: @PROJECT_VERSION@/Version: $kvazaar_ver/" "$pc"
-                echo "Patched $pc version to $kvazaar_ver"
+            kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
+            for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
+              echo "Found kvazaar.pc: $pc"
+              cat "$pc" || true
+              if [ -n "$kvazaar_ver" ]; then
+                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            pkg-config --modversion kvazaar || true
 
       - name: 安装 CUDA 工具包
         run: |
@@ -194,13 +197,16 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
-            for pc in /usr/lib/x86_64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/aarch64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/pkgconfig/kvazaar.pc; do
-              if [ -f "$pc" ] && grep -q '@PROJECT_VERSION@' "$pc"; then
-                kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-                sed -i "s/^Version: @PROJECT_VERSION@/Version: $kvazaar_ver/" "$pc"
-                echo "Patched $pc version to $kvazaar_ver"
+            kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
+            for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
+              echo "Found kvazaar.pc: $pc"
+              cat "$pc" || true
+              if [ -n "$kvazaar_ver" ]; then
+                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -279,13 +285,16 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
-            for pc in /usr/lib/x86_64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/aarch64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/pkgconfig/kvazaar.pc; do
-              if [ -f "$pc" ] && grep -q '@PROJECT_VERSION@' "$pc"; then
-                kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-                sed -i "s/^Version: @PROJECT_VERSION@/Version: $kvazaar_ver/" "$pc"
-                echo "Patched $pc version to $kvazaar_ver"
+            kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
+            for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
+              echo "Found kvazaar.pc: $pc"
+              cat "$pc" || true
+              if [ -n "$kvazaar_ver" ]; then
+                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -3732,7 +3741,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband vidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -4954,13 +4963,16 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
-            for pc in /usr/lib/x86_64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/aarch64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/pkgconfig/kvazaar.pc; do
-              if [ -f "$pc" ] && grep -q '@PROJECT_VERSION@' "$pc"; then
-                kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-                sed -i "s/^Version: @PROJECT_VERSION@/Version: $kvazaar_ver/" "$pc"
-                echo "Patched $pc version to $kvazaar_ver"
+            kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
+            for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
+              echo "Found kvazaar.pc: $pc"
+              cat "$pc" || true
+              if [ -n "$kvazaar_ver" ]; then
+                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            pkg-config --modversion kvazaar || true
 
       - name: 安装 CUDA 工具包
         run: |
@@ -6300,13 +6312,16 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
-            for pc in /usr/lib/x86_64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/aarch64-linux-gnu/pkgconfig/kvazaar.pc /usr/lib/pkgconfig/kvazaar.pc; do
-              if [ -f "$pc" ] && grep -q '@PROJECT_VERSION@' "$pc"; then
-                kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-                sed -i "s/^Version: @PROJECT_VERSION@/Version: $kvazaar_ver/" "$pc"
-                echo "Patched $pc version to $kvazaar_ver"
+            kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
+            for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
+              echo "Found kvazaar.pc: $pc"
+              cat "$pc" || true
+              if [ -n "$kvazaar_ver" ]; then
+                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
         run: |
