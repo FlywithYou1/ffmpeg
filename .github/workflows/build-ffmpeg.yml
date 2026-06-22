@@ -1632,7 +1632,7 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include -DLIBTWOLAME_STATIC" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -2802,7 +2802,7 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include -DLIBTWOLAME_STATIC" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -4004,7 +4004,7 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include -DLIBTWOLAME_STATIC" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -5202,9 +5202,9 @@ jobs:
           }
           VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
           VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-          # ARM64: keep it simple with MSVC; NEON asm is different from x86 AVX2
+          # ARM64 NEON code in VMAF is C intrinsics and MSVC arm64 supports it.
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
+          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=true -Db_vscrt=mt -Ddefault_library=static \
             -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
             -Dc_args="$VMAF_C_ARGS" \
             -Dc_link_args="$VMAF_LINK_ARGS"
@@ -5294,7 +5294,7 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${LAME_PREFIX}/include -DLIBTWOLAME_STATIC" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
@@ -6749,7 +6749,7 @@ jobs:
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include" \
+            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -I${LAME_PREFIX}/include -DLIBTWOLAME_STATIC" \
             --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib -LIBPATH:${LAME_PREFIX}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
