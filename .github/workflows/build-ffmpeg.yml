@@ -708,7 +708,7 @@ jobs:
             'Description: SVT-AV1 encoder library',
             "Version: $svtVersion",
             "Libs: $svtLibs",
-            'Cflags: -I${includedir}'
+            'Cflags: -I${includedir} -I${includedir}/svt-av1'
           )
           Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
@@ -1981,7 +1981,7 @@ jobs:
             'Description: SVT-AV1 encoder library',
             "Version: $svtVersion",
             "Libs: $svtLibs",
-            'Cflags: -I${includedir}'
+            'Cflags: -I${includedir} -I${includedir}/svt-av1'
           )
           Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
@@ -3147,7 +3147,7 @@ jobs:
             'Description: SVT-AV1 encoder library',
             "Version: $svtVersion",
             "Libs: $svtLibs",
-            'Cflags: -I${includedir}'
+            'Cflags: -I${includedir} -I${includedir}/svt-av1'
           )
           Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
@@ -4470,7 +4470,7 @@ jobs:
             'Description: SVT-AV1 encoder library',
             "Version: $svtVersion",
             "Libs: $svtLibs",
-            'Cflags: -I${includedir}'
+            'Cflags: -I${includedir} -I${includedir}/svt-av1'
           )
           Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
@@ -5783,7 +5783,7 @@ jobs:
             'Description: SVT-AV1 encoder library',
             "Version: $svtVersion",
             "Libs: $svtLibs",
-            'Cflags: -I${includedir}'
+            'Cflags: -I${includedir} -I${includedir}/svt-av1'
           )
           Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 

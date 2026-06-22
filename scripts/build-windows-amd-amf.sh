@@ -239,7 +239,7 @@ Name: SvtAv1Enc
 Description: SVT-AV1 encoder library
 Version: ${svt_version}
 Libs: ${svt_lib} ${fastfeat_lib}
-Cflags: -I\${includedir}
+Cflags: -I\${includedir} -I\${includedir}/svt-av1
 EOF
   write_pc "libdav1d" "dav1d AV1 decoder library" "-ldav1d"
   write_pc "libopenh264" "OpenH264 library" "-lopenh264"
