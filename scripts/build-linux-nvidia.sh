@@ -54,6 +54,12 @@ echo "[3/5] FFmpeg"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
+
+# 验证 libplacebo 静态链接
+echo "=== manual libplacebo static link test ==="
+printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
+
 ./configure --prefix="$P" --pkg-config-flags="--static" \
   --extra-cflags="-I${P}/include -I${CUDA_HOME}/include" \
   --extra-ldflags="-L${P}/lib -L${CUDA_HOME}/lib64" \

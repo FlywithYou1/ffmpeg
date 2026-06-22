@@ -74,7 +74,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -150,6 +150,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
@@ -207,7 +211,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -250,6 +254,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -307,7 +315,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -340,6 +348,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
@@ -354,6 +366,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -4997,7 +5013,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -5073,6 +5089,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
@@ -6358,7 +6378,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -6392,6 +6412,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
@@ -6407,6 +6431,10 @@ jobs:
           # Fallback x265.pc when the distro does not ship it
           printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=%s\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' "$ARCH_LIBDIR" > "$P/lib/pkgconfig/x265.pc"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # 验证 libplacebo 静态链接
+          echo "=== manual libplacebo static link test ==="
+          printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
+          cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
