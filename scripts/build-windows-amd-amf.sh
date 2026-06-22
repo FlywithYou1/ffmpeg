@@ -430,7 +430,7 @@ sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleav
 
 ./configure --toolchain=msvc --prefix="$P" \
   --pkg-config-flags="--static" \
-  --extra-cflags="-I${P_MIXED}/include -I${AMF_INCLUDE} ${VCPKG_CFLAGS}" \
+  --extra-cflags="-I${P_MIXED}/include -I${AMF_INCLUDE} ${VCPKG_CFLAGS} -DLIBTWOLAME_STATIC" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${VCPKG_LDFLAGS}" \
   --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
