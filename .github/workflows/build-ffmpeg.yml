@@ -80,11 +80,16 @@ jobs:
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
               echo "Found kvazaar.pc: $pc"
               cat "$pc" || true
+              pc_dir=$(dirname "$pc")
+              if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
+                export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              fi
               if [ -n "$kvazaar_ver" ]; then
-                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
                 echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
 
       - name: 安装 CUDA 工具包
@@ -201,11 +206,16 @@ jobs:
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
               echo "Found kvazaar.pc: $pc"
               cat "$pc" || true
+              pc_dir=$(dirname "$pc")
+              if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
+                export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              fi
               if [ -n "$kvazaar_ver" ]; then
-                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
                 echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
@@ -289,11 +299,16 @@ jobs:
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
               echo "Found kvazaar.pc: $pc"
               cat "$pc" || true
+              pc_dir=$(dirname "$pc")
+              if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
+                export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              fi
               if [ -n "$kvazaar_ver" ]; then
-                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
                 echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
@@ -4967,11 +4982,16 @@ jobs:
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
               echo "Found kvazaar.pc: $pc"
               cat "$pc" || true
+              pc_dir=$(dirname "$pc")
+              if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
+                export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              fi
               if [ -n "$kvazaar_ver" ]; then
-                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
                 echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
 
       - name: 安装 CUDA 工具包
@@ -6316,11 +6336,16 @@ jobs:
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
               echo "Found kvazaar.pc: $pc"
               cat "$pc" || true
+              pc_dir=$(dirname "$pc")
+              if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
+                export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+              fi
               if [ -n "$kvazaar_ver" ]; then
-                sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+                sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
                 echo "Patched $pc -> Version: $kvazaar_ver"
               fi
             done
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
 
       - name: 编译 VMAF（CPU）
