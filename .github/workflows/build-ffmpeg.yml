@@ -74,7 +74,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libbs2b-dev libaribb24-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -91,6 +91,13 @@ jobs:
             done
             echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
+            # Debug libplacebo pkg-config
+            echo "=== libplacebo pkg-config debug ==="
+            find /usr/lib /usr/local/lib -name 'libplacebo.pc' -exec sh -c 'echo "File: $1"; cat "$1"' _ {} \; || true
+            echo "libplacebo modversion: $(pkg-config --modversion libplacebo 2>&1 || true)"
+            echo "libplacebo static exists: $(pkg-config --static --exists libplacebo 2>&1 && echo OK || echo FAIL)"
+            echo "libplacebo static requires:"
+            pkg-config --print-requires --static libplacebo 2>&1 || true
 
       - name: 安装 CUDA 工具包
         run: |
@@ -152,7 +159,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -200,7 +207,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libbs2b-dev libaribb24-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -217,6 +224,13 @@ jobs:
             done
             echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
+            # Debug libplacebo pkg-config
+            echo "=== libplacebo pkg-config debug ==="
+            find /usr/lib /usr/local/lib -name 'libplacebo.pc' -exec sh -c 'echo "File: $1"; cat "$1"' _ {} \; || true
+            echo "libplacebo modversion: $(pkg-config --modversion libplacebo 2>&1 || true)"
+            echo "libplacebo static exists: $(pkg-config --static --exists libplacebo 2>&1 && echo OK || echo FAIL)"
+            echo "libplacebo static requires:"
+            pkg-config --print-requires --static libplacebo 2>&1 || true
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -244,7 +258,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -293,7 +307,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libbs2b-dev libaribb24-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -310,6 +324,13 @@ jobs:
             done
             echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
+            # Debug libplacebo pkg-config
+            echo "=== libplacebo pkg-config debug ==="
+            find /usr/lib /usr/local/lib -name 'libplacebo.pc' -exec sh -c 'echo "File: $1"; cat "$1"' _ {} \; || true
+            echo "libplacebo modversion: $(pkg-config --modversion libplacebo 2>&1 || true)"
+            echo "libplacebo static exists: $(pkg-config --static --exists libplacebo 2>&1 && echo OK || echo FAIL)"
+            echo "libplacebo static requires:"
+            pkg-config --print-requires --static libplacebo 2>&1 || true
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -341,7 +362,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -3822,7 +3843,7 @@ jobs:
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
-            --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab \
+            --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
             --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
@@ -4976,7 +4997,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libbs2b-dev libaribb24-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -4993,6 +5014,13 @@ jobs:
             done
             echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
+            # Debug libplacebo pkg-config
+            echo "=== libplacebo pkg-config debug ==="
+            find /usr/lib /usr/local/lib -name 'libplacebo.pc' -exec sh -c 'echo "File: $1"; cat "$1"' _ {} \; || true
+            echo "libplacebo modversion: $(pkg-config --modversion libplacebo 2>&1 || true)"
+            echo "libplacebo static exists: $(pkg-config --static --exists libplacebo 2>&1 && echo OK || echo FAIL)"
+            echo "libplacebo static requires:"
+            pkg-config --print-requires --static libplacebo 2>&1 || true
 
       - name: 安装 CUDA 工具包
         run: |
@@ -5055,7 +5083,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-vaapi --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -6330,7 +6358,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libbs2b-dev libaribb24-dev librubberband-dev libvidstab-dev
+            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -6347,6 +6375,13 @@ jobs:
             done
             echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "$GITHUB_ENV"
             pkg-config --modversion kvazaar || true
+            # Debug libplacebo pkg-config
+            echo "=== libplacebo pkg-config debug ==="
+            find /usr/lib /usr/local/lib -name 'libplacebo.pc' -exec sh -c 'echo "File: $1"; cat "$1"' _ {} \; || true
+            echo "libplacebo modversion: $(pkg-config --modversion libplacebo 2>&1 || true)"
+            echo "libplacebo static exists: $(pkg-config --static --exists libplacebo 2>&1 && echo OK || echo FAIL)"
+            echo "libplacebo static requires:"
+            pkg-config --print-requires --static libplacebo 2>&1 || true
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -6380,7 +6415,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
