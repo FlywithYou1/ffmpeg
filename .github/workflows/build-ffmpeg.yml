@@ -74,7 +74,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libwavpack-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 
       - name: 安装 CUDA 工具包
         run: |
@@ -136,7 +136,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -184,7 +184,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libwavpack-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -212,7 +212,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -261,7 +261,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libwavpack-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -293,7 +293,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -496,7 +496,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt wavpack shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -1016,28 +1016,6 @@ jobs:
           } else {
             Write-Host "::warning::未找到 libopenmpt 导入库；跳过 .pc"
           }
-          $libwavpackLib = Find-ImportLib @('wavpack', 'libwavpack')
-          if ($libwavpackLib) {
-            if (-not (Test-Path "$pcDir/libwavpack.pc")) {
-              Write-Utf8 "$pcDir/libwavpack.pc" @(
-                "prefix=$instMixed",
-                'exec_prefix=${prefix}',
-                'libdir=${prefix}/lib',
-                'includedir=${prefix}/include',
-                '',
-                "Name: libwavpack",
-                "Description: WavPack library",
-                "Version: $(Get-PortVersion 'wavpack')",
-                "Libs: $libwavpackLib",
-                "Cflags: -I${includedir}"
-              )
-              Write-Host "已创建回退 libwavpack.pc"
-            } else {
-              Write-Host "使用 vcpkg 提供的 libwavpack.pc"
-            }
-          } else {
-            Write-Host "::warning::未找到 libwavpack 导入库；跳过 .pc"
-          }
 
           # 同时创建备用导入库名称，以便 ffmpeg 的非 pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -1087,8 +1065,6 @@ jobs:
           if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "twolame.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "openmpt.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "libwavpack.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "wavpack.lib" }
           # 来自 vcpkg 的 pkg-config 实现（此运行器上的 Git for Windows 缺少它）
           $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
@@ -1485,7 +1461,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1707,7 +1683,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt wavpack shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -2227,28 +2203,6 @@ jobs:
           } else {
             Write-Host "::warning::未找到 libopenmpt 导入库；跳过 .pc"
           }
-          $libwavpackLib = Find-ImportLib @('wavpack', 'libwavpack')
-          if ($libwavpackLib) {
-            if (-not (Test-Path "$pcDir/libwavpack.pc")) {
-              Write-Utf8 "$pcDir/libwavpack.pc" @(
-                "prefix=$instMixed",
-                'exec_prefix=${prefix}',
-                'libdir=${prefix}/lib',
-                'includedir=${prefix}/include',
-                '',
-                "Name: libwavpack",
-                "Description: WavPack library",
-                "Version: $(Get-PortVersion 'wavpack')",
-                "Libs: $libwavpackLib",
-                "Cflags: -I${includedir}"
-              )
-              Write-Host "已创建回退 libwavpack.pc"
-            } else {
-              Write-Host "使用 vcpkg 提供的 libwavpack.pc"
-            }
-          } else {
-            Write-Host "::warning::未找到 libwavpack 导入库；跳过 .pc"
-          }
 
           # 同时创建备用导入库名称，以便 ffmpeg 的非 pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -2298,8 +2252,6 @@ jobs:
           if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "twolame.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "openmpt.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "libwavpack.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "wavpack.lib" }
           # 来自 vcpkg 的 pkg-config 实现（此运行器上的 Git for Windows 缺少它）
           $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
@@ -2589,7 +2541,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2811,7 +2763,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt wavpack shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -3331,28 +3283,6 @@ jobs:
           } else {
             Write-Host "::warning::未找到 libopenmpt 导入库；跳过 .pc"
           }
-          $libwavpackLib = Find-ImportLib @('wavpack', 'libwavpack')
-          if ($libwavpackLib) {
-            if (-not (Test-Path "$pcDir/libwavpack.pc")) {
-              Write-Utf8 "$pcDir/libwavpack.pc" @(
-                "prefix=$instMixed",
-                'exec_prefix=${prefix}',
-                'libdir=${prefix}/lib',
-                'includedir=${prefix}/include',
-                '',
-                "Name: libwavpack",
-                "Description: WavPack library",
-                "Version: $(Get-PortVersion 'wavpack')",
-                "Libs: $libwavpackLib",
-                "Cflags: -I${includedir}"
-              )
-              Write-Host "已创建回退 libwavpack.pc"
-            } else {
-              Write-Host "使用 vcpkg 提供的 libwavpack.pc"
-            }
-          } else {
-            Write-Host "::warning::未找到 libwavpack 导入库；跳过 .pc"
-          }
 
           # vpl.pc — vcpkg libvpl 使用 cmake-config，ffmpeg 需要 pkg-config
           # oneVPL 2.x 头文件位于 include/vpl/ 下；为兼容性同时包含父目录
@@ -3420,8 +3350,6 @@ jobs:
           if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "twolame.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "openmpt.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "libwavpack.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "wavpack.lib" }
           # 来自 vcpkg 的 pkg-config 实现（此运行器上的 Git for Windows 缺少它）
           $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
@@ -3726,7 +3654,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -3780,7 +3708,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt wavpack libbs2b aribb24 libplacebo rubberband vidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband vidstab
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -3846,7 +3774,7 @@ jobs:
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
-            --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
+            --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
             --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
@@ -4072,7 +4000,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt wavpack shaderc
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -4592,28 +4520,6 @@ jobs:
           } else {
             Write-Host "::warning::未找到 libopenmpt 导入库；跳过 .pc"
           }
-          $libwavpackLib = Find-ImportLib @('wavpack', 'libwavpack')
-          if ($libwavpackLib) {
-            if (-not (Test-Path "$pcDir/libwavpack.pc")) {
-              Write-Utf8 "$pcDir/libwavpack.pc" @(
-                "prefix=$instMixed",
-                'exec_prefix=${prefix}',
-                'libdir=${prefix}/lib',
-                'includedir=${prefix}/include',
-                '',
-                "Name: libwavpack",
-                "Description: WavPack library",
-                "Version: $(Get-PortVersion 'wavpack')",
-                "Libs: $libwavpackLib",
-                "Cflags: -I${includedir}"
-              )
-              Write-Host "已创建回退 libwavpack.pc"
-            } else {
-              Write-Host "使用 vcpkg 提供的 libwavpack.pc"
-            }
-          } else {
-            Write-Host "::warning::未找到 libwavpack 导入库；跳过 .pc"
-          }
 
           # 同时创建备用导入库名称，以便 ffmpeg 的非 pkg-config
           # fallbacks (-lmp3lame, -lfdk-aac) can find the files.
@@ -4663,8 +4569,6 @@ jobs:
           if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "twolame.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "openmpt.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "libwavpack.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "wavpack.lib" }
           # 来自 vcpkg 的 pkg-config 实现（此运行器上的 Git for Windows 缺少它）
           $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
@@ -5024,7 +4928,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libwavpack-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 
       - name: 安装 CUDA 工具包
         run: |
@@ -5087,7 +4991,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-vaapi --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
@@ -5295,7 +5199,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt wavpack shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
           $pcDir = "$instMixed/lib/pkgconfig"
@@ -5815,28 +5719,6 @@ jobs:
           } else {
             Write-Host "::warning::未找到 libopenmpt 导入库；跳过 .pc"
           }
-          $libwavpackLib = Find-ImportLib @('wavpack', 'libwavpack')
-          if ($libwavpackLib) {
-            if (-not (Test-Path "$pcDir/libwavpack.pc")) {
-              Write-Utf8 "$pcDir/libwavpack.pc" @(
-                "prefix=$instMixed",
-                'exec_prefix=${prefix}',
-                'libdir=${prefix}/lib',
-                'includedir=${prefix}/include',
-                '',
-                "Name: libwavpack",
-                "Description: WavPack library",
-                "Version: $(Get-PortVersion 'wavpack')",
-                "Libs: $libwavpackLib",
-                "Cflags: -I${includedir}"
-              )
-              Write-Host "已创建回退 libwavpack.pc"
-            } else {
-              Write-Host "使用 vcpkg 提供的 libwavpack.pc"
-            }
-          } else {
-            Write-Host "::warning::未找到 libwavpack 导入库；跳过 .pc"
-          }
 
           # vpl.pc — vcpkg libvpl 使用 cmake-config，ffmpeg 需要 pkg-config
           # oneVPL 2.x 头文件位于 include/vpl/ 下；为兼容性同时包含父目录
@@ -5904,8 +5786,6 @@ jobs:
           if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "twolame.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib" }
           if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "openmpt.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "libwavpack.lib" }
-          if ($libwavpackLib) { Ensure-LibAlias $libwavpackLib "wavpack.lib" }
           # 来自 vcpkg 的 pkg-config 实现（此运行器上的 Git for Windows 缺少它）
           $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
@@ -6315,7 +6195,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -6386,7 +6266,7 @@ jobs:
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            libwavpack-dev libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+            libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -6420,7 +6300,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 裁剪与验证
