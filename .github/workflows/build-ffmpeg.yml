@@ -65,7 +65,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
+            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
@@ -202,7 +202,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
+            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libvpl-dev libdrm-dev \
@@ -307,7 +307,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
+            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libdrm-dev \
@@ -5034,7 +5034,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
+            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libvpl-dev libdrm-dev \
@@ -6407,7 +6407,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
+            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libdrm-dev \
