@@ -184,15 +184,12 @@ EOF
   write_pc "snappy" "snappy library" "-lsnappy"
   write_pc "libsvtav1" "SVT-AV1 library" "-lsvtav1"
   write_pc "libdav1d" "dav1d AV1 decoder library" "-ldav1d"
-  write_pc "libkvazaar" "Kvazaar HEVC encoder library" "-lkvazaar"
   write_pc "libopenh264" "OpenH264 library" "-lopenh264"
   write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame"
   write_pc "libspeex" "Speex codec library" "-lspeex"
   write_pc "libjxl" "JPEG XL library" "-ljxl"
   write_pc "libopenmpt" "OpenMPT module library" "-lopenmpt"
   write_pc "libwavpack" "WavPack library" "-lwavpack"
-  write_pc "libplacebo" "libplacebo library" "-lplacebo"
-  write_pc "libvidstab" "VidStab library" "-lvidstab"
 
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 fi
@@ -381,7 +378,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --enable-libvmaf --enable-amf \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
-  --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libplacebo --enable-libvidstab \
+  --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
   --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
 make -j"$THREADS" && make install
