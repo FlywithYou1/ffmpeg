@@ -182,7 +182,23 @@ EOF
   write_pc "soxr" "soxr library" "-lsoxr"
   write_pc "libopenjp2" "OpenJPEG JPEG 2000 library" "-lopenjp2"
   write_pc "snappy" "snappy library" "-lsnappy"
-  write_pc "libsvtav1" "SVT-AV1 library" "-lsvtav1"
+  # 重写 SvtAv1Enc.pc：vcpkg 生成的 .pc 会携带 Cflags.private: -UEB_DLL，
+  # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+  svt_lib="$(find_import_lib SvtAv1Enc svtav1)" || { echo "错误：未找到 SvtAv1Enc import library"; exit 1; }
+  fastfeat_lib="$(find_import_lib fastfeat)" || { echo "错误：未找到 fastfeat import library"; exit 1; }
+  svt_version=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","unknown"))' < "${VCPKG_INSTALLED}/share/svt-av1/vcpkg.json" 2>/dev/null || echo unknown)
+  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/SvtAv1Enc.pc" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: SvtAv1Enc
+Description: SVT-AV1 encoder library
+Version: ${svt_version}
+Libs: ${svt_lib} ${fastfeat_lib}
+Cflags: -I\${includedir}
+EOF
   write_pc "libdav1d" "dav1d AV1 decoder library" "-ldav1d"
   write_pc "libopenh264" "OpenH264 library" "-lopenh264"
   write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame"

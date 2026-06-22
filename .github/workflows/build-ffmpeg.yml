@@ -638,6 +638,38 @@ jobs:
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
 
+          # 重写 SvtAv1Enc.pc：vcpkg 生成的版本会携带 Cflags.private: -UEB_DLL，
+          # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+          $svtLibName = $null
+          foreach ($cand in @('SvtAv1Enc','svtav1')) {
+            foreach ($suffix in @('','-static','_static')) {
+              $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+              if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+            }
+            if ($svtLibName) { break }
+          }
+          $fastfeatLibName = $null
+          foreach ($suffix in @('','-static','_static')) {
+            $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+            if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+          }
+          if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+          if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+          $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: SvtAv1Enc',
+            'Description: SVT-AV1 encoder library',
+            "Version: $(Get-PortVersion 'svt-av1')",
+            "Libs: $svtLibs",
+            'Cflags: -I${includedir}'
+          )
+          Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
           Write-Utf8 "$pcDir/libfdk-aac.pc" @(
@@ -1837,6 +1869,38 @@ jobs:
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
 
+          # 重写 SvtAv1Enc.pc：vcpkg 生成的版本会携带 Cflags.private: -UEB_DLL，
+          # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+          $svtLibName = $null
+          foreach ($cand in @('SvtAv1Enc','svtav1')) {
+            foreach ($suffix in @('','-static','_static')) {
+              $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+              if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+            }
+            if ($svtLibName) { break }
+          }
+          $fastfeatLibName = $null
+          foreach ($suffix in @('','-static','_static')) {
+            $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+            if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+          }
+          if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+          if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+          $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: SvtAv1Enc',
+            'Description: SVT-AV1 encoder library',
+            "Version: $(Get-PortVersion 'svt-av1')",
+            "Libs: $svtLibs",
+            'Cflags: -I${includedir}'
+          )
+          Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
           Write-Utf8 "$pcDir/libfdk-aac.pc" @(
@@ -2928,6 +2992,38 @@ jobs:
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
+
+          # 重写 SvtAv1Enc.pc：vcpkg 生成的版本会携带 Cflags.private: -UEB_DLL，
+          # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+          $svtLibName = $null
+          foreach ($cand in @('SvtAv1Enc','svtav1')) {
+            foreach ($suffix in @('','-static','_static')) {
+              $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+              if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+            }
+            if ($svtLibName) { break }
+          }
+          $fastfeatLibName = $null
+          foreach ($suffix in @('','-static','_static')) {
+            $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+            if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+          }
+          if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+          if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+          $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: SvtAv1Enc',
+            'Description: SVT-AV1 encoder library',
+            "Version: $(Get-PortVersion 'svt-av1')",
+            "Libs: $svtLibs",
+            'Cflags: -I${includedir}'
+          )
+          Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
@@ -4178,6 +4274,38 @@ jobs:
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
 
+          # 重写 SvtAv1Enc.pc：vcpkg 生成的版本会携带 Cflags.private: -UEB_DLL，
+          # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+          $svtLibName = $null
+          foreach ($cand in @('SvtAv1Enc','svtav1')) {
+            foreach ($suffix in @('','-static','_static')) {
+              $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+              if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+            }
+            if ($svtLibName) { break }
+          }
+          $fastfeatLibName = $null
+          foreach ($suffix in @('','-static','_static')) {
+            $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+            if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+          }
+          if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+          if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+          $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: SvtAv1Enc',
+            'Description: SVT-AV1 encoder library',
+            "Version: $(Get-PortVersion 'svt-av1')",
+            "Libs: $svtLibs",
+            'Cflags: -I${includedir}'
+          )
+          Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
           Write-Utf8 "$pcDir/libfdk-aac.pc" @(
@@ -5416,6 +5544,38 @@ jobs:
 
           # vcpkg 端口并不总是提供 pkg-config 文件；创建 ffmpeg 期望的文件。
           # libmp3lame.pc 由独立的编译 libmp3lame 步骤提供。
+
+          # 重写 SvtAv1Enc.pc：vcpkg 生成的版本会携带 Cflags.private: -UEB_DLL，
+          # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
+          $svtLibName = $null
+          foreach ($cand in @('SvtAv1Enc','svtav1')) {
+            foreach ($suffix in @('','-static','_static')) {
+              $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+              if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+            }
+            if ($svtLibName) { break }
+          }
+          $fastfeatLibName = $null
+          foreach ($suffix in @('','-static','_static')) {
+            $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+            if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+          }
+          if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+          if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+          $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: SvtAv1Enc',
+            'Description: SVT-AV1 encoder library',
+            "Version: $(Get-PortVersion 'svt-av1')",
+            "Libs: $svtLibs",
+            'Cflags: -I${includedir}'
+          )
+          Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
           $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
           if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
