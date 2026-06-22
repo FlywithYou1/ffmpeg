@@ -221,7 +221,49 @@ EOF
   # MSVC 链接器会把它当成未知选项；同时修正库名与实际导入库一致。
   svt_lib="$(find_import_lib SvtAv1Enc svtav1)" || { echo "错误：未找到 SvtAv1Enc import library"; exit 1; }
   fastfeat_lib="$(find_import_lib fastfeat)" || { echo "错误：未找到 fastfeat import library"; exit 1; }
-  svt_version=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","unknown"))' < "${VCPKG_INSTALLED}/share/svt-av1/vcpkg.json" 2>/dev/null || echo unknown)
+  svt_json="${VCPKG_INSTALLED}/share/svt-av1/vcpkg.json"
+  svt_version=$(python3 -c '
+import json,sys
+try:
+    data=json.load(sys.stdin)
+    for k in ("version","version-semver","version-string","version-date"):
+        v=data.get(k)
+        if v:
+            print(v.split("#")[0])
+            sys.exit(0)
+except Exception as e:
+    pass
+print("unknown")
+' < "$svt_json" 2>/dev/null || echo unknown)
+  if [ "$svt_version" = "unknown" ]; then
+    svt_abi="${VCPKG_INSTALLED}/share/svt-av1/vcpkg_abi_info.txt"
+    if [ -f "$svt_abi" ]; then
+      svt_version_abi=$(grep -E '^version[[:space:]]+' "$svt_abi" | head -1 | awk '{print $2}')
+      [ -n "$svt_version_abi" ] && svt_version="$svt_version_abi"
+    fi
+  fi
+  if [ "$svt_version" = "unknown" ]; then
+    for info_dir in "${VCPKG_INSTALLED}/../vcpkg/info" "${VCPKG_INSTALLED}/vcpkg/info"; do
+      [ -d "$info_dir" ] || continue
+      list_file=$(find "$info_dir" -maxdepth 1 -name 'svt-av1_*.list' | head -1)
+      if [ -n "$list_file" ]; then
+        svt_version_list=$(basename "$list_file" | sed -E 's/^svt-av1_([^_]+)_.*/\1/')
+        [ -n "$svt_version_list" ] && { svt_version="$svt_version_list"; break; }
+      fi
+    done
+  fi
+  if [ "$svt_version" = "unknown" ]; then
+    svt_header="${VCPKG_INSTALLED}/include/EbSvtAv1Enc.h"
+    if [ -f "$svt_header" ]; then
+      svt_major=$(grep -E '#define[[:space:]]+SVT_AV1_VERSION_MAJOR[[:space:]]+[0-9]+' "$svt_header" | head -1 | awk '{print $3}')
+      svt_minor=$(grep -E '#define[[:space:]]+SVT_AV1_VERSION_MINOR[[:space:]]+[0-9]+' "$svt_header" | head -1 | awk '{print $3}')
+      svt_patch=$(grep -E '#define[[:space:]]+SVT_AV1_VERSION_PATCH[[:space:]]+[0-9]+' "$svt_header" | head -1 | awk '{print $3}')
+      if [ -n "$svt_major" ] && [ -n "$svt_minor" ] && [ -n "$svt_patch" ]; then
+        svt_version="${svt_major}.${svt_minor}.${svt_patch}"
+      fi
+    fi
+  fi
+  echo "SvtAv1Enc.pc Version: $svt_version"
   cat > "${VCPKG_INSTALLED}/lib/pkgconfig/SvtAv1Enc.pc" <<EOF
 prefix=${VCPKG_INSTALLED_MIXED}
 exec_prefix=\${prefix}

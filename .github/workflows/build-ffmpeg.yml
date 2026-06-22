@@ -620,18 +620,43 @@ jobs:
           function Get-PortVersion($portName) {
             $json = "$inst\share\$portName\vcpkg.json"
             $control = "$inst\share\$portName\CONTROL"
+            $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
             $ver = $null
             if (Test-Path $json) {
-              $data = Get-Content $json -Raw | ConvertFrom-Json
-              $ver = $data.version
-              if (-not $ver) { $ver = $data.'version-semver' }
-              if (-not $ver) { $ver = $data.'version-string' }
-              if (-not $ver) { $ver = $data.'version-date' }
-            } elseif (Test-Path $control) {
+              try {
+                $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+                $ver = $data.version
+                if (-not $ver) { $ver = $data.'version-semver' }
+                if (-not $ver) { $ver = $data.'version-string' }
+                if (-not $ver) { $ver = $data.'version-date' }
+                if ($ver) { $ver = ($ver -split '#')[0] }
+              } catch {
+                Write-Host "警告：无法解析 $json : $_"
+              }
+            }
+            if (-not $ver -and (Test-Path $control)) {
               $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
               if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
             }
+            if (-not $ver -and (Test-Path $abi)) {
+              $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) {
+              # 尝试从 vcpkg 安装清单文件名推断版本，例如 svt-av1_3.1.2_x64-windows-static.list
+              $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+              foreach ($infoDir in $infoDirs) {
+                if (Test-Path $infoDir) {
+                  $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                  }
+                }
+              }
+            }
             if (-not $ver) { $ver = 'unknown' }
+            Write-Host "Get-PortVersion $portName -> $ver"
             return $ver
           }
 
@@ -656,6 +681,23 @@ jobs:
           if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
           if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
           $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          $svtVersion = Get-PortVersion 'svt-av1'
+          if ($svtVersion -eq 'unknown') {
+            # 如果 vcpkg.json 无法提供版本，尝试从公共头文件推断
+            $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+            if (Test-Path $svtHeader) {
+              $major = $null; $minor = $null; $patch = $null
+              foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                  'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                  'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                  'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
+              }
+              if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+            }
+          }
+          Write-Host "SvtAv1Enc.pc Version: $svtVersion"
           Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -664,7 +706,7 @@ jobs:
             '',
             'Name: SvtAv1Enc',
             'Description: SVT-AV1 encoder library',
-            "Version: $(Get-PortVersion 'svt-av1')",
+            "Version: $svtVersion",
             "Libs: $svtLibs",
             'Cflags: -I${includedir}'
           )
@@ -1851,18 +1893,43 @@ jobs:
           function Get-PortVersion($portName) {
             $json = "$inst\share\$portName\vcpkg.json"
             $control = "$inst\share\$portName\CONTROL"
+            $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
             $ver = $null
             if (Test-Path $json) {
-              $data = Get-Content $json -Raw | ConvertFrom-Json
-              $ver = $data.version
-              if (-not $ver) { $ver = $data.'version-semver' }
-              if (-not $ver) { $ver = $data.'version-string' }
-              if (-not $ver) { $ver = $data.'version-date' }
-            } elseif (Test-Path $control) {
+              try {
+                $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+                $ver = $data.version
+                if (-not $ver) { $ver = $data.'version-semver' }
+                if (-not $ver) { $ver = $data.'version-string' }
+                if (-not $ver) { $ver = $data.'version-date' }
+                if ($ver) { $ver = ($ver -split '#')[0] }
+              } catch {
+                Write-Host "警告：无法解析 $json : $_"
+              }
+            }
+            if (-not $ver -and (Test-Path $control)) {
               $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
               if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
             }
+            if (-not $ver -and (Test-Path $abi)) {
+              $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) {
+              # 尝试从 vcpkg 安装清单文件名推断版本，例如 svt-av1_3.1.2_x64-windows-static.list
+              $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+              foreach ($infoDir in $infoDirs) {
+                if (Test-Path $infoDir) {
+                  $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                  }
+                }
+              }
+            }
             if (-not $ver) { $ver = 'unknown' }
+            Write-Host "Get-PortVersion $portName -> $ver"
             return $ver
           }
 
@@ -1887,6 +1954,23 @@ jobs:
           if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
           if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
           $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          $svtVersion = Get-PortVersion 'svt-av1'
+          if ($svtVersion -eq 'unknown') {
+            # 如果 vcpkg.json 无法提供版本，尝试从公共头文件推断
+            $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+            if (Test-Path $svtHeader) {
+              $major = $null; $minor = $null; $patch = $null
+              foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                  'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                  'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                  'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
+              }
+              if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+            }
+          }
+          Write-Host "SvtAv1Enc.pc Version: $svtVersion"
           Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -1895,7 +1979,7 @@ jobs:
             '',
             'Name: SvtAv1Enc',
             'Description: SVT-AV1 encoder library',
-            "Version: $(Get-PortVersion 'svt-av1')",
+            "Version: $svtVersion",
             "Libs: $svtLibs",
             'Cflags: -I${includedir}'
           )
@@ -2975,18 +3059,43 @@ jobs:
           function Get-PortVersion($portName) {
             $json = "$inst\share\$portName\vcpkg.json"
             $control = "$inst\share\$portName\CONTROL"
+            $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
             $ver = $null
             if (Test-Path $json) {
-              $data = Get-Content $json -Raw | ConvertFrom-Json
-              $ver = $data.version
-              if (-not $ver) { $ver = $data.'version-semver' }
-              if (-not $ver) { $ver = $data.'version-string' }
-              if (-not $ver) { $ver = $data.'version-date' }
-            } elseif (Test-Path $control) {
+              try {
+                $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+                $ver = $data.version
+                if (-not $ver) { $ver = $data.'version-semver' }
+                if (-not $ver) { $ver = $data.'version-string' }
+                if (-not $ver) { $ver = $data.'version-date' }
+                if ($ver) { $ver = ($ver -split '#')[0] }
+              } catch {
+                Write-Host "警告：无法解析 $json : $_"
+              }
+            }
+            if (-not $ver -and (Test-Path $control)) {
               $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
               if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
             }
+            if (-not $ver -and (Test-Path $abi)) {
+              $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) {
+              # 尝试从 vcpkg 安装清单文件名推断版本，例如 svt-av1_3.1.2_x64-windows-static.list
+              $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+              foreach ($infoDir in $infoDirs) {
+                if (Test-Path $infoDir) {
+                  $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                  }
+                }
+              }
+            }
             if (-not $ver) { $ver = 'unknown' }
+            Write-Host "Get-PortVersion $portName -> $ver"
             return $ver
           }
 
@@ -3011,6 +3120,23 @@ jobs:
           if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
           if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
           $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          $svtVersion = Get-PortVersion 'svt-av1'
+          if ($svtVersion -eq 'unknown') {
+            # 如果 vcpkg.json 无法提供版本，尝试从公共头文件推断
+            $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+            if (Test-Path $svtHeader) {
+              $major = $null; $minor = $null; $patch = $null
+              foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                  'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                  'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                  'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
+              }
+              if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+            }
+          }
+          Write-Host "SvtAv1Enc.pc Version: $svtVersion"
           Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -3019,7 +3145,7 @@ jobs:
             '',
             'Name: SvtAv1Enc',
             'Description: SVT-AV1 encoder library',
-            "Version: $(Get-PortVersion 'svt-av1')",
+            "Version: $svtVersion",
             "Libs: $svtLibs",
             'Cflags: -I${includedir}'
           )
@@ -4256,18 +4382,43 @@ jobs:
           function Get-PortVersion($portName) {
             $json = "$inst\share\$portName\vcpkg.json"
             $control = "$inst\share\$portName\CONTROL"
+            $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
             $ver = $null
             if (Test-Path $json) {
-              $data = Get-Content $json -Raw | ConvertFrom-Json
-              $ver = $data.version
-              if (-not $ver) { $ver = $data.'version-semver' }
-              if (-not $ver) { $ver = $data.'version-string' }
-              if (-not $ver) { $ver = $data.'version-date' }
-            } elseif (Test-Path $control) {
+              try {
+                $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+                $ver = $data.version
+                if (-not $ver) { $ver = $data.'version-semver' }
+                if (-not $ver) { $ver = $data.'version-string' }
+                if (-not $ver) { $ver = $data.'version-date' }
+                if ($ver) { $ver = ($ver -split '#')[0] }
+              } catch {
+                Write-Host "警告：无法解析 $json : $_"
+              }
+            }
+            if (-not $ver -and (Test-Path $control)) {
               $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
               if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
             }
+            if (-not $ver -and (Test-Path $abi)) {
+              $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) {
+              # 尝试从 vcpkg 安装清单文件名推断版本，例如 svt-av1_3.1.2_x64-windows-static.list
+              $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+              foreach ($infoDir in $infoDirs) {
+                if (Test-Path $infoDir) {
+                  $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                  }
+                }
+              }
+            }
             if (-not $ver) { $ver = 'unknown' }
+            Write-Host "Get-PortVersion $portName -> $ver"
             return $ver
           }
 
@@ -4292,6 +4443,23 @@ jobs:
           if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
           if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
           $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          $svtVersion = Get-PortVersion 'svt-av1'
+          if ($svtVersion -eq 'unknown') {
+            # 如果 vcpkg.json 无法提供版本，尝试从公共头文件推断
+            $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+            if (Test-Path $svtHeader) {
+              $major = $null; $minor = $null; $patch = $null
+              foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                  'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                  'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                  'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
+              }
+              if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+            }
+          }
+          Write-Host "SvtAv1Enc.pc Version: $svtVersion"
           Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -4300,7 +4468,7 @@ jobs:
             '',
             'Name: SvtAv1Enc',
             'Description: SVT-AV1 encoder library',
-            "Version: $(Get-PortVersion 'svt-av1')",
+            "Version: $svtVersion",
             "Libs: $svtLibs",
             'Cflags: -I${includedir}'
           )
@@ -5527,18 +5695,43 @@ jobs:
           function Get-PortVersion($portName) {
             $json = "$inst\share\$portName\vcpkg.json"
             $control = "$inst\share\$portName\CONTROL"
+            $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
             $ver = $null
             if (Test-Path $json) {
-              $data = Get-Content $json -Raw | ConvertFrom-Json
-              $ver = $data.version
-              if (-not $ver) { $ver = $data.'version-semver' }
-              if (-not $ver) { $ver = $data.'version-string' }
-              if (-not $ver) { $ver = $data.'version-date' }
-            } elseif (Test-Path $control) {
+              try {
+                $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+                $ver = $data.version
+                if (-not $ver) { $ver = $data.'version-semver' }
+                if (-not $ver) { $ver = $data.'version-string' }
+                if (-not $ver) { $ver = $data.'version-date' }
+                if ($ver) { $ver = ($ver -split '#')[0] }
+              } catch {
+                Write-Host "警告：无法解析 $json : $_"
+              }
+            }
+            if (-not $ver -and (Test-Path $control)) {
               $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
               if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
             }
+            if (-not $ver -and (Test-Path $abi)) {
+              $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+              if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+            }
+            if (-not $ver) {
+              # 尝试从 vcpkg 安装清单文件名推断版本，例如 svt-av1_3.1.2_x64-windows-static.list
+              $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+              foreach ($infoDir in $infoDirs) {
+                if (Test-Path $infoDir) {
+                  $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                  if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                  }
+                }
+              }
+            }
             if (-not $ver) { $ver = 'unknown' }
+            Write-Host "Get-PortVersion $portName -> $ver"
             return $ver
           }
 
@@ -5563,6 +5756,23 @@ jobs:
           if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
           if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
           $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+          $svtVersion = Get-PortVersion 'svt-av1'
+          if ($svtVersion -eq 'unknown') {
+            # 如果 vcpkg.json 无法提供版本，尝试从公共头文件推断
+            $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+            if (Test-Path $svtHeader) {
+              $major = $null; $minor = $null; $patch = $null
+              foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                  'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                  'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                  'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
+              }
+              if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+            }
+          }
+          Write-Host "SvtAv1Enc.pc Version: $svtVersion"
           Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
             "prefix=$instMixed",
             'exec_prefix=${prefix}',
@@ -5571,7 +5781,7 @@ jobs:
             '',
             'Name: SvtAv1Enc',
             'Description: SVT-AV1 encoder library',
-            "Version: $(Get-PortVersion 'svt-av1')",
+            "Version: $svtVersion",
             "Libs: $svtLibs",
             'Cflags: -I${includedir}'
           )
