@@ -259,7 +259,7 @@ Cflags: -I\${includedir} -I\${includedir}/svt-av1
 EOF
   write_pc "libdav1d" "dav1d AV1 decoder library" "-ldav1d"
   write_pc "libopenh264" "OpenH264 library" "-lopenh264"
-  write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame"
+  write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame" "-DLIBTWOLAME_STATIC"
   write_pc "libspeex" "Speex codec library" "-lspeex"
   write_pc "libjxl" "JPEG XL library" "-ljxl"
 
@@ -430,6 +430,9 @@ python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
+# libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
 
 ./configure --toolchain=msvc --prefix="$P" \
   --pkg-config-flags="--static" \

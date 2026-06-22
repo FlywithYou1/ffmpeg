@@ -1159,7 +1159,7 @@ jobs:
                 "Description: TwoLAME MP2 encoder library",
                 "Version: $(Get-PortVersion 'libtwolame')",
                 "Libs: $libtwolameLib",
-                "Cflags: -I${includedir}"
+                "Cflags: -I${includedir} -DLIBTWOLAME_STATIC"
               )
               Write-Host "已创建回退 libtwolame.pc"
             } else {
@@ -1626,6 +1626,9 @@ jobs:
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -2432,7 +2435,7 @@ jobs:
                 "Description: TwoLAME MP2 encoder library",
                 "Version: $(Get-PortVersion 'libtwolame')",
                 "Libs: $libtwolameLib",
-                "Cflags: -I${includedir}"
+                "Cflags: -I${includedir} -DLIBTWOLAME_STATIC"
               )
               Write-Host "已创建回退 libtwolame.pc"
             } else {
@@ -2793,6 +2796,9 @@ jobs:
           AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
           # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -3598,7 +3604,7 @@ jobs:
                 "Description: TwoLAME MP2 encoder library",
                 "Version: $(Get-PortVersion 'libtwolame')",
                 "Libs: $libtwolameLib",
-                "Cflags: -I${includedir}"
+                "Cflags: -I${includedir} -DLIBTWOLAME_STATIC"
               )
               Write-Host "已创建回退 libtwolame.pc"
             } else {
@@ -3992,6 +3998,9 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -4921,7 +4930,7 @@ jobs:
                 "Description: TwoLAME MP2 encoder library",
                 "Version: $(Get-PortVersion 'libtwolame')",
                 "Libs: $libtwolameLib",
-                "Cflags: -I${includedir}"
+                "Cflags: -I${includedir} -DLIBTWOLAME_STATIC"
               )
               Write-Host "已创建回退 libtwolame.pc"
             } else {
@@ -5279,6 +5288,9 @@ jobs:
           python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
           # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
           ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -6234,7 +6246,7 @@ jobs:
                 "Description: TwoLAME MP2 encoder library",
                 "Version: $(Get-PortVersion 'libtwolame')",
                 "Libs: $libtwolameLib",
-                "Cflags: -I${includedir}"
+                "Cflags: -I${includedir} -DLIBTWOLAME_STATIC"
               )
               Write-Host "已创建回退 libtwolame.pc"
             } else {
@@ -6731,6 +6743,9 @@ jobs:
           CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
+          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
+          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
+          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
