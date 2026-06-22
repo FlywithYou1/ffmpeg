@@ -585,12 +585,17 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
-          # 修复 libjxl.pc：vcpkg 在 MSVC 静态构建中错误地包含 -lm
-          $jxlPc = "$inst/lib/pkgconfig/libjxl.pc"
-          if (Test-Path $jxlPc) {
-            $content = (Get-Content $jxlPc -Raw) -replace ' -lm',''
-            [System.IO.File]::WriteAllText($jxlPc, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $jxlPc : removed -lm"
+          # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+          $pcDir = "$inst/lib/pkgconfig"
+          if (Test-Path $pcDir) {
+            foreach ($pc in (Get-ChildItem $pcDir -Filter '*.pc')) {
+              $content = Get-Content $pc.FullName -Raw
+              if ($content -match ' -lm') {
+                $content = $content -replace ' -lm',''
+                [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "Patched $($pc.Name) : removed -lm"
+              }
+            }
           }
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
@@ -1779,12 +1784,17 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
-          # 修复 libjxl.pc：vcpkg 在 MSVC 静态构建中错误地包含 -lm
-          $jxlPc = "$inst/lib/pkgconfig/libjxl.pc"
-          if (Test-Path $jxlPc) {
-            $content = (Get-Content $jxlPc -Raw) -replace ' -lm',''
-            [System.IO.File]::WriteAllText($jxlPc, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $jxlPc : removed -lm"
+          # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+          $pcDir = "$inst/lib/pkgconfig"
+          if (Test-Path $pcDir) {
+            foreach ($pc in (Get-ChildItem $pcDir -Filter '*.pc')) {
+              $content = Get-Content $pc.FullName -Raw
+              if ($content -match ' -lm') {
+                $content = $content -replace ' -lm',''
+                [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "Patched $($pc.Name) : removed -lm"
+              }
+            }
           }
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
@@ -2866,12 +2876,17 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
-          # 修复 libjxl.pc：vcpkg 在 MSVC 静态构建中错误地包含 -lm
-          $jxlPc = "$inst/lib/pkgconfig/libjxl.pc"
-          if (Test-Path $jxlPc) {
-            $content = (Get-Content $jxlPc -Raw) -replace ' -lm',''
-            [System.IO.File]::WriteAllText($jxlPc, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $jxlPc : removed -lm"
+          # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+          $pcDir = "$inst/lib/pkgconfig"
+          if (Test-Path $pcDir) {
+            foreach ($pc in (Get-ChildItem $pcDir -Filter '*.pc')) {
+              $content = Get-Content $pc.FullName -Raw
+              if ($content -match ' -lm') {
+                $content = $content -replace ' -lm',''
+                [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "Patched $($pc.Name) : removed -lm"
+              }
+            }
           }
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
@@ -4110,12 +4125,17 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
           & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
-          # 修复 libjxl.pc：vcpkg 在 MSVC 静态构建中错误地包含 -lm
-          $jxlPc = "$inst/lib/pkgconfig/libjxl.pc"
-          if (Test-Path $jxlPc) {
-            $content = (Get-Content $jxlPc -Raw) -replace ' -lm',''
-            [System.IO.File]::WriteAllText($jxlPc, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $jxlPc : removed -lm"
+          # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+          $pcDir = "$inst/lib/pkgconfig"
+          if (Test-Path $pcDir) {
+            foreach ($pc in (Get-ChildItem $pcDir -Filter '*.pc')) {
+              $content = Get-Content $pc.FullName -Raw
+              if ($content -match ' -lm') {
+                $content = $content -replace ' -lm',''
+                [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "Patched $($pc.Name) : removed -lm"
+              }
+            }
           }
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
@@ -5344,12 +5364,17 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
           & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
-          # 修复 libjxl.pc：vcpkg 在 MSVC 静态构建中错误地包含 -lm
-          $jxlPc = "$inst/lib/pkgconfig/libjxl.pc"
-          if (Test-Path $jxlPc) {
-            $content = (Get-Content $jxlPc -Raw) -replace ' -lm',''
-            [System.IO.File]::WriteAllText($jxlPc, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $jxlPc : removed -lm"
+          # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+          $pcDir = "$inst/lib/pkgconfig"
+          if (Test-Path $pcDir) {
+            foreach ($pc in (Get-ChildItem $pcDir -Filter '*.pc')) {
+              $content = Get-Content $pc.FullName -Raw
+              if ($content -match ' -lm') {
+                $content = $content -replace ' -lm',''
+                [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "Patched $($pc.Name) : removed -lm"
+              }
+            }
           }
           # 转换为正斜杠，以便 pkg-config（bash）可以使用该路径
           $instMixed = $inst -replace '\\','/'
