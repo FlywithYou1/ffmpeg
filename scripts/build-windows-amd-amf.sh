@@ -188,7 +188,6 @@ EOF
   write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame"
   write_pc "libspeex" "Speex codec library" "-lspeex"
   write_pc "libjxl" "JPEG XL library" "-ljxl"
-  write_pc "libopenmpt" "OpenMPT module library" "-lopenmpt"
 
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 fi
@@ -377,7 +376,7 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --enable-libvmaf --enable-amf \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
-  --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt \
+  --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
   --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
 make -j"$THREADS" && make install

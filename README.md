@@ -52,7 +52,7 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 
 ## 🔧 功能特性
 
-- **软件编解码器**: libmp3lame (MP3), libfdk-aac (AAC), libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl、libopenmpt）
+- **软件编解码器**: libmp3lame (MP3), libfdk-aac (AAC), libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl）
 - **硬件加速**: NVENC/NVDEC, Intel QSV, AMD AMF/VAAPI, VideoToolbox, D3D11VA/D3D12VA/DXVA2
 - **CUDA 处理**: libnpp (NVIDIA Performance Primitives)
 - **VMAF**: Netflix 视频质量评分（CPU 或 CUDA 加速）
@@ -66,7 +66,7 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 
 - [Visual Studio 2026](https://visualstudio.microsoft.com/) (Windows MSVC)
 - [Git for Windows](https://git-scm.com/) (提供 Bash 环境)
-- [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理；x64 建议安装 `pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc`)
+- [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理；x64 建议安装 `pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc`)
 - [NASM](https://www.nasm.us/) (x86/x64 汇编优化)
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Windows CI 自动安装最新版)
 - [Meson](https://mesonbuild.com/) + [Ninja](https://ninja-build.org/) (VMAF 构建)
@@ -97,7 +97,7 @@ bash scripts/build-windows-arm64.sh
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential yasm nasm pkg-config meson ninja-build \
+sudo apt-get install -y gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
   cmake git wget curl ca-certificates python3 xxd \
   libmp3lame-dev libfdk-aac-dev libsdl2-dev \
   libva-dev libdrm-dev libvpl-dev \
@@ -107,7 +107,13 @@ sudo apt-get install -y build-essential yasm nasm pkg-config meson ninja-build \
   libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
   libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
   libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-  libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
+  liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
+
+# 显式将 GCC 16 设为默认编译器
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+sudo update-alternatives --set gcc /usr/bin/gcc-16
+sudo update-alternatives --set g++ /usr/bin/g++-16
 ```
 
 ```bash

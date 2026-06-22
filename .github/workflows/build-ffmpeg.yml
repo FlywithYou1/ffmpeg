@@ -1,4 +1,4 @@
-﻿name: FFmpeg 多厂商构建
+name: FFmpeg 多厂商构建
 
 on:
   workflow_dispatch:
@@ -65,7 +65,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
+            gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
@@ -76,6 +76,15 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
+            # 显式将 GCC 16 设为默认编译器
+            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+            sudo update-alternatives --set gcc /usr/bin/gcc-16
+            sudo update-alternatives --set g++ /usr/bin/g++-16
+            gcc --version
+            g++ --version
+            echo "CC=gcc-16" >> "$GITHUB_ENV"
+            echo "CXX=g++-16" >> "$GITHUB_ENV"
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -202,7 +211,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
+            gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libvpl-dev libdrm-dev \
@@ -214,6 +223,15 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
+            # 显式将 GCC 16 设为默认编译器
+            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+            sudo update-alternatives --set gcc /usr/bin/gcc-16
+            sudo update-alternatives --set g++ /usr/bin/g++-16
+            gcc --version
+            g++ --version
+            echo "CC=gcc-16" >> "$GITHUB_ENV"
+            echo "CXX=g++-16" >> "$GITHUB_ENV"
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -307,7 +325,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
+            gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libdrm-dev \
@@ -319,6 +337,15 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
+            # 显式将 GCC 16 设为默认编译器
+            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+            sudo update-alternatives --set gcc /usr/bin/gcc-16
+            sudo update-alternatives --set g++ /usr/bin/g++-16
+            gcc --version
+            g++ --version
+            echo "CC=gcc-16" >> "$GITHUB_ENV"
+            echo "CXX=g++-16" >> "$GITHUB_ENV"
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -584,7 +611,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
           # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
           $pcDir = "$inst/lib/pkgconfig"
           if (Test-Path $pcDir) {
@@ -1561,7 +1588,7 @@ jobs:
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1783,7 +1810,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
           # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
           $pcDir = "$inst/lib/pkgconfig"
           if (Test-Path $pcDir) {
@@ -2653,7 +2680,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-amf --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -2875,7 +2902,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
           # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
           $pcDir = "$inst/lib/pkgconfig"
           if (Test-Path $pcDir) {
@@ -3778,7 +3805,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libvpl --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -4124,7 +4151,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
           # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
           $pcDir = "$inst/lib/pkgconfig"
           if (Test-Path $pcDir) {
@@ -5054,7 +5081,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
+            gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libvpl-dev libdrm-dev \
@@ -5066,6 +5093,15 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
+            # 显式将 GCC 16 设为默认编译器
+            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+            sudo update-alternatives --set gcc /usr/bin/gcc-16
+            sudo update-alternatives --set g++ /usr/bin/g++-16
+            gcc --version
+            g++ --version
+            echo "CC=gcc-16" >> "$GITHUB_ENV"
+            echo "CXX=g++-16" >> "$GITHUB_ENV"
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
@@ -5363,7 +5399,7 @@ jobs:
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl libopenmpt shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
           # 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
           $pcDir = "$inst/lib/pkgconfig"
           if (Test-Path $pcDir) {
@@ -6371,7 +6407,7 @@ jobs:
             --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
             --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
             --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -6432,7 +6468,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            gcc g++ make libc6-dev yasm nasm pkg-config meson ninja-build \
+            gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             libva-dev libdrm-dev \
@@ -6444,6 +6480,15 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
+            # 显式将 GCC 16 设为默认编译器
+            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
+            sudo update-alternatives --set gcc /usr/bin/gcc-16
+            sudo update-alternatives --set g++ /usr/bin/g++-16
+            gcc --version
+            g++ --version
+            echo "CC=gcc-16" >> "$GITHUB_ENV"
+            echo "CXX=g++-16" >> "$GITHUB_ENV"
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
             kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
             for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
