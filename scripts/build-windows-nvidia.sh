@@ -180,6 +180,55 @@ EOF
   ensure_lib_alias "${fdk_lib}" "fdk-aac.lib"
   ensure_lib_alias "${fdk_lib}" "libfdk-aac.lib"
 
+  # 为 FFmpeg 的 --enable-libxxx 选项提供 pkg-config 回退（vcpkg 并不总是自带 .pc）
+  write_pc() {
+    local pc_name="$1" pc_desc="$2" pc_libs="$3" pc_cflags="${4:-}" pc_requires="${5:-}"
+    local pc_path="${VCPKG_INSTALLED}/lib/pkgconfig/${pc_name}.pc"
+    [ -f "$pc_path" ] && return 0
+    cat > "$pc_path" <<EOF
+prefix=${VCPKG_INSTALLED_MIXED}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: ${pc_name}
+Description: ${pc_desc}
+Version: 1.0.0
+${pc_requires:+Requires: ${pc_requires}}
+Libs: ${pc_libs}
+${pc_cflags:+Cflags: ${pc_cflags}}
+EOF
+  }
+  write_pc "libx264" "libx264 library" "-lx264"
+  write_pc "libx265" "libx265 library" "-lx265"
+  write_pc "libvpx" "libvpx library" "-lvpx"
+  write_pc "opus" "opus library" "-lopus"
+  write_pc "vorbis" "vorbis library" "-lvorbis"
+  write_pc "vorbisenc" "vorbisenc library" "-lvorbisenc" "" "vorbis"
+  write_pc "theora" "theora library" "-ltheora"
+  write_pc "theoradec" "theoradec library" "-ltheoradec"
+  write_pc "theoraenc" "theoraenc library" "-ltheoraenc" "" "theoradec"
+  write_pc "libaom" "libaom library" "-laom"
+  write_pc "libwebp" "libwebp library" "-lwebp"
+  write_pc "libass" "libass library" "-lass"
+  write_pc "freetype2" "freetype2 library" "-lfreetype" "-I\${includedir}/freetype2"
+  write_pc "fontconfig" "fontconfig library" "-lfontconfig"
+  write_pc "zimg" "zimg library" "-lzimg"
+  write_pc "soxr" "soxr library" "-lsoxr"
+  write_pc "libopenjp2" "OpenJPEG JPEG 2000 library" "-lopenjp2"
+  write_pc "snappy" "snappy library" "-lsnappy"
+  write_pc "libsvtav1" "SVT-AV1 library" "-lsvtav1"
+  write_pc "libdav1d" "dav1d AV1 decoder library" "-ldav1d"
+  write_pc "libkvazaar" "Kvazaar HEVC encoder library" "-lkvazaar"
+  write_pc "libopenh264" "OpenH264 library" "-lopenh264"
+  write_pc "libtwolame" "TwoLAME MP2 encoder library" "-ltwolame"
+  write_pc "libspeex" "Speex codec library" "-lspeex"
+  write_pc "libjxl" "JPEG XL library" "-ljxl"
+  write_pc "libopenmpt" "OpenMPT module library" "-lopenmpt"
+  write_pc "libwavpack" "WavPack library" "-lwavpack"
+  write_pc "libplacebo" "libplacebo library" "-lplacebo"
+  write_pc "libvidstab" "VidStab library" "-lvidstab"
+
   export PKG_CONFIG_PATH="${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
 fi
 
@@ -391,11 +440,15 @@ VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
   --pkg-config-flags="--static" \
   --extra-cflags="-I${P_MIXED}/include -I${CUDA_HOME_MIXED}/include ${VCPKG_CFLAGS}" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
-  --extra-libs="ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib" \
+  --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
   --enable-cuvid --enable-nvenc --enable-libnpp \
-  --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+  --enable-opencl --enable-vulkan \
+  --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
+  --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libplacebo --enable-libvidstab \
+  --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
+  --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
 make -j"$THREADS" && make install
 
 # ---- 复制 DLL ----

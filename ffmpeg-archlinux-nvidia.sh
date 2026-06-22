@@ -59,7 +59,44 @@ sudo pacman -S --needed --noconfirm \
   gnupg \
   lsb-release \
   lame \
-  libfdk-aac
+  libfdk-aac \
+  x264 \
+  x265 \
+  libvpx \
+  opus \
+  libvorbis \
+  libtheora \
+  aom \
+  libwebp \
+  libass \
+  freetype2 \
+  fontconfig \
+  zimg \
+  libsoxr \
+  openjpeg2 \
+  snappy \
+  sdl2 \
+  opencl-headers \
+  ocl-icd \
+  vulkan-headers \
+  vulkan-icd-loader \
+  shaderc \
+  svt-av1 \
+  dav1d \
+  kvazaar \
+  openh264 \
+  xvidcore \
+  twolame \
+  speex \
+  codec2 \
+  libjxl \
+  libopenmpt \
+  wavpack \
+  libbs2b \
+  aribb24 \
+  libplacebo \
+  rubberband \
+  vidstab
 
 echo "[2/12] 确保 GCC 可用..."
 # Arch 滚动发行版：gcc 包始终为最新版
@@ -169,8 +206,12 @@ RANLIB="${RANLIB_BIN}" \
   --enable-cuvid \
   --enable-nvenc \
   --enable-libnpp \
+  --enable-opencl --enable-vulkan \
+  --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
+  --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
   --enable-libmp3lame \
-  --enable-libfdk-aac
+  --enable-libfdk-aac \
+  --enable-sdl2
 
 echo "[7/12] 校验 configure 输出..."
 CFG_MAK=""
