@@ -72,7 +72,7 @@ jobs:
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcryptopp-dev libopenh264-dev libxvidcore-dev \
+            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
@@ -198,7 +198,7 @@ jobs:
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcryptopp-dev libopenh264-dev libxvidcore-dev \
+            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
@@ -291,7 +291,7 @@ jobs:
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcryptopp-dev libopenh264-dev libxvidcore-dev \
+            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
@@ -4974,7 +4974,7 @@ jobs:
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcryptopp-dev libopenh264-dev libxvidcore-dev \
+            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
@@ -6328,7 +6328,7 @@ jobs:
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcryptopp-dev libopenh264-dev libxvidcore-dev \
+            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
             libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
             # 修复 Ubuntu 26.04 中 libkvazaar-dev 的 pkg-config 版本占位符
