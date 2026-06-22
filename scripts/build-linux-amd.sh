@@ -18,10 +18,6 @@ export PATH="${P}/bin:${PATH}"
 export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 export LD_LIBRARY_PATH="${P}/lib:${LD_LIBRARY_PATH:-}"
 
-# 优先使用 GCC 16 作为默认编译器
-export CC="${CC:-gcc-16}"
-export CXX="${CXX:-g++-16}"
-
 # ---- 清理 ----
 rm -rf "$P" /tmp/vmaf /tmp/ffmpeg-src 2>/dev/null || true
 mkdir -p "$P"/{bin,lib,include,lib/pkgconfig}
@@ -44,7 +40,7 @@ cd ffmpeg-src
 # 验证 libplacebo 静态链接
 echo "=== manual libplacebo static link test ==="
 printf '%s\n' '#include <libplacebo/vulkan.h>' 'int main(void) { pl_gpu_create(NULL, NULL); return 0; }' > /tmp/pl_test.c
-"$CC" /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
+cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_test 2>&1 && echo "manual link OK" || echo "manual link FAIL"
 
 ./configure --prefix="$P" --pkg-config-flags="--static" \
   --extra-cflags="-I${P}/include" \

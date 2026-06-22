@@ -97,7 +97,7 @@ bash scripts/build-windows-arm64.sh
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson ninja-build \
+sudo apt-get install -y build-essential yasm nasm pkg-config meson ninja-build \
   cmake git wget curl ca-certificates python3 xxd \
   libmp3lame-dev libfdk-aac-dev libsdl2-dev \
   libva-dev libdrm-dev libvpl-dev \
@@ -107,13 +107,7 @@ sudo apt-get install -y gcc-16 g++-16 make libc6-dev yasm nasm pkg-config meson 
   libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
   libsvtav1enc-dev libdav1d-dev libkvazaar-dev libopenh264-dev libxvidcore-dev \
   libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-  liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
-
-# 显式将 GCC 16 设为默认编译器
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-16 100
-sudo update-alternatives --set gcc /usr/bin/gcc-16
-sudo update-alternatives --set g++ /usr/bin/g++-16
+  libbs2b-dev libaribb24-dev libplacebo-dev librubberband-dev libvidstab-dev
 ```
 
 ```bash
