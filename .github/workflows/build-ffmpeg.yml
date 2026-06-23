@@ -421,16 +421,7 @@ jobs:
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
         run: |
-          $profileDir = Split-Path $PROFILE -Parent
-          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-          $lines = @(
-            '$OutputEncoding = [System.Text.Encoding]::UTF8'
-            '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-          )
-          [System.IO.File]::WriteAllLines($PROFILE, $lines, [System.Text.UTF8Encoding]::new($false))
-          $OutputEncoding = [System.Text.Encoding]::UTF8
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "PowerShell profile created: $PROFILE"
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1
@@ -1711,16 +1702,7 @@ jobs:
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
         run: |
-          $profileDir = Split-Path $PROFILE -Parent
-          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-          $lines = @(
-            '$OutputEncoding = [System.Text.Encoding]::UTF8'
-            '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-          )
-          [System.IO.File]::WriteAllLines($PROFILE, $lines, [System.Text.UTF8Encoding]::new($false))
-          $OutputEncoding = [System.Text.Encoding]::UTF8
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "PowerShell profile created: $PROFILE"
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1
@@ -2894,16 +2876,7 @@ jobs:
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
         run: |
-          $profileDir = Split-Path $PROFILE -Parent
-          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-          $lines = @(
-            '$OutputEncoding = [System.Text.Encoding]::UTF8'
-            '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-          )
-          [System.IO.File]::WriteAllLines($PROFILE, $lines, [System.Text.UTF8Encoding]::new($false))
-          $OutputEncoding = [System.Text.Encoding]::UTF8
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "PowerShell profile created: $PROFILE"
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1
@@ -4234,16 +4207,7 @@ jobs:
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
         run: |
-          $profileDir = Split-Path $PROFILE -Parent
-          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-          $lines = @(
-            '$OutputEncoding = [System.Text.Encoding]::UTF8'
-            '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-          )
-          [System.IO.File]::WriteAllLines($PROFILE, $lines, [System.Text.UTF8Encoding]::new($false))
-          $OutputEncoding = [System.Text.Encoding]::UTF8
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "PowerShell profile created: $PROFILE"
 
       - name: 配置 MSVC（VS 2026 ARM64）
         uses: ilammy/msvc-dev-cmd@v1
@@ -5564,16 +5528,7 @@ jobs:
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
         run: |
-          $profileDir = Split-Path $PROFILE -Parent
-          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-          $lines = @(
-            '$OutputEncoding = [System.Text.Encoding]::UTF8'
-            '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8'
-          )
-          [System.IO.File]::WriteAllLines($PROFILE, $lines, [System.Text.UTF8Encoding]::new($false))
-          $OutputEncoding = [System.Text.Encoding]::UTF8
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "PowerShell profile created: $PROFILE"
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1
