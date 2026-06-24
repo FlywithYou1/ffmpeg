@@ -59,7 +59,7 @@ jobs:
     name: Linux（NVIDIA NVENC/CUDA）
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -183,7 +183,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-linux-nvidia.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-linux-nvidia
           path: ffmpeg-linux-nvidia.tar.xz
@@ -196,7 +196,7 @@ jobs:
     name: Linux（Intel QSV）
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -288,7 +288,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-linux-intel-qsv.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-linux-intel-qsv
           path: ffmpeg-linux-intel-qsv.tar.xz
@@ -301,7 +301,7 @@ jobs:
     name: Linux（AMD VAAPI）
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -399,7 +399,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-linux-amd.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-linux-amd
           path: ffmpeg-linux-amd.tar.xz
@@ -416,7 +416,7 @@ jobs:
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
@@ -424,7 +424,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with: { arch: amd64, vsversion: "18.0" }
 
       - name: 安装构建工具
@@ -1341,7 +1341,7 @@ jobs:
           $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
-        uses: mjun0812/setup-cuda@v1
+        uses: mjun0812/setup-cuda@v1.5.0
         with:
           version: latest
           method: network
@@ -1680,7 +1680,7 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-nvidia.zip -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows-nvidia
           path: ffmpeg-windows-nvidia.zip
@@ -1697,7 +1697,7 @@ jobs:
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
@@ -1705,7 +1705,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with: { arch: amd64, vsversion: "18.0" }
 
       - name: 安装构建工具
@@ -2854,7 +2854,7 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-amd-amf.zip -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows-amd-amf
           path: ffmpeg-windows-amd-amf.zip
@@ -2871,7 +2871,7 @@ jobs:
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
@@ -2879,7 +2879,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with: { arch: amd64, vsversion: "18.0" }
 
       - name: 安装构建工具
@@ -4061,7 +4061,7 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-intel-qsv.zip -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows-intel-qsv
           path: ffmpeg-windows-intel-qsv.zip
@@ -4074,7 +4074,7 @@ jobs:
     name: macOS ARM（VideoToolbox）
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -4185,7 +4185,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-macos-arm.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-macos-arm
           path: ffmpeg-macos-arm.tar.xz
@@ -4202,7 +4202,7 @@ jobs:
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
@@ -4210,7 +4210,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026 ARM64）
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with: { arch: amd64_arm64, vsversion: "18.0" }
 
       - name: 安装构建工具
@@ -5363,7 +5363,7 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-arm64.zip -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows-arm64
           path: ffmpeg-windows-arm64.zip
@@ -5376,7 +5376,7 @@ jobs:
     name: "Linux x86 整合版（NVIDIA + Intel QSV + AMD VAAPI）"
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -5506,7 +5506,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-linux-x86-all.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-linux-x86-all
           path: ffmpeg-linux-x86-all.tar.xz
@@ -5523,7 +5523,7 @@ jobs:
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 PowerShell UTF-8 输出编码
         shell: pwsh
@@ -5531,7 +5531,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with: { arch: amd64, vsversion: "18.0" }
 
       - name: 安装构建工具
@@ -6468,7 +6468,7 @@ jobs:
           $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
-        uses: mjun0812/setup-cuda@v1
+        uses: mjun0812/setup-cuda@v1.5.0
         with:
           version: latest
           method: network
@@ -6822,7 +6822,7 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-x86-all.zip -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-windows-x86-all
           path: ffmpeg-windows-x86-all.zip
@@ -6836,7 +6836,7 @@ jobs:
     name: Linux（ARM64 VAAPI）
     runs-on: ubuntu-26.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
@@ -6936,7 +6936,7 @@ jobs:
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           cd dist && tar -cJf ../ffmpeg-linux-arm.tar.xz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-linux-arm
           path: ffmpeg-linux-arm.tar.xz
@@ -6966,7 +6966,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -6976,7 +6976,7 @@ jobs:
           find artifacts -type f \( -name '*.tar.xz' -o -name '*.zip' \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ needs.metadata.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
