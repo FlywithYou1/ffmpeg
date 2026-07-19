@@ -1,23 +1,35 @@
 # FFmpeg 构建产物
+ffmpeg/
+ffmpeg-*/
+ffmpeg_sources/
+ffmpeg_build/
+*-build/
+bin/
 output/
 dist/
 release-assets/
 artifacts/
 ffmpeg-install/
+pkg/
 
 # 压缩包
 *.tar.xz
 *.tar.gz
+*.tar.bz2
 *.zip
 *.7z
+*.rar
 
 # 编译临时文件
 /tmp/
 *.o
 *.obj
+*.lo
+*.la
 *.exe
 *.dll
 *.so
+*.so.*
 *.dylib
 *.a
 *.lib
@@ -25,14 +37,51 @@ ffmpeg-install/
 *.ilk
 *.exp
 
+# 汇编中间文件
+*.asm
+*.s
+
 # IDE / 编辑器
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+\#*\#
+.\#*
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
+ehthumbs.db
 
 # 系统
 Desktop.ini
+$RECYCLE.BIN/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+*.egg
+venv/
+.venv/
+env/
+.env
+.env.*
+*.local
+
+# Node
+node_modules/
+
+# 日志 & 缓存
+*.log
+*.tmp
+/temp/
+.cache/
+
+# Copilot 本地约束 (个人偏好，不入库)
+.github/copilot-instructions.md
+.github/hooks/
+scripts/hooks/
