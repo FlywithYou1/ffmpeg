@@ -5080,12 +5080,13 @@ jobs:
             '    <ClCompile>',
             '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
             '      <WholeProgramOptimization>false</WholeProgramOptimization>',
+            '      <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>',
             '    </ClCompile>',
             '  </ItemDefinitionGroup>',
             '</Project>'
           )
           [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m /p:CL_AdditionalOptions="/Zc:noexceptTypes-"
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
           $prefix = $env:VCPKG_INSTALLED
