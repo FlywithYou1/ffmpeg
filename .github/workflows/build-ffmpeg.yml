@@ -5066,6 +5066,17 @@ jobs:
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
           git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
+          # 修补 zimg ARM NEON 代码：MSVC 14.51+ 要求覆盖虚函数具有兼容的 noexcept 规范
+          $neonFile = "$zimgRoot\src\zimg\colorspace\arm\operation_impl_neon.cpp"
+          if (Test-Path $neonFile) {
+            $content = [System.IO.File]::ReadAllText($neonFile, [System.Text.UTF8Encoding]::new($false))
+            # 三类 process() 覆盖缺少 noexcept（基类 Operation::process 声明了 noexcept）：
+            # ToLinearLutOperationNeon, ToGammaLutOperationNeon, MatrixOperationNeon
+            # 正则匹配 "void process(...) const override" 并替换为 "void process(...) const noexcept override"
+            $content = $content -replace '(void\s+process\s*\([^)]*\)\s+const)\s+override', '$1 noexcept override'
+            [System.IO.File]::WriteAllText($neonFile, $content, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "已修补 operation_impl_neon.cpp (添加 noexcept)"
+          }
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
@@ -5080,7 +5091,6 @@ jobs:
             '    <ClCompile>',
             '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
             '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '      <AdditionalOptions>/Zc:noexceptTypes- %(AdditionalOptions)</AdditionalOptions>',
             '    </ClCompile>',
             '  </ItemDefinitionGroup>',
             '</Project>'
