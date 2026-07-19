@@ -111,8 +111,14 @@ jobs:
           sudo apt-get install -y cuda-toolkit-13-3
           sudo apt-get update -qq
           sudo apt-get upgrade -y -qq
-          # 通过 /usr/local/cuda 软链接使 CUDA 可被发现
-          sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
+          # 自动检测 CUDA 版本并链接
+          CUDA_VER_DIR=$(ls -d /usr/local/cuda-13.* 2>/dev/null | sort -V | tail -1)
+          if [ -n "${CUDA_VER_DIR}" ]; then
+            sudo ln -sf "${CUDA_VER_DIR}" /usr/local/cuda 2>/dev/null || true
+            echo "CUDA linked: ${CUDA_VER_DIR}"
+          else
+            sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
+          fi
 
       - name: 检测 CUDA
         run: |
@@ -5079,7 +5085,7 @@ jobs:
             '</Project>'
           )
           [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
+          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m /p:CL_AdditionalOptions="/Zc:noexceptTypes-"
           $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
           if (-not $lib) { throw "z.lib not found after building zimg" }
           $prefix = $env:VCPKG_INSTALLED
@@ -5429,8 +5435,14 @@ jobs:
           sudo apt-get install -y cuda-toolkit-13-3
           sudo apt-get update -qq
           sudo apt-get upgrade -y -qq
-          # 通过 /usr/local/cuda 软链接使 CUDA 可被发现
-          sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
+          # 自动检测 CUDA 版本并链接
+          CUDA_VER_DIR=$(ls -d /usr/local/cuda-13.* 2>/dev/null | sort -V | tail -1)
+          if [ -n "${CUDA_VER_DIR}" ]; then
+            sudo ln -sf "${CUDA_VER_DIR}" /usr/local/cuda 2>/dev/null || true
+            echo "CUDA linked: ${CUDA_VER_DIR}"
+          else
+            sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
+          fi
 
       - name: 检测 CUDA
         run: |
