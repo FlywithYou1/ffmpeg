@@ -439,7 +439,7 @@ sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleav
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl \
   --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
-  --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+  --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
 make -j"$THREADS" && make install
 
 # ---- 复制 DLL ----

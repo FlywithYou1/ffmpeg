@@ -103,7 +103,7 @@ rm -f configure.bak
   --enable-videotoolbox --enable-audiotoolbox \
   --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
   --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
-  --enable-hwaccel=av1_videotoolbox --disable-doc
+  --enable-hwaccel=av1_videotoolbox --enable-doc
 make -j"$THREADS" && make install
 
 # ---- 签名 + 验证 + 输出 ----
