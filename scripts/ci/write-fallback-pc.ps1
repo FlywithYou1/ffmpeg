@@ -295,8 +295,14 @@ if ($libtwolameLib) { Copy-LibAlias $libtwolameLib "libtwolame.lib"; Copy-LibAli
 if ($libopenmptLib) { Copy-LibAlias $libopenmptLib "libopenmpt.lib"; Copy-LibAlias $libopenmptLib "openmpt.lib" }
 
 # 输出环境变量
-$pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+$vcpkgRoot = Split-Path (Split-Path $inst) -Parent
+$pkgconf = Get-ChildItem -Path @(
+    "$inst\bin\pkgconf.exe",
+    "$inst\tools\pkgconf\pkgconf.exe",
+    "$inst\tools\pkgconf\pkg-config.exe",
+    "$vcpkgRoot\packages\pkgconf_*\tools\pkgconf\pkgconf.exe"
+) -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $pkgconf) { throw "pkgconf.exe not found under $inst or $vcpkgRoot\packages" }
 $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
 Write-Output "pkg-config: $pkgconfMixed"
 
