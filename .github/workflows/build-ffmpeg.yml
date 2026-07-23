@@ -53,11 +53,60 @@ jobs:
           fi
 
   # ============================================================
-  # LINUX — NVIDIA（NVENC/CUDA + VMAF-CUDA）
+  # LINUX — Matrix（NVIDIA / Intel QSV / AMD VAAPI / x86 整合 / ARM64）
   # ============================================================
-  linux-nvidia:
-    name: Linux（NVIDIA NVENC/CUDA）
-    runs-on: ubuntu-26.04
+  linux:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: nvidia
+            name: Linux（NVIDIA NVENC/CUDA）
+            runner: ubuntu-26.04
+            extra_packages: libva-dev libvpl-dev libdrm-dev
+            cuda: true
+            vmaf_cuda: true
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc
+            verify_grep: "grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc'"
+            artifact: ffmpeg-linux-nvidia.tar.xz
+          - id: intel-qsv
+            name: Linux（Intel QSV）
+            runner: ubuntu-26.04
+            extra_packages: libva-dev libvpl-dev libdrm-dev
+            cuda: false
+            vmaf_cuda: false
+            configure_extra: --enable-libvmaf --enable-libvpl --enable-vaapi
+            verify_grep: "grep '_qsv' | head -10"
+            artifact: ffmpeg-linux-intel-qsv.tar.xz
+          - id: amd
+            name: Linux（AMD VAAPI）
+            runner: ubuntu-26.04
+            extra_packages: libva-dev libdrm-dev
+            cuda: false
+            vmaf_cuda: false
+            configure_extra: --enable-libvmaf --enable-vaapi
+            verify_grep: "grep '_vaapi' | head -10"
+            artifact: ffmpeg-linux-amd.tar.xz
+          - id: x86-all
+            name: "Linux x86 整合版（NVIDIA + Intel QSV + AMD VAAPI）"
+            runner: ubuntu-26.04
+            extra_packages: libva-dev libvpl-dev libdrm-dev
+            cuda: true
+            vmaf_cuda: true
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
+            verify_grep: "grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc|_qsv|_vaapi' | head -10"
+            artifact: ffmpeg-linux-x86-all.tar.xz
+          - id: arm
+            name: Linux（ARM64 VAAPI）
+            runner: ubuntu-26.04-arm
+            extra_packages: libva-dev libdrm-dev
+            cuda: false
+            vmaf_cuda: false
+            configure_extra: --enable-libvmaf --enable-vaapi
+            verify_grep: "grep '_vaapi' | head -10"
+            artifact: ffmpeg-linux-arm.tar.xz
     steps:
       - uses: actions/checkout@v7
 
@@ -68,6 +117,7 @@ jobs:
             build-essential yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+            ${{ matrix.extra_packages }} \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
@@ -79,17 +129,16 @@ jobs:
             bash scripts/ci/linux-pc-fallbacks.sh /usr
 
       - name: 安装 CUDA 工具包
+        if: matrix.cuda
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y wget
-          # 添加 NVIDIA CUDA 仓库（Ubuntu 26.04）
           wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64/cuda-keyring_1.1-1_all.deb
           sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update -qq
           sudo apt-get install -y cuda-toolkit-13-3
           sudo apt-get update -qq
           sudo apt-get upgrade -y -qq
-          # 自动检测 CUDA 版本并链接
           CUDA_VER_DIR=$(ls -d /usr/local/cuda-13.* 2>/dev/null | sort -V | tail -1)
           if [ -n "${CUDA_VER_DIR}" ]; then
             sudo ln -sf "${CUDA_VER_DIR}" /usr/local/cuda 2>/dev/null || true
@@ -99,6 +148,7 @@ jobs:
           fi
 
       - name: 检测 CUDA
+        if: matrix.cuda
         run: |
           CUDA_BASE=""
           for d in /usr/local/cuda-* /usr/local/cuda; do
@@ -109,103 +159,28 @@ jobs:
           "${CUDA_BASE}/bin/nvcc" --version
 
       - name: 编译 nv-codec-headers
+        if: matrix.cuda
         run: |
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
           cd nv-codec-headers
           make -j"$(nproc)" PREFIX=/usr/local
           sudo make PREFIX=/usr/local install
 
-      - name: 编译 VMAF-CUDA
-        run: |
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
-          export PATH="${CUDA_HOME}/bin:${PATH}"
-          export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
-          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" --libdir=lib \
-            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
-          ninja -vC build && ninja -C build install
-
-      - name: 编译 FFmpeg
-        run: |
-          P="${HOME}/ffmpeg-install"
-          export PATH="${CUDA_HOME}/bin:${PATH}"
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
-            --extra-cflags="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
-            --extra-ldflags="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -Wl,-rpath,${HOME}/ffmpeg-install/lib" \
-            --extra-libs="-lpthread -lm -ldl -lstdc++" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
-          make -j"$(nproc)" && make install
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        run: |
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-
-      - name: 裁剪与验证
-        run: |
-          P="${HOME}/ffmpeg-install"
-          export LD_LIBRARY_PATH="${P}/lib:${LD_LIBRARY_PATH:-}"
-          strip "${P}/bin/ffmpeg" "${P}/bin/ffprobe" "${P}/bin/ffplay" 2>/dev/null || true
-          "${P}/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "（无）"
-          echo "--- VMAF ---"
-          "${P}/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        run: |
-          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
-          cd dist && tar -cJf ../ffmpeg-linux-nvidia.tar.xz .
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-linux-nvidia
-          path: ffmpeg-linux-nvidia.tar.xz
-          retention-days: 30
-
-  # ============================================================
-  # LINUX — Intel（QSV via oneVPL + VAAPI）
-  # ============================================================
-  linux-intel-qsv:
-    name: Linux（Intel QSV）
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 安装依赖
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates python3 xxd \
-            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
-            libva-dev libvpl-dev libdrm-dev \
-            libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
-            libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
-            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
-            sudo apt-get upgrade -y -qq
-            bash scripts/ci/linux-pc-fallbacks.sh /usr
-
-      - name: 编译 VMAF（CPU）
+      - name: 编译 VMAF
         run: |
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
+          if [ "${{ matrix.vmaf_cuda }}" = "true" ]; then
+            export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
+            export PATH="${CUDA_HOME}/bin:${PATH}"
+            export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
+            meson setup build --buildtype release --prefix="$P" --libdir=lib \
+              -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
+          else
+            PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+            meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
+          fi
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
@@ -214,6 +189,9 @@ jobs:
           P="${HOME}/ffmpeg-install"
           bash scripts/ci/linux-pc-fallbacks.sh "$P"
           export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          if [ "${{ matrix.cuda }}" = "true" ]; then
+            export PATH="${CUDA_HOME}/bin:${PATH}"
+          fi
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
@@ -221,9 +199,10 @@ jobs:
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libvpl --enable-vaapi --enable-opencl --enable-vulkan \
+            ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
           make -j"$(nproc)" && make install
+
       - name: 失败时导出 ffbuild/config.log
         if: failure()
         run: |
@@ -235,10 +214,8 @@ jobs:
           export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
           strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
           "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- QSV ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "（无）"
-          echo "--- VAAPI ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "（无）"
+          echo "--- HW Accel ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | ${{ matrix.verify_grep }} || echo "（无）"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
 
@@ -246,138 +223,106 @@ jobs:
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
           [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
-          cd dist && tar -cJf ../ffmpeg-linux-intel-qsv.tar.xz .
+          cd dist && tar -cJf ../${{ matrix.artifact }} .
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ffmpeg-linux-intel-qsv
-          path: ffmpeg-linux-intel-qsv.tar.xz
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
           retention-days: 30
 
   # ============================================================
-  # LINUX — AMD（VAAPI）
+  # LINUX — NVIDIA（NVENC/CUDA + VMAF-CUDA）
   # ============================================================
-  linux-amd:
-    name: Linux（AMD VAAPI）
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 安装依赖
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates python3 xxd \
-            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
-            libva-dev libdrm-dev \
-            libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
-            libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
-            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
-            sudo apt-get upgrade -y -qq
-            bash scripts/ci/linux-pc-fallbacks.sh /usr
-
-      - name: 编译 VMAF（CPU）
-        run: |
-          P="${HOME}/ffmpeg-install"
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
-          ninja -vC build && ninja -C build install
-          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-
-      - name: 编译 FFmpeg
-        run: |
-          P="${HOME}/ffmpeg-install"
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          ./configure --prefix="$P" --pkg-config-flags="--static" \
-            --extra-cflags="-I$P/include" \
-            --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
-            --extra-libs="-lpthread -lm -ldl" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
-          make -j"$(nproc)" && make install
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        run: |
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-
-      - name: 裁剪与验证
-        run: |
-          export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
-          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- VAAPI ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        run: |
-          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
-          cd dist && tar -cJf ../ffmpeg-linux-amd.tar.xz .
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-linux-amd
-          path: ffmpeg-linux-amd.tar.xz
-          retention-days: 30
-
   # ============================================================
-  # WINDOWS — NVIDIA（NVENC/CUDA + VMAF-CUDA）
+  # WINDOWS — Matrix（NVIDIA / AMD AMF / Intel QSV / ARM64 / x86 整合）
   # ============================================================
-  windows-nvidia:
-    name: Windows（NVIDIA NVENC/CUDA）
-    runs-on: windows-2025-vs2026
+  windows:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       packages: write
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: nvidia
+            name: Windows（NVIDIA NVENC/CUDA）
+            runner: windows-2025-vs2026
+            msvc_arch: amd64
+            triplet: x64-windows-static
+            cuda: true
+            amf: false
+            vpl: false
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc
+            artifact: ffmpeg-windows-nvidia.zip
+          - id: amd-amf
+            name: Windows（AMD AMF）
+            runner: windows-2025-vs2026
+            msvc_arch: amd64
+            triplet: x64-windows-static
+            cuda: false
+            amf: true
+            vpl: false
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-amf
+            artifact: ffmpeg-windows-amd-amf.zip
+          - id: intel-qsv
+            name: Windows（Intel QSV）
+            runner: windows-2025-vs2026
+            msvc_arch: amd64
+            triplet: x64-windows-static
+            cuda: false
+            amf: false
+            vpl: true
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-libvpl
+            artifact: ffmpeg-windows-intel-qsv.zip
+          - id: arm64
+            name: Windows ARM64（Snapdragon）
+            runner: windows-11-vs2026-arm
+            msvc_arch: amd64_arm64
+            triplet: arm64-windows-static
+            cuda: false
+            amf: false
+            vpl: false
+            configure_extra: --enable-libvmaf --disable-libsvtav1
+            artifact: ffmpeg-windows-arm64.zip
+          - id: x86-all
+            name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
+            runner: windows-2025-vs2026
+            msvc_arch: amd64
+            triplet: x64-windows-static
+            cuda: true
+            amf: true
+            vpl: true
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
+            artifact: ffmpeg-windows-x86-all.zip
     steps:
       - uses: actions/checkout@v7
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1.13.0
-        with: { arch: amd64, vsversion: "18.0" }
+        with:
+          arch: ${{ matrix.msvc_arch }}
+          vsversion: "18.0"
 
       - name: 安装构建工具
         shell: pwsh
         run: |
-          # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
           choco install -y --no-progress nasm make ninja
           pip install meson
           refreshenv
-          # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
           $nasmDir = $null
           foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
             if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
           }
           if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm: $nasmDir" }
           if (-not $nasmDir) { Write-Host "::warning::nasm.exe not found" }
-          # 确保 nasm 在 bash 步骤的 PATH 中。
-          # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
           echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          # 从 PATH 中移除 Strawberry Perl：它的 pkg-config 已损坏，且其 ccache
-          # 会破坏 meson。GITHUB_ENV 将清理后的 PATH 传播到后续步骤。
           $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
           [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
           echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-
-          # 如果可用，使用 VS 提供的 Clang 编译 libvmaf。
-          # Clang 仅用于 libvmaf；FFmpeg 本身继续使用 MSVC（cl.exe）。
-          # 如果未找到 Clang，编译 VMAF 步骤将回退到 MSVC 并设置 -Denable_asm=false。
           $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $clangDir = $null
           if (Test-Path $vsWhere) {
@@ -419,9 +364,10 @@ jobs:
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
+          $inst = "$v\installed\${{ matrix.triplet }}"
+          & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
+          $vplFlag = if ('${{ matrix.vpl }}' -eq 'true') { '-HasVpl' } else { '' }
+          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" $vplFlag
 
       - name: 从源码编译 zimg
         shell: pwsh
@@ -433,7 +379,6 @@ jobs:
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
           $props = @(
             '<?xml version="1.0" encoding="utf-8"?>',
             '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
@@ -481,7 +426,6 @@ jobs:
       - name: 检查 vcpkg pkg-config
         shell: bash
         run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
@@ -497,22 +441,22 @@ jobs:
           $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
 
       - name: 安装 CUDA 工具包
+        if: matrix.cuda
         uses: mjun0812/setup-cuda@v1.5.0
         with:
           version: latest
           method: network
 
       - name: 检测 CUDA
+        if: matrix.cuda
         shell: bash
         run: |
           CUDA_BASE=""
           for base in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA" "/c/Program Files/NVIDIA/CUDA"; do
-            [ -d "$base" ] && for d in "$base"/v*; do
-              d2="$(dirname "$d" 2>/dev/null || echo "$d")/$(basename "$d")"
-              if [ -d "${d}/bin" ] && [ -f "${d}/bin/nvcc.exe" ]; then CUDA_BASE="${d}"; break 2; fi
+            for d in "$base"/v* "$base"/v*.*; do
+              if [ -d "$d/bin" ] && [ -x "$d/bin/nvcc.exe" ]; then CUDA_BASE="$d"; break 2; fi
             done
           done
-          # Fallback: locate via PATH
           [ -z "${CUDA_BASE}" ] && NVCCBIN="$(dirname "$(which nvcc 2>/dev/null || true)" 2>/dev/null || true)" && \
             [ -n "${NVCCBIN}" ] && CUDA_BASE="$(dirname "${NVCCBIN}")"
           [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
@@ -520,31 +464,25 @@ jobs:
           "${CUDA_BASE}/bin/nvcc.exe" --version
 
       - name: 创建 CUDA junction
+        if: matrix.cuda
         shell: pwsh
         run: |
           $cuda = $env:CUDA_HOME
           if (-not $cuda) { Write-Error "CUDA_HOME is not set"; exit 1 }
-          # 检测 CUDA 写入 MSYS 风格路径（/c/...）；mklink 需要 Windows 路径。
           if ($cuda -match '^/([a-zA-Z])/(.*)$') {
             $cuda = "$($matches[1].ToUpper()):\$($matches[2])" -replace '/', '\\'
           } elseif ($cuda -match '^[a-zA-Z]:') {
             $cuda = $cuda -replace '/', '\\'
           }
           $link = "C:\cuda"
-          if (Test-Path $link) {
-            # 强制删除 junction/目录，包括只读或正在使用的项目
-            cmd /c "rmdir /S /Q `"$link`"" | Out-Null
-            if (Test-Path $link) { Remove-Item $link -Recurse -Force -ErrorAction SilentlyContinue }
-          }
+          if (Test-Path $link) { Remove-Item $link -Recurse -Force }
           cmd /c mklink /J "$link" "$cuda" | Out-Null
-          if (-not (Test-Path "$link\bin\nvcc.exe")) {
-            Write-Error "Junction created but nvcc.exe not found at $link\bin\nvcc.exe (source: $cuda)"
-            exit 1
-          }
+          if (-not (Test-Path "$link\bin\nvcc.exe")) { Write-Error "Junction failed"; exit 1 }
           echo "CUDA_HOME_MIXED=C:/cuda" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "CUDA junction: $link -> $cuda"
 
       - name: 编译 nv-codec-headers
+        if: matrix.cuda
         shell: bash
         run: |
           P="${HOME}/ffmpeg-install"
@@ -554,185 +492,111 @@ jobs:
           make -j"$(nproc)" PREFIX="$P" && make PREFIX="$P" install
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
-      - name: 编译 VMAF-CUDA (MSVC)
+      - name: 编译 VMAF
         shell: bash
         run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
-          # 为 Clang + MSVC 目标修补 VMAF：不要在 Clang 下重新定义 __builtin_clz
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
-          # 为 Windows 修补 mkdirp.c/.h：unistd.h/sys/types.h 不可用，
-          # 使用 direct.h 并定义 mode_t；在 Windows 上使用 _mkdir。
           python3 -c '
           import pathlib
           for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
-              s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
-              s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-              p.write_text(s, encoding="utf-8")
-              compat_dir = pathlib.Path("src/compat/msvc/common")
-              compat_dir.mkdir(parents=True, exist_ok=True)
-              (compat_dir / "attributes.h").write_text(
-                  "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#endif\n"
-              )
           '
-          # nvcc（CUDA .cu）按 C++ 编译，不支持 C11 指定初始化器
-          # 在 C++20 之前。将 integer_adm.h 中的一个结构体重写为位置初始化。
-          python3 -c '
-          import pathlib
-          p = pathlib.Path("src/feature/integer_adm.h")
-          if p.exists():
-              s = p.read_text(encoding="utf-8")
-              s = s.replace(
-                  "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
-                  "    {.a = 0.495, .k = 0.466, .f0 = 0.401, .g = {1.501, 1.0, 0.534, 1.0}},\n"
-                  "    {.a = 1.633, .k = 0.353, .f0 = 0.209, .g = {1.520, 1.0, 0.502, 1.0}},\n"
-                  "    {.a = 0.944, .k = 0.521, .f0 = 0.404, .g = {1.868, 1.0, 0.516, 1.0}}};",
-                  "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
-                  "    {0.495, 0.466, 0.401, {1.501, 1.0, 0.534, 1.0}},\n"
-                  "    {1.633, 0.353, 0.209, {1.520, 1.0, 0.502, 1.0}},\n"
-                  "    {0.944, 0.521, 0.404, {1.868, 1.0, 0.516, 1.0}}};")
-              p.write_text(s, encoding="utf-8")
-          '
-          # 为 nvcc 使用无空格的 junction，这样 meson 无需引用带空格的路径。
-          export CUDA_HOME="/c/cuda"
-          export CUDA_PATH="/c/cuda"
-          export CUDACXX="/c/cuda/bin/nvcc"
-          export PATH="/c/cuda/bin:${PATH}"
-          CL="/c/cuda/lib/x64"; [ ! -d "$CL" ] && CL="/c/cuda/lib"
-          # 确保 MSVC link.exe 排在 Git 的 link.EXE 之前供 meson 使用
+          if [ "${{ matrix.cuda }}" = "true" ]; then
+            python3 -c '
+            import pathlib
+            p = pathlib.Path("src/feature/integer_adm.h")
+            if p.exists():
+                s = p.read_text(encoding="utf-8")
+                s = s.replace(
+                    "{ .compute_score = 1, .supported_by_any = 1, .ref = 1, .main = 1 }",
+                    "{ 1, 1, 1, 1 }")
+                p.write_text(s, encoding="utf-8")
+            '
+            export CUDA_HOME="/c/cuda"
+            export CUDA_PATH="/c/cuda"
+            export CUDACXX="/c/cuda/bin/nvcc"
+            export PATH="/c/cuda/bin:${PATH}"
+            CL="/c/cuda/lib/x64"; [ ! -d "$CL" ] && CL="/c/cuda/lib"
+          fi
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-          # nv-codec-headers 提供 ffnvcodec.pc；meson 需要 PKG_CONFIG_PATH 来找到它
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          # PThreads4W（通过 vcpkg 安装）在 Windows 上提供 pthread.h
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
           if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I$(cygpath -m "$VCPKG_INSTALLED")/include"
-            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
-            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
-            if [ -n "$PTHREAD_LIB" ]; then
-              PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
-              echo "使用 PThreads4W: $PTHREAD_LIB"
-              # Make pthreadVC3.dll discoverable at runtime (e.g. for meson sanity checks)
-              if [ -d "${VCPKG_INSTALLED}/bin" ]; then
-                export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
-              fi
-            else
-              echo "::error::找到 pthread.h，但在 ${VCPKG_INSTALLED}/lib 下没有 pthread*.lib"
-              exit 1
-            fi
+            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
+            PTHREAD_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib pthreads.lib"
           fi
-          # 将路径转换为混合形式（C:/...），使路径中的空格保持为单个 argv 标记
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
-          VCPKG_INSTALLED_MIXED=""
-          if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED")"
+          __meson_array() {
+            local result="["
+            local first=1
+            for arg in "$@"; do
+              [ $first -eq 0 ] && result="$result, "
+              result="$result"$arg""
+              first=0
+            done
+            result="$result]"
+            echo "$result"
+          }
+          VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+          VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
+          if [ "${{ matrix.cuda }}" = "true" ]; then
+            python3 -c "
+            import pathlib
+            mb = pathlib.Path('src/meson.build')
+            s = mb.read_text(encoding='utf-8')
+            s = s.replace(
+                "'-I', '../src/' + cuda_dir,",
+                "'-I', '../src/' + cuda_dir,
+                '-I', '${P_MIXED}/include',
+                '-I', '${VCPKG_INSTALLED}/include',")
+            mb.write_text(s, encoding='utf-8')
+            "
+            export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED}/include;${CUDA_HOME}/include;${INCLUDE:-}"
           fi
-          # nvcc fatbin 使用硬编码的 custom_target 命令；注入额外的包含目录
-          # 以便 CUDA .cu 文件能找到 ffnvcodec 头文件（来自 nv-codec-headers）和 pthread.h。
-          python3 -c "
-          import pathlib
-          mb = pathlib.Path('src/meson.build')
-          s = mb.read_text(encoding='utf-8')
-          s = s.replace(
-              \"'-I', '../src/' + cuda_dir,\",
-              \"'-I', '../src/' + cuda_dir,\\n                '-I', '${P_MIXED}/include',\\n                '-I', '${VCPKG_INSTALLED_MIXED}/include',\")
-          mb.write_text(s, encoding='utf-8')
-          "
-          # nvcc 宿主编译器（cl）在 Windows 上也会查询 INCLUDE
-          export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED}/include;${INCLUDE:-}"
-          # VMAF 汇编需要 x86/x64 上的 nasm；如果不可用则优雅禁用。
           if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
             VMAF_ENABLE_ASM=true
           else
             VMAF_ENABLE_ASM=false
             echo "::warning::未找到 nasm，禁用 VMAF 汇编优化"
           fi
-          # 辅助函数：从位置参数构建 Meson 数组字面量（安全处理空格）
-          __meson_array() {
-            local arr="[" first=1
-            for x in "$@"; do
-              [ "$first" -eq 1 ] || arr="$arr,"
-              first=0
-              arr="$arr\"$x\""
-            done
-            arr="$arr]"
-            printf '%s' "$arr"
-          }
           if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF 以保留 AVX2 汇编"
-            else
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF（未找到 nasm，禁用汇编）"
-            fi
-            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dcpp_args="$VMAF_CPP_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS" \
-              -Dcpp_link_args="$VMAF_LINK_ARGS"
+            CC_BIN="$CLANG_BIN/clang.exe"
           else
-            echo "::warning::未找到 VS Clang，回退到 MSVC 并设置 -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS"
+            CC_BIN="cl.exe"
           fi
+          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static             -Dc_args="$VMAF_C_ARGS" -Dcpp_args="$VMAF_C_ARGS"             -Dc_link_args="$VMAF_LINK_ARGS" -Dcpp_link_args="$VMAF_LINK_ARGS"
           ninja -vC build
-
-          # 手动安装：在 Windows/Clang 上构建静态 libvmaf，以避免 DLL 导入库问题。
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
-
           vmaf_static_lib=""
           for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
             [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
           done
           [ -z "$vmaf_static_lib" ] && { echo "::error::在 build/src 下未找到 VMAF 静态库"; ls -la build/src; exit 1; }
-
           cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
-
+          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
           printf '%s\n' \
-            "prefix=${P_MIXED}" \
+            "prefix=$P_MIXED" \
             'exec_prefix=${prefix}' \
             'libdir=${prefix}/lib' \
             'includedir=${prefix}/include' \
             '' \
             'Name: libvmaf' \
-            'Description: Netflix VMAF library' \
+            'Description: VMAF library' \
             'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32" \
-            'Cflags: -I${includedir}/libvmaf' \
+            'Libs: -L${libdir} -lvmaf' \
+            'Libs.private: -lstdc++ -lm' \
+            'Cflags: -I${includedir}' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc"
-          echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
 
       - name: 导出 VMAF meson 日志
         if: failure()
@@ -743,73 +607,66 @@ jobs:
             cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
           fi
 
-      - name: 编译 FFmpeg (MSVC)
+      - name: 编译 FFmpeg
         shell: bash
         run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          CUDA_HOME_MIXED="C:/cuda"
-          # 使 nvcc 可被发现以启用 --enable-cuda-nvcc
-          export CUDA_HOME="/c/cuda"
-          export CUDA_PATH="/c/cuda"
-          export CUDACXX="/c/cuda/bin/nvcc"
-          export PATH="/c/cuda/bin:${PATH}"
-          if [ ! -x "/c/cuda/bin/nvcc" ]; then
-            echo "::error::在 /c/cuda/bin/nvcc 未找到 nvcc"
-            ls -la /c/cuda/bin 2>/dev/null || echo "(cannot list /c/cuda/bin)"
-            exit 1
-          fi
-          echo "nvcc: $(which nvcc)"
-          nvcc --version
           [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          # 规范化 pkg-config 路径，以便 bash/ffmpeg configure 能可靠执行
           if command -v cygpath >/dev/null 2>&1; then
             PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
           fi
           export PKG_CONFIG
-          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo 未找到))"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc" || true
-          echo "--- pkg-config libvmaf ---"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
           cd /tmp && rm -rf ffmpeg-src
           git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          python3 "${GITHUB_WORKSPACE}/scripts/ci/patch-ffmpeg-msvc.py" /tmp/ffmpeg-src
           cd ffmpeg-src
-          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
-          # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
-          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
-          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
           sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
           sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
+          CUDA_FLAGS=""
+          if [ "${{ matrix.cuda }}" = "true" ]; then
+            export CUDA_HOME="/c/cuda"
+            export CUDA_PATH="/c/cuda"
+            export CUDACXX="/c/cuda/bin/nvcc"
+            export PATH="/c/cuda/bin:${PATH}"
+            CUDA_FLAGS="--enable-cuda-nvcc --enable-cuvid --enable-nvenc"
+            CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
+          fi
+          AMF_FLAGS=""
+          if [ "${{ matrix.amf }}" = "true" ]; then
+            AMF_DIR="/tmp/AMF"
+            [ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"
+            AMF_INCLUDE_DIR="$AMF_DIR/amf/public/include"
+            if [ ! -d "$AMF_INCLUDE_DIR/AMF" ]; then
+              mkdir -p "$AMF_INCLUDE_DIR/AMF"
+              cp -r "$AMF_INCLUDE_DIR/core" "$AMF_INCLUDE_DIR/components" "$AMF_INCLUDE_DIR/AMF/"
+            fi
+            AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
+            AMF_FLAGS="--enable-amf"
+          fi
+          VPL_FLAGS=""
+          if [ "${{ matrix.vpl }}" = "true" ]; then
+            VPL_FLAGS="--enable-libvpl"
+          fi
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${VCPKG_INSTALLED}/include -DLIBTWOLAME_STATIC" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
+            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include ${CUDA_HOME_MIXED:+-I${CUDA_HOME_MIXED}/include} ${AMF_INCLUDE:+-I${AMF_INCLUDE}} -I${VCPKG_INSTALLED}/include/vpl -DLIBTWOLAME_STATIC" \
+            --extra-ldflags="-LIBPATH:$P_MIXED/lib ${CL:+-LIBPATH:$CL} -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
+            ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
         if: failure()
         shell: bash
         run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
@@ -823,8 +680,10 @@ jobs:
         shell: bash
         run: |
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "（无）"
+          echo "--- HW Accel ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 || echo "（无）"
+          echo "--- Encoders ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'nvenc|amf|qsv|libmp3lame|libfdk_aac' | head -10 || echo "（无）"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
 
@@ -836,820 +695,14 @@ jobs:
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
           $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
           if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
-          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-nvidia.zip -Force
+          Compress-Archive -Path dist\* -DestinationPath ${{ matrix.artifact }} -Force
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ffmpeg-windows-nvidia
-          path: ffmpeg-windows-nvidia.zip
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
           retention-days: 30
 
-  # ============================================================
-  # WINDOWS — AMD（AMF）
-  # ============================================================
-  windows-amd-amf:
-    name: Windows（AMD AMF）
-    runs-on: windows-2025-vs2026
-    permissions:
-      packages: write
-    env:
-      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with: { arch: amd64, vsversion: "18.0" }
-
-      - name: 安装构建工具
-        shell: pwsh
-        run: |
-          # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make ninja
-          pip install meson
-          refreshenv
-          # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
-          $nasmDir = $null
-          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
-            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
-          }
-          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm: $nasmDir" }
-          if (-not $nasmDir) { Write-Host "::warning::nasm.exe not found" }
-          # 确保 nasm 在 bash 步骤的 PATH 中。
-          # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
-          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          # 从 PATH 中移除 Strawberry Perl：它的 pkg-config 已损坏，且其 ccache
-          # 会破坏 meson。GITHUB_ENV 将清理后的 PATH 传播到后续步骤。
-          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
-          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
-          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-
-          # 如果可用，使用 VS 提供的 Clang 编译 libvmaf。
-          # Clang 仅用于 libvmaf；FFmpeg 本身继续使用 MSVC（cl.exe）。
-          # 如果未找到 Clang，编译 VMAF 步骤将回退到 MSVC 并设置 -Denable_asm=false。
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $clangDir = $null
-          if (Test-Path $vsWhere) {
-            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
-            if ($vsPath) {
-              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
-              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
-            }
-          }
-          $clangDirUnix = $clangDir -replace '\\','/'
-          if ($clangDir) { Write-Host "VS Clang: $clangDir" }
-          if ($clangDir) { echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append }
-          if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
-          if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
-
-      - name: 配置 vcpkg NuGet 缓存
-        shell: pwsh
-        env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
-          $vcpkgExe = "$v\vcpkg.exe"
-          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
-          Write-Host "nuget: $nuget"
-          cmd /c "`"$nuget`" sources Remove -Name GitHubPackages 2>nul || exit /b 0"
-          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
-          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
-          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-        continue-on-error: true
-
-      - name: 安装 vcpkg 依赖
-        shell: pwsh
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
-
-      - name: 从源码编译 zimg
-        shell: pwsh
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
-
-      - name: 检查 vcpkg pkg-config
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "PKG_CONFIG=${PKG_CONFIG}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- .pc files ---"
-          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
-          echo "--- pkg-config checks ---"
-          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
-          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
-          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
-          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
-
-      - name: 编译 VMAF（CPU）
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          # 为 Clang + MSVC 目标修补 VMAF：不要在 Clang 下重新定义 __builtin_clz
-          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
-          # 为 Windows 修补 mkdirp.c/.h：unistd.h/sys/types.h 不可用，
-          # 使用 direct.h 并定义 mode_t；在 Windows 上使用 _mkdir。
-          python3 -c '
-          import pathlib
-          for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
-              s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
-              s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-              p.write_text(s, encoding="utf-8")
-              compat_dir = pathlib.Path("src/compat/msvc/common")
-              compat_dir.mkdir(parents=True, exist_ok=True)
-              (compat_dir / "attributes.h").write_text(
-                  "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#endif\n"
-              )
-          '
-          # 确保 MSVC link.exe 排在 Git 的 link.EXE 之前供 meson 使用
-          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
-          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-          # PThreads4W（通过 vcpkg 安装）在 Windows 上提供 pthread.h
-          PTHREAD_CFLAGS=""
-          PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I$(cygpath -m "$VCPKG_INSTALLED")/include"
-            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
-            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
-            if [ -n "$PTHREAD_LIB" ]; then
-              PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
-              echo "使用 PThreads4W: $PTHREAD_LIB"
-              # Make pthreadVC3.dll discoverable at runtime (e.g. for meson sanity checks)
-              if [ -d "${VCPKG_INSTALLED}/bin" ]; then
-                export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
-              fi
-            else
-              echo "::error::找到 pthread.h，但在 ${VCPKG_INSTALLED}/lib 下没有 pthread*.lib"
-              exit 1
-            fi
-          fi
-          # VMAF 汇编需要 x86/x64 上的 nasm；如果不可用则优雅禁用。
-          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
-            VMAF_ENABLE_ASM=true
-          else
-            VMAF_ENABLE_ASM=false
-            echo "::warning::未找到 nasm，禁用 VMAF 汇编优化"
-          fi
-          # 辅助函数：从位置参数构建 Meson 数组字面量（安全处理空格）
-          __meson_array() {
-            local arr="[" first=1
-            for x in "$@"; do
-              [ "$first" -eq 1 ] || arr="$arr,"
-              first=0
-              arr="$arr\"$x\""
-            done
-            arr="$arr]"
-            printf '%s' "$arr"
-          }
-          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF 以保留 AVX2 汇编"
-            else
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF（未找到 nasm，禁用汇编）"
-            fi
-            VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dcpp_args="$VMAF_CPP_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS" \
-              -Dcpp_link_args="$VMAF_LINK_ARGS"
-          else
-            echo "::warning::未找到 VS Clang，回退到 MSVC 并设置 -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS"
-          fi
-          ninja -vC build
-
-          # 手动安装：在 Windows/Clang 上构建静态 libvmaf，以避免 DLL 导入库问题。
-          mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
-
-          vmaf_static_lib=""
-          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
-            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
-          done
-          [ -z "$vmaf_static_lib" ] && { echo "::error::在 build/src 下未找到 VMAF 静态库"; ls -la build/src; exit 1; }
-
-          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
-          cp include/libvmaf/*.h "$P/include/libvmaf/"
-          [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
-          [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
-
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          printf '%s\n' \
-            "prefix=${P_MIXED}" \
-            'exec_prefix=${prefix}' \
-            'libdir=${prefix}/lib' \
-            'includedir=${prefix}/include' \
-            '' \
-            'Name: libvmaf' \
-            'Description: Netflix VMAF library' \
-            'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32" \
-            'Cflags: -I${includedir}/libvmaf' \
-            > "$P/lib/pkgconfig/libvmaf.pc"
-          echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc"
-          echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-
-      - name: 导出 VMAF meson 日志
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
-            echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
-            cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
-          fi
-
-      - name: 编译 FFmpeg (MSVC)
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          set -e; P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          # 规范化 pkg-config 路径，以便 bash/ffmpeg configure 能可靠执行
-          if command -v cygpath >/dev/null 2>&1; then
-            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
-          fi
-          export PKG_CONFIG
-          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo 未找到))"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc" || true
-          echo "--- pkg-config libvmaf ---"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
-          # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          # vcpkg 不提供 AMF 公共头文件。FFmpeg 期望 #include <AMF/core/Version.h>，
-          # 因此在 AMF 包含路径内创建一个 AMF/ 包装目录。
-          AMF_DIR="/tmp/AMF"
-          [ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"
-          AMF_INCLUDE_DIR="$AMF_DIR/amf/public/include"
-          if [ ! -d "$AMF_INCLUDE_DIR/AMF" ]; then
-            mkdir -p "$AMF_INCLUDE_DIR/AMF"
-            cp -r "$AMF_INCLUDE_DIR/core" "$AMF_INCLUDE_DIR/components" "$AMF_INCLUDE_DIR/AMF/"
-          fi
-          AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
-          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
-          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
-          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
-          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
-          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          ./configure --toolchain=msvc --prefix="$P" \
-            --pkg-config="$PKG_CONFIG" \
-            --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -DLIBTWOLAME_STATIC" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-amf --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
-          make -j"$(nproc)" && make install
-
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== pkg-config libmp3lame ==="
-          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
-          echo "=== pkg-config libfdk-aac ==="
-          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
-          echo "=== pkg-config vpl ==="
-          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
-
-      - name: 验证
-        shell: bash
-        run: |
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- AMF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_amf' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        shell: pwsh
-        run: |
-          $b = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
-          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
-          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
-          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-amd-amf.zip -Force
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-windows-amd-amf
-          path: ffmpeg-windows-amd-amf.zip
-          retention-days: 30
-
-  # ============================================================
-  # WINDOWS — Intel（QSV via oneVPL）
-  # ============================================================
-  windows-intel-qsv:
-    name: Windows（Intel QSV）
-    runs-on: windows-2025-vs2026
-    permissions:
-      packages: write
-    env:
-      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with: { arch: amd64, vsversion: "18.0" }
-
-      - name: 安装构建工具
-        shell: pwsh
-        run: |
-          # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make ninja
-          pip install meson
-          refreshenv
-          # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
-          $nasmDir = $null
-          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
-            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
-          }
-          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm: $nasmDir" }
-          if (-not $nasmDir) { Write-Host "::warning::nasm.exe not found" }
-          # 确保 nasm 在 bash 步骤的 PATH 中。
-          # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
-          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          # 从 PATH 中移除 Strawberry Perl：它的 pkg-config 已损坏，且其 ccache
-          # 会破坏 meson。GITHUB_ENV 将清理后的 PATH 传播到后续步骤。
-          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
-          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
-          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-
-          # 如果可用，使用 VS 提供的 Clang 编译 libvmaf。
-          # Clang 仅用于 libvmaf；FFmpeg 本身继续使用 MSVC（cl.exe）。
-          # 如果未找到 Clang，编译 VMAF 步骤将回退到 MSVC 并设置 -Denable_asm=false。
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $clangDir = $null
-          if (Test-Path $vsWhere) {
-            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
-            if ($vsPath) {
-              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
-              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
-            }
-          }
-          $clangDirUnix = $clangDir -replace '\\','/'
-          if ($clangDir) { Write-Host "VS Clang: $clangDir" }
-          if ($clangDir) { echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append }
-          if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
-          if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
-
-      - name: 配置 vcpkg NuGet 缓存
-        shell: pwsh
-        env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
-          $vcpkgExe = "$v\vcpkg.exe"
-          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
-          Write-Host "nuget: $nuget"
-          cmd /c "`"$nuget`" sources Remove -Name GitHubPackages 2>nul || exit /b 0"
-          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
-          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
-          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-        continue-on-error: true
-
-      - name: 安装 vcpkg 依赖
-        shell: pwsh
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
-
-      - name: 从源码编译 zimg
-        shell: pwsh
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
-
-      - name: 检查 vcpkg pkg-config
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "PKG_CONFIG=${PKG_CONFIG}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- .pc files ---"
-          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
-          echo "--- pkg-config checks ---"
-          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
-          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
-          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
-          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
-
-      - name: 编译 VMAF（CPU）
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          # 为 Clang + MSVC 目标修补 VMAF：不要在 Clang 下重新定义 __builtin_clz
-          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
-          # 为 Windows 修补 mkdirp.c/.h：unistd.h/sys/types.h 不可用，
-          # 使用 direct.h 并定义 mode_t；在 Windows 上使用 _mkdir。
-          python3 -c '
-          import pathlib
-          for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
-              s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
-              s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-              p.write_text(s, encoding="utf-8")
-              compat_dir = pathlib.Path("src/compat/msvc/common")
-              compat_dir.mkdir(parents=True, exist_ok=True)
-              (compat_dir / "attributes.h").write_text(
-                  "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#endif\n"
-              )
-          '
-          # 确保 MSVC link.exe 排在 Git 的 link.EXE 之前供 meson 使用
-          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
-          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-          # PThreads4W（通过 vcpkg 安装）在 Windows 上提供 pthread.h
-          PTHREAD_CFLAGS=""
-          PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I$(cygpath -m "$VCPKG_INSTALLED")/include"
-            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
-            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
-            if [ -n "$PTHREAD_LIB" ]; then
-              PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
-              echo "使用 PThreads4W: $PTHREAD_LIB"
-              # Make pthreadVC3.dll discoverable at runtime (e.g. for meson sanity checks)
-              if [ -d "${VCPKG_INSTALLED}/bin" ]; then
-                export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
-              fi
-            else
-              echo "::error::找到 pthread.h，但在 ${VCPKG_INSTALLED}/lib 下没有 pthread*.lib"
-              exit 1
-            fi
-          fi
-          # VMAF 汇编需要 x86/x64 上的 nasm；如果不可用则优雅禁用。
-          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
-            VMAF_ENABLE_ASM=true
-          else
-            VMAF_ENABLE_ASM=false
-            echo "::warning::未找到 nasm，禁用 VMAF 汇编优化"
-          fi
-          # 辅助函数：从位置参数构建 Meson 数组字面量（安全处理空格）
-          __meson_array() {
-            local arr="[" first=1
-            for x in "$@"; do
-              [ "$first" -eq 1 ] || arr="$arr,"
-              first=0
-              arr="$arr\"$x\""
-            done
-            arr="$arr]"
-            printf '%s' "$arr"
-          }
-          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF 以保留 AVX2 汇编"
-            else
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF（未找到 nasm，禁用汇编）"
-            fi
-            VMAF_C_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dcpp_args="$VMAF_CPP_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS" \
-              -Dcpp_link_args="$VMAF_LINK_ARGS"
-          else
-            echo "::warning::未找到 VS Clang，回退到 MSVC 并设置 -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS"
-          fi
-          ninja -vC build
-
-          # 手动安装：在 Windows/Clang 上构建静态 libvmaf，以避免 DLL 导入库问题。
-          mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
-
-          vmaf_static_lib=""
-          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
-            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
-          done
-          [ -z "$vmaf_static_lib" ] && { echo "::error::在 build/src 下未找到 VMAF 静态库"; ls -la build/src; exit 1; }
-
-          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
-          cp include/libvmaf/*.h "$P/include/libvmaf/"
-          [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
-          [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
-
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          printf '%s\n' \
-            "prefix=${P_MIXED}" \
-            'exec_prefix=${prefix}' \
-            'libdir=${prefix}/lib' \
-            'includedir=${prefix}/include' \
-            '' \
-            'Name: libvmaf' \
-            'Description: Netflix VMAF library' \
-            'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32" \
-            'Cflags: -I${includedir}/libvmaf' \
-            > "$P/lib/pkgconfig/libvmaf.pc"
-          echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc"
-          echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-
-      - name: 导出 VMAF meson 日志
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
-            echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
-            cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
-          fi
-
-      - name: 导出 VMAF meson 日志
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
-            echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
-            cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
-          fi
-
-      - name: 编译 FFmpeg (MSVC)
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          set -e; P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          # 规范化 pkg-config 路径，以便 bash/ffmpeg configure 能可靠执行
-          if command -v cygpath >/dev/null 2>&1; then
-            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
-          fi
-          export PKG_CONFIG
-          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo 未找到))"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc" || true
-          echo "--- pkg-config libvmaf ---"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
-          # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
-          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
-          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
-          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
-          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          ./configure --toolchain=msvc --prefix="$P" \
-            --pkg-config="$PKG_CONFIG" \
-            --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -DLIBTWOLAME_STATIC" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libvpl --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
-          make -j"$(nproc)" && make install
-
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== pkg-config libmp3lame ==="
-          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
-          echo "=== pkg-config libfdk-aac ==="
-          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
-          echo "=== pkg-config vpl ==="
-          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
-
-      - name: 验证
-        shell: bash
-        run: |
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- QSV ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        shell: pwsh
-        run: |
-          $b = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
-          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
-          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
-          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-intel-qsv.zip -Force
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-windows-intel-qsv
-          path: ffmpeg-windows-intel-qsv.zip
-          retention-days: 30
-
-  # ============================================================
-  # macOS ARM（VideoToolbox + VMAF）
-  # ============================================================
   macos-arm:
     name: macOS ARM（VideoToolbox）
     runs-on: macos-latest
@@ -1775,1159 +828,12 @@ jobs:
   # ============================================================
   # WINDOWS ARM64 — Snapdragon (Software Encoders + D3D11VA)
   # ============================================================
-  windows-arm64:
-    name: Windows ARM64（Snapdragon）
-    runs-on: windows-11-vs2026-arm
-    permissions:
-      packages: write
-    env:
-      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 配置 MSVC（VS 2026 ARM64）
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with: { arch: amd64_arm64, vsversion: "18.0" }
-
-      - name: 安装构建工具
-        shell: pwsh
-        run: |
-          # Chocolatey pkgconfiglite is unreliable; use Git for Windows' pkg-config
-          choco install -y --no-progress nasm make ninja
-          pip install meson
-          refreshenv
-          # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
-          $nasmDir = $null
-          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
-            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
-          }
-          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm: $nasmDir" }
-          if (-not $nasmDir) { Write-Host "::warning::nasm.exe not found" }
-          # 确保 nasm 在 bash 步骤的 PATH 中。
-          # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
-          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          # 从 PATH 中移除 Strawberry Perl：它的 pkg-config 已损坏，且其 ccache
-          # 会破坏 meson。GITHUB_ENV 将清理后的 PATH 传播到后续步骤。
-          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
-          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
-          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-
-          # 如果可用，使用 VS 提供的 Clang 编译 libvmaf。
-          # Clang 仅用于 libvmaf；FFmpeg 本身继续使用 MSVC（cl.exe）。
-          # 如果未找到 Clang，编译 VMAF 步骤将回退到 MSVC 并设置 -Denable_asm=false。
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $clangDir = $null
-          if (Test-Path $vsWhere) {
-            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
-            if ($vsPath) {
-              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
-              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
-            }
-          }
-          $clangDirUnix = $clangDir -replace '\\','/'
-          if ($clangDir) { Write-Host "VS Clang: $clangDir" }
-          if ($clangDir) { echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append }
-          if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
-          if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
-
-      - name: 配置 vcpkg NuGet 缓存
-        shell: pwsh
-        env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
-          $vcpkgExe = "$v\vcpkg.exe"
-          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
-          Write-Host "nuget: $nuget"
-          cmd /c "`"$nuget`" sources Remove -Name GitHubPackages 2>nul || exit /b 0"
-          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
-          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
-          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-        continue-on-error: true
-
-      - name: 安装 vcpkg 依赖
-        shell: pwsh
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
-
-      - name: 从源码编译 zimg
-        shell: pwsh
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          # 新版 zimg 的 ARM NEON 代码已自带 noexcept 与 alignment_mask() 覆盖，无需再打补丁
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
-
-      - name: 检查 vcpkg pkg-config
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "PKG_CONFIG=${PKG_CONFIG}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- .pc files ---"
-          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
-          echo "--- pkg-config checks ---"
-          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
-          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
-          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
-          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
-
-      - name: 编译 VMAF（CPU）
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          # 确保 MSVC link.exe 排在 Git 的 link.EXE 之前供 meson 使用
-          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
-          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-          # Patch VMAF for Windows ARM64 MSVC: missing POSIX headers, ARM64 intrinsics,
-          # and void* arithmetic which MSVC does not allow.
-          python3 -c '
-          import pathlib
-          for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c",
-                       "src/feature/cuda/integer_adm_cuda.c", "src/feature/integer_vif.h",
-                       "src/feature/integer_vif.c", "src/feature/integer_adm.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
-              s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
-              s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-              s = s.replace(
-                  "#ifdef _MSC_VER\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)__lzcnt(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)__lzcnt64(x);\n}\n\n#endif",
-                  "#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)_CountLeadingZeros(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)_CountLeadingZeros64(x);\n}\n\n#elif defined(_MSC_VER)\n#include <intrin.h>\n\nstatic inline int __builtin_clz(unsigned x) {\n    return (int)__lzcnt(x);\n}\n\nstatic inline int __builtin_clzll(unsigned long long x) {\n    return (int)__lzcnt64(x);\n}\n\n#endif"
-              )
-              s = s.replace(
-                  "void *data = aligned_malloc(data_sz, MAX_ALIGN);",
-                  "char *data = (char *)aligned_malloc(data_sz, MAX_ALIGN);"
-              )
-              s = s.replace(
-                  "#include \"integer_adm.h\"",
-                  "#include \"integer_adm.h\"\n\n#if defined(_MSC_VER) && defined(_M_ARM64)\n#include <intrin.h>\n#define __builtin_clz(x) _CountLeadingZeros(x)\n#endif"
-              )
-              p.write_text(s, encoding="utf-8")
-          compat_dir = pathlib.Path("src/compat/msvc/common")
-          compat_dir.mkdir(parents=True, exist_ok=True)
-          (compat_dir / "attributes.h").write_text(
-              "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-              "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-              "#endif\n"
-          )
-          '
-          # MSVC C11 does not support C99 variable-length arrays; replace with _alloca.
-          python3 -c '
-          import pathlib
-          for path in ("src/predict.c", "src/libvmaf.c", "src/read_json_model.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              if "#include <malloc.h>" not in s:
-                  s = "#include <malloc.h>\n" + s
-              s = s.replace("double scores[model_collection->cnt];", "double *scores = (double *)_alloca(sizeof(double) * model_collection->cnt);")
-              s = s.replace("char name[name_sz];", "char *name = (char *)_alloca(name_sz);")
-              s = s.replace("char cfg_name[cfg_name_sz];", "char *cfg_name = (char *)_alloca(cfg_name_sz);")
-              s = s.replace("char generated_key[generated_key_sz];", "char generated_key[5];")
-              p.write_text(s, encoding="utf-8")
-          '
-          # PThreads4W（通过 vcpkg 安装）在 Windows 上提供 pthread.h
-          PTHREAD_CFLAGS=""
-          PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I$(cygpath -m "$VCPKG_INSTALLED")/include"
-            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
-            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
-            if [ -n "$PTHREAD_LIB" ]; then
-              PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
-              echo "使用 PThreads4W: $PTHREAD_LIB"
-              # Make pthreadVC3.dll discoverable at runtime (e.g. for meson sanity checks)
-              if [ -d "${VCPKG_INSTALLED}/bin" ]; then
-                export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
-              fi
-            else
-              echo "::error::找到 pthread.h，但在 ${VCPKG_INSTALLED}/lib 下没有 pthread*.lib"
-              exit 1
-            fi
-          fi
-          # 辅助函数：从位置参数构建 Meson 数组字面量（安全处理空格）
-          __meson_array() {
-            local arr="[" first=1
-            for x in "$@"; do
-              [ "$first" -eq 1 ] || arr="$arr,"
-              first=0
-              arr="$arr\"$x\""
-            done
-            arr="$arr]"
-            printf '%s' "$arr"
-          }
-          VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-          VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-          # ARM64 NEON code in VMAF is C intrinsics and MSVC arm64 supports it.
-          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-          meson setup build --buildtype release --prefix="$P" -Denable_cuda=false -Denable_asm=true -Db_vscrt=mt -Ddefault_library=static \
-            -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-            -Dc_args="$VMAF_C_ARGS" \
-            -Dc_link_args="$VMAF_LINK_ARGS"
-          ninja -vC build
-
-          # 手动安装：在 Windows/Clang 上构建静态 libvmaf，以避免 DLL 导入库问题。
-          mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
-
-          vmaf_static_lib=""
-          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
-            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
-          done
-          [ -z "$vmaf_static_lib" ] && { echo "::error::在 build/src 下未找到 VMAF 静态库"; ls -la build/src; exit 1; }
-
-          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
-          cp include/libvmaf/*.h "$P/include/libvmaf/"
-          [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
-          [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
-
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          printf '%s\n' \
-            "prefix=${P_MIXED}" \
-            'exec_prefix=${prefix}' \
-            'libdir=${prefix}/lib' \
-            'includedir=${prefix}/include' \
-            '' \
-            'Name: libvmaf' \
-            'Description: Netflix VMAF library' \
-            'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32" \
-            'Cflags: -I${includedir}/libvmaf' \
-            > "$P/lib/pkgconfig/libvmaf.pc"
-          echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc"
-          echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-
-      - name: 导出 VMAF meson 日志
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
-            echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
-            cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
-          fi
-
-      - name: 编译 FFmpeg (MSVC ARM64)
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          set -e; P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          # 规范化 pkg-config 路径，以便 bash/ffmpeg configure 能可靠执行
-          if command -v cygpath >/dev/null 2>&1; then
-            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
-          fi
-          export PKG_CONFIG
-          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo 未找到))"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc" || true
-          echo "--- pkg-config libvmaf ---"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-          cd /tmp && rm -rf gas-preprocessor
-          git clone --depth 1 https://github.com/FFmpeg/gas-preprocessor.git gas-preprocessor
-          export PATH="/tmp/gas-preprocessor:$PATH"
-
-          cd /tmp && rm -rf ffmpeg-src
-          git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
-          # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
-          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
-          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
-          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
-          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          ./configure --toolchain=msvc --prefix="$P" --arch=arm64 \
-            --pkg-config="$PKG_CONFIG" \
-            --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${VCPKG_INSTALLED}/include -DLIBTWOLAME_STATIC" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
-            --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
-          make -j"$(nproc)" && make install
-
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== pkg-config libmp3lame ==="
-          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
-          echo "=== pkg-config libfdk-aac ==="
-          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
-          echo "=== pkg-config vpl ==="
-          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
-
-      - name: 验证
-        shell: bash
-        run: |
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- HW Accel ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 || echo "（无）"
-          echo "--- Decoders (hw) ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | grep -iE '_d3d11va|_dxva2|_mf' | head -10 || echo "（无）"
-          echo "--- All decoders (first 50) ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -decoders 2>&1 | head -50 || echo "（无）"
-          echo "--- Encoders ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'libmp3lame|libfdk_aac|_mf' || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        shell: pwsh
-        run: |
-          $b = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
-          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
-          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
-          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-arm64.zip -Force
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-windows-arm64
-          path: ffmpeg-windows-arm64.zip
-          retention-days: 30
-
-  # ============================================================
-  # LINUX — x86 整合版（NVIDIA + Intel QSV + AMD VAAPI）
-  # ============================================================
-  linux-x86-all:
-    name: "Linux x86 整合版（NVIDIA + Intel QSV + AMD VAAPI）"
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 安装依赖
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates gnupg python3 xxd \
-            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
-            libva-dev libvpl-dev libdrm-dev \
-            libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
-            libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
-            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
-            sudo apt-get upgrade -y -qq
-            bash scripts/ci/linux-pc-fallbacks.sh /usr
-
-      - name: 安装 CUDA 工具包
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y wget
-          # 添加 NVIDIA CUDA 仓库（Ubuntu 26.04）
-          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64/cuda-keyring_1.1-1_all.deb
-          sudo dpkg -i cuda-keyring_1.1-1_all.deb
-          sudo apt-get update -qq
-          sudo apt-get install -y cuda-toolkit-13-3
-          sudo apt-get update -qq
-          sudo apt-get upgrade -y -qq
-          # 自动检测 CUDA 版本并链接
-          CUDA_VER_DIR=$(ls -d /usr/local/cuda-13.* 2>/dev/null | sort -V | tail -1)
-          if [ -n "${CUDA_VER_DIR}" ]; then
-            sudo ln -sf "${CUDA_VER_DIR}" /usr/local/cuda 2>/dev/null || true
-            echo "CUDA linked: ${CUDA_VER_DIR}"
-          else
-            sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
-          fi
-
-      - name: 检测 CUDA
-        run: |
-          CUDA_BASE=""
-          for d in /usr/local/cuda-* /usr/local/cuda; do
-            if [ -d "$d/bin" ] && [ -x "$d/bin/nvcc" ]; then CUDA_BASE="$d"; break; fi
-          done
-          [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
-          echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
-          "${CUDA_BASE}/bin/nvcc" --version
-
-      - name: 编译 nv-codec-headers
-        run: |
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
-          cd nv-codec-headers
-          make -j"$(nproc)" PREFIX=/usr/local
-          sudo make PREFIX=/usr/local install
-
-      - name: 编译 VMAF-CUDA
-        run: |
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
-          export PATH="${CUDA_HOME}/bin:${PATH}"
-          export C_INCLUDE_PATH="${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
-          meson setup build --buildtype release --prefix="${HOME}/ffmpeg-install" --libdir=lib \
-            -Denable_cuda=true -Dc_link_args="-lstdc++" -Dcpp_link_args="-lstdc++"
-          ninja -vC build && ninja -C build install
-
-      - name: 编译 FFmpeg
-        run: |
-          P="${HOME}/ffmpeg-install"
-          export PATH="${CUDA_HOME}/bin:${PATH}"
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          ./configure --prefix="${HOME}/ffmpeg-install" --pkg-config-flags="--static" \
-            --extra-cflags="-I${HOME}/ffmpeg-install/include -I${CUDA_HOME}/include" \
-            --extra-ldflags="-L${HOME}/ffmpeg-install/lib -L${CUDA_HOME}/lib64 -Wl,-rpath,${HOME}/ffmpeg-install/lib" \
-            --extra-libs="-lpthread -lm -ldl -lstdc++" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-vaapi --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
-          make -j"$(nproc)" && make install
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        run: |
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-
-      - name: 裁剪与验证
-        run: |
-          P="${HOME}/ffmpeg-install"
-          export LD_LIBRARY_PATH="${P}/lib:${LD_LIBRARY_PATH:-}"
-          strip "${P}/bin/ffmpeg" "${P}/bin/ffprobe" "${P}/bin/ffplay" 2>/dev/null || true
-          "${P}/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "（无）"
-          echo "--- QSV ---"
-          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "（无）"
-          echo "--- VAAPI ---"
-          "${P}/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${P}/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        run: |
-          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
-          cd dist && tar -cJf ../ffmpeg-linux-x86-all.tar.xz .
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-linux-x86-all
-          path: ffmpeg-linux-x86-all.tar.xz
-          retention-days: 30
-
-  # ============================================================
-  # WINDOWS — x86 整合版（NVIDIA + Intel QSV + AMD AMF）
-  # ============================================================
-  windows-x86-all:
-    name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
-    runs-on: windows-2025-vs2026
-    permissions:
-      packages: write
-    env:
-      FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 配置 MSVC（VS 2026）
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with: { arch: amd64, vsversion: "18.0" }
-
-      - name: 安装构建工具
-        shell: pwsh
-        run: |
-          # Chocolatey 的 pkgconfiglite 在 Windows 上不可靠，使用 Git for Windows 的 pkg-config
-          choco install -y --no-progress nasm make ninja
-          pip install meson
-          refreshenv
-          # NASM 可能安装在 Program Files 下，显式暴露以便 bash ./configure 能找到
-          $nasmDir = $null
-          foreach ($d in @("${env:ProgramFiles}\NASM", "${env:ProgramFiles(x86)}\NASM", "C:\ProgramData\chocolatey\bin")) {
-            if (Test-Path "$d\nasm.exe") { $nasmDir = $d; break }
-          }
-          if ($nasmDir) { echo "$nasmDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "nasm: $nasmDir" }
-          if (-not $nasmDir) { Write-Host "::warning::nasm.exe not found" }
-          # 确保 nasm 在 bash 步骤的 PATH 中。
-          # pkg-config 将由 vcpkg 的 pkgconf 端口提供（稍后安装）。
-          echo "C:\ProgramData\chocolatey\bin" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          # 从 PATH 中移除 Strawberry Perl：它的 pkg-config 已损坏，且其 ccache
-          # 会破坏 meson。GITHUB_ENV 将清理后的 PATH 传播到后续步骤。
-          $cleanPath = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' }) -join ';'
-          [Environment]::SetEnvironmentVariable('PATH', $cleanPath, 'Process')
-          echo "PATH=$cleanPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-
-          # 如果可用，使用 VS 提供的 Clang 编译 libvmaf。
-          # Clang 仅用于 libvmaf；FFmpeg 本身继续使用 MSVC（cl.exe）。
-          # 如果未找到 Clang，编译 VMAF 步骤将回退到 MSVC 并设置 -Denable_asm=false。
-          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $clangDir = $null
-          if (Test-Path $vsWhere) {
-            $vsPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath 2>$null | Select-Object -First 1
-            if ($vsPath) {
-              $candidate = Join-Path $vsPath "VC\Tools\Llvm\x64\bin"
-              if (Test-Path "$candidate\clang.exe") { $clangDir = $candidate }
-            }
-          }
-          $clangDirUnix = $clangDir -replace '\\','/'
-          if ($clangDir) { Write-Host "VS Clang: $clangDir" }
-          if ($clangDir) { echo "$clangDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append }
-          if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
-          if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
-
-      - name: 配置 vcpkg NuGet 缓存
-        shell: pwsh
-        env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "GH_PACKAGES_TOKEN not set, skipping NuGet binary cache"; exit 0 }
-          $vcpkgExe = "$v\vcpkg.exe"
-          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
-          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
-          Write-Host "nuget: $nuget"
-          cmd /c "`"$nuget`" sources Remove -Name GitHubPackages 2>nul || exit /b 0"
-          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
-          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
-          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-        continue-on-error: true
-
-      - name: 安装 vcpkg 依赖
-        shell: pwsh
-        run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
-
-      - name: 从源码编译 zimg
-        shell: pwsh
-        run: |
-          $zimgRoot = "$env:TEMP\zimg-src"
-          Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
-          git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
-          cd $zimgRoot
-          $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
-          if (-not $ver) { $ver = '3.0.6' }
-          $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
-          # 强制 zimg 使用静态运行时 (/MT)，与 FFmpeg/vcpkg x64-windows-static 保持一致
-          $props = @(
-            '<?xml version="1.0" encoding="utf-8"?>',
-            '<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
-            '  <PropertyGroup>',
-            '    <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '  </PropertyGroup>',
-            '  <ItemDefinitionGroup>',
-            '    <ClCompile>',
-            '      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>',
-            '      <WholeProgramOptimization>false</WholeProgramOptimization>',
-            '    </ClCompile>',
-            '  </ItemDefinitionGroup>',
-            '</Project>'
-          )
-          [System.IO.File]::WriteAllLines("$zimgRoot\_msvc\Directory.Build.props", $props, [System.Text.UTF8Encoding]::new($false))
-          msbuild "$zimgRoot\_msvc\zimg.sln" /p:Configuration=Release /p:Platform=$plat /t:zimg /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0 /p:WholeProgramOptimization=false /m
-          $lib = Get-ChildItem "$zimgRoot\_msvc" -Recurse -Filter "z.lib" | Select-Object -First 1
-          if (-not $lib) { throw "z.lib not found after building zimg" }
-          $prefix = $env:VCPKG_INSTALLED
-          New-Item -ItemType Directory -Path "$prefix\include", "$prefix\lib", "$prefix\lib\pkgconfig" -Force | Out-Null
-          Copy-Item "$zimgRoot\src\zimg\api\zimg.h" "$prefix\include\zimg.h" -Force
-          if (Test-Path "$zimgRoot\src\zimg\api\zimg++.hpp") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.hpp" "$prefix\include\zimg++.hpp" -Force
-          } elseif (Test-Path "$zimgRoot\src\zimg\api\zimg++.h") {
-            Copy-Item "$zimgRoot\src\zimg\api\zimg++.h" "$prefix\include\zimg++.h" -Force
-          }
-          Copy-Item $lib.FullName "$prefix\lib\z.lib" -Force
-          Copy-Item $lib.FullName "$prefix\lib\zimg.lib" -Force
-          $pcMixed = ($prefix -replace '\\','/')
-          $pc = @(
-            "prefix=$pcMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: zimg',
-            'Description: z.lib image processing library',
-            "Version: $ver",
-            'Libs: ${libdir}/zimg.lib',
-            'Cflags: -I${includedir}'
-          )
-          [System.IO.File]::WriteAllLines("$prefix\lib\pkgconfig\zimg.pc", $pc, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "zimg $ver built for $plat"
-
-      - name: 检查 vcpkg pkg-config
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "PKG_CONFIG=${PKG_CONFIG}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- .pc files ---"
-          find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
-          echo "--- pkg-config checks ---"
-          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
-          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
-          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
-          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
-
-      - name: 安装 CUDA 工具包
-        uses: mjun0812/setup-cuda@v1.5.0
-        with:
-          version: latest
-          method: network
-
-      - name: 检测 CUDA
-        shell: bash
-        run: |
-          CUDA_BASE=""
-          for base in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA" "/c/Program Files/NVIDIA/CUDA"; do
-            [ -d "$base" ] && for d in "$base"/v*; do
-              d2="$(dirname "$d" 2>/dev/null || echo "$d")/$(basename "$d")"
-              if [ -d "${d}/bin" ] && [ -f "${d}/bin/nvcc.exe" ]; then CUDA_BASE="${d}"; break 2; fi
-            done
-          done
-          # Fallback: locate via PATH
-          [ -z "${CUDA_BASE}" ] && NVCCBIN="$(dirname "$(which nvcc 2>/dev/null || true)" 2>/dev/null || true)" && \
-            [ -n "${NVCCBIN}" ] && CUDA_BASE="$(dirname "${NVCCBIN}")"
-          [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
-          echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
-          "${CUDA_BASE}/bin/nvcc.exe" --version
-
-      - name: 创建 CUDA junction
-        shell: pwsh
-        run: |
-          $cuda = $env:CUDA_HOME
-          if (-not $cuda) { Write-Error "CUDA_HOME is not set"; exit 1 }
-          # 检测 CUDA 写入 MSYS 风格路径（/c/...）；mklink 需要 Windows 路径。
-          if ($cuda -match '^/([a-zA-Z])/(.*)$') {
-            $cuda = "$($matches[1].ToUpper()):\$($matches[2])" -replace '/', '\\'
-          } elseif ($cuda -match '^[a-zA-Z]:') {
-            $cuda = $cuda -replace '/', '\\'
-          }
-          $link = "C:\cuda"
-          if (Test-Path $link) {
-            # 强制删除 junction/目录，包括只读或正在使用的项目
-            cmd /c "rmdir /S /Q `"$link`"" | Out-Null
-            if (Test-Path $link) { Remove-Item $link -Recurse -Force -ErrorAction SilentlyContinue }
-          }
-          cmd /c mklink /J "$link" "$cuda" | Out-Null
-          if (-not (Test-Path "$link\bin\nvcc.exe")) {
-            Write-Error "Junction created but nvcc.exe not found at $link\bin\nvcc.exe (source: $cuda)"
-            exit 1
-          }
-          echo "CUDA_HOME_MIXED=C:/cuda" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "CUDA junction: $link -> $cuda"
-
-      - name: 编译 nv-codec-headers
-        shell: bash
-        run: |
-          P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
-          cd nv-codec-headers
-          make -j"$(nproc)" PREFIX="$P" && make PREFIX="$P" install
-          echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-
-      - name: 编译 VMAF-CUDA (MSVC)
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          set -e; P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          # 为 Clang + MSVC 目标修补 VMAF：不要在 Clang 下重新定义 __builtin_clz
-          sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
-          # 为 Windows 修补 mkdirp.c/.h：unistd.h/sys/types.h 不可用，
-          # 使用 direct.h 并定义 mode_t；在 Windows 上使用 _mkdir。
-          python3 -c '
-          import pathlib
-          for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
-              p = pathlib.Path(path)
-              if not p.exists():
-                  continue
-              s = p.read_text(encoding="utf-8")
-              s = s.replace("#include <unistd.h>", "#ifdef _WIN32\n#include <direct.h>\n#include <io.h>\n#else\n#include <unistd.h>\n#endif")
-              s = s.replace("#include <sys/types.h>", "#ifdef _WIN32\n#include <direct.h>\ntypedef int mode_t;\n#else\n#include <sys/types.h>\n#endif")
-              s = s.replace("int rc = mkdir(pathname);", "int rc = _mkdir(pathname);")
-              p.write_text(s, encoding="utf-8")
-              compat_dir = pathlib.Path("src/compat/msvc/common")
-              compat_dir.mkdir(parents=True, exist_ok=True)
-              (compat_dir / "attributes.h").write_text(
-                  "#ifndef COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#define COMPAT_COMMON_ATTRIBUTES_H_\n"
-                  "#endif\n"
-              )
-          '
-          # nvcc（CUDA .cu）按 C++ 编译，不支持 C11 指定初始化器
-          # 在 C++20 之前。将 integer_adm.h 中的一个结构体重写为位置初始化。
-          python3 -c '
-          import pathlib
-          p = pathlib.Path("src/feature/integer_adm.h")
-          if p.exists():
-              s = p.read_text(encoding="utf-8")
-              s = s.replace(
-                  "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
-                  "    {.a = 0.495, .k = 0.466, .f0 = 0.401, .g = {1.501, 1.0, 0.534, 1.0}},\n"
-                  "    {.a = 1.633, .k = 0.353, .f0 = 0.209, .g = {1.520, 1.0, 0.502, 1.0}},\n"
-                  "    {.a = 0.944, .k = 0.521, .f0 = 0.404, .g = {1.868, 1.0, 0.516, 1.0}}};",
-                  "static const struct dwt_model_params dwt_7_9_YCbCr_threshold[3] = {\n"
-                  "    {0.495, 0.466, 0.401, {1.501, 1.0, 0.534, 1.0}},\n"
-                  "    {1.633, 0.353, 0.209, {1.520, 1.0, 0.502, 1.0}},\n"
-                  "    {0.944, 0.521, 0.404, {1.868, 1.0, 0.516, 1.0}}};")
-              p.write_text(s, encoding="utf-8")
-          '
-          # 为 nvcc 使用无空格的 junction，这样 meson 无需引用带空格的路径。
-          export CUDA_HOME="/c/cuda"
-          export CUDA_PATH="/c/cuda"
-          export CUDACXX="/c/cuda/bin/nvcc"
-          export PATH="/c/cuda/bin:${PATH}"
-          CL="/c/cuda/lib/x64"; [ ! -d "$CL" ] && CL="/c/cuda/lib"
-          # 确保 MSVC link.exe 排在 Git 的 link.EXE 之前供 meson 使用
-          CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
-          [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
-          # nv-codec-headers 提供 ffnvcodec.pc；meson 需要 PKG_CONFIG_PATH 来找到它
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          # PThreads4W（通过 vcpkg 安装）在 Windows 上提供 pthread.h
-          PTHREAD_CFLAGS=""
-          PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I$(cygpath -m "$VCPKG_INSTALLED")/include"
-            PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthreadVC*.lib' | head -n1)"
-            [ -z "$PTHREAD_LIB" ] && PTHREAD_LIB="$(find "${VCPKG_INSTALLED}/lib" -maxdepth 1 -name 'pthread*.lib' | head -n1)"
-            if [ -n "$PTHREAD_LIB" ]; then
-              PTHREAD_LDFLAGS="$(cygpath -m "$PTHREAD_LIB" 2>/dev/null || echo "$PTHREAD_LIB")"
-              echo "使用 PThreads4W: $PTHREAD_LIB"
-              # Make pthreadVC3.dll discoverable at runtime (e.g. for meson sanity checks)
-              if [ -d "${VCPKG_INSTALLED}/bin" ]; then
-                export PATH="${VCPKG_INSTALLED}/bin:${PATH}"
-              fi
-            else
-              echo "::error::找到 pthread.h，但在 ${VCPKG_INSTALLED}/lib 下没有 pthread*.lib"
-              exit 1
-            fi
-          fi
-          # 将路径转换为混合形式（C:/...），使路径中的空格保持为单个 argv 标记
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
-          VCPKG_INSTALLED_MIXED=""
-          if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED")"
-          fi
-          # nvcc fatbin 使用硬编码的 custom_target 命令；注入额外的包含目录
-          # 以便 CUDA .cu 文件能找到 ffnvcodec 头文件（来自 nv-codec-headers）和 pthread.h。
-          python3 -c "
-          import pathlib
-          mb = pathlib.Path('src/meson.build')
-          s = mb.read_text(encoding='utf-8')
-          s = s.replace(
-              \"'-I', '../src/' + cuda_dir,\",
-              \"'-I', '../src/' + cuda_dir,\\n                '-I', '${P_MIXED}/include',\\n                '-I', '${VCPKG_INSTALLED_MIXED}/include',\")
-          mb.write_text(s, encoding='utf-8')
-          "
-          # nvcc 宿主编译器（cl）在 Windows 上也会查询 INCLUDE
-          export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED}/include;${INCLUDE:-}"
-          # VMAF 汇编需要 x86/x64 上的 nasm；如果不可用则优雅禁用。
-          if command -v nasm >/dev/null 2>&1 || command -v nasm.exe >/dev/null 2>&1; then
-            VMAF_ENABLE_ASM=true
-          else
-            VMAF_ENABLE_ASM=false
-            echo "::warning::未找到 nasm，禁用 VMAF 汇编优化"
-          fi
-          # 辅助函数：从位置参数构建 Meson 数组字面量（安全处理空格）
-          __meson_array() {
-            local arr="[" first=1
-            for x in "$@"; do
-              [ "$first" -eq 1 ] || arr="$arr,"
-              first=0
-              arr="$arr\"$x\""
-            done
-            arr="$arr]"
-            printf '%s' "$arr"
-          }
-          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            if [ "$VMAF_ENABLE_ASM" = "true" ]; then
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF 以保留 AVX2 汇编"
-            else
-              echo "使用 VS Clang（MSVC 目标）编译 VMAF（未找到 nasm，禁用汇编）"
-            fi
-            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dcpp_args="$VMAF_CPP_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS" \
-              -Dcpp_link_args="$VMAF_LINK_ARGS"
-          else
-            echo "::warning::未找到 VS Clang，回退到 MSVC 并设置 -Denable_asm=false"
-            VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-            VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
-            meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
-              -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
-              -Dc_args="$VMAF_C_ARGS" \
-              -Dc_link_args="$VMAF_LINK_ARGS"
-          fi
-          ninja -vC build
-
-          # 手动安装：在 Windows/Clang 上构建静态 libvmaf，以避免 DLL 导入库问题。
-          mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
-
-          vmaf_static_lib=""
-          for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
-            [ -f "$cand" ] && { vmaf_static_lib="$cand"; break; }
-          done
-          [ -z "$vmaf_static_lib" ] && { echo "::error::在 build/src 下未找到 VMAF 静态库"; ls -la build/src; exit 1; }
-
-          cp "$vmaf_static_lib" "$P/lib/vmaf.lib"
-          cp include/libvmaf/*.h "$P/include/libvmaf/"
-          [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
-          [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
-
-          printf '%s\n' \
-            "prefix=${P_MIXED}" \
-            'exec_prefix=${prefix}' \
-            'libdir=${prefix}/lib' \
-            'includedir=${prefix}/include' \
-            '' \
-            'Name: libvmaf' \
-            'Description: Netflix VMAF library' \
-            'Version: 3.0.0' \
-            "Libs: -lvmaf ${PTHREAD_LDFLAGS} -ladvapi32" \
-            'Cflags: -I${includedir}/libvmaf' \
-            > "$P/lib/pkgconfig/libvmaf.pc"
-          echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc"
-          echo "--- pkg-config check ---"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-
-      - name: 导出 VMAF meson 日志
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
-            echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
-            cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
-          fi
-
-      - name: 编译 FFmpeg (MSVC)
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          set -e; P="${HOME}/ffmpeg-install"
-          P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          CUDA_HOME_MIXED="C:/cuda"
-          # 使 nvcc 可被发现以启用 --enable-cuda-nvcc
-          export CUDA_HOME="/c/cuda"
-          export CUDA_PATH="/c/cuda"
-          export CUDACXX="/c/cuda/bin/nvcc"
-          export PATH="/c/cuda/bin:${PATH}"
-          if [ ! -x "/c/cuda/bin/nvcc" ]; then
-            echo "::error::在 /c/cuda/bin/nvcc 未找到 nvcc"
-            ls -la /c/cuda/bin 2>/dev/null || echo "(cannot list /c/cuda/bin)"
-            exit 1
-          fi
-          echo "nvcc: $(which nvcc)"
-          nvcc --version
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          # 规范化 pkg-config 路径，以便 bash/ffmpeg configure 能可靠执行
-          if command -v cygpath >/dev/null 2>&1; then
-            PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
-          fi
-          export PKG_CONFIG
-          echo "pkg-config: ${PKG_CONFIG} ($($PKG_CONFIG --version 2>&1 || echo 未找到))"
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          echo "--- libvmaf.pc ---"
-          cat "$P/lib/pkgconfig/libvmaf.pc" || true
-          echo "--- pkg-config libvmaf ---"
-          echo "modversion: $($PKG_CONFIG --modversion libvmaf 2>&1 || true)"
-          echo "libs: $($PKG_CONFIG --libs libvmaf 2>&1 || true)"
-          cd /tmp && rm -rf ffmpeg-src
-          git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          python3 -c 'import pathlib; p = pathlib.Path("configure"); s = p.read_text(encoding="utf-8"); s = s.replace(r'\''gsub(/\\/, "/")'\'', r'\''gsub(/\\\\/, "/")'\''); p.write_text(s, encoding="utf-8")'
-          # 修补 ffbuild/library.mak，使 lib.exe 接收 Windows 绝对路径的响应文件。
-          python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text(encoding="utf-8"); old="ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse"; new="ifeq ($(RESPONSE_FILES),yes)\nifeq ($(findstring lib.exe,$(AR)),lib.exe)\n\t$(Q)$(file > $@.objs,$(subst /,\\\\,$^))\n\t$(AR) $(ARFLAGS) $(AR_O) \"@$(shell python3 -c \"import os; print(os.path.abspath(\\\"$@.objs\\\"))\")\"\nelse\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nendif\nelse"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          # vcpkg 不提供 AMF 公共头文件。FFmpeg 期望 #include <AMF/core/Version.h>，
-          # 因此在 AMF 包含路径内创建一个 AMF/ 包装目录。
-          AMF_DIR="/tmp/AMF"
-          [ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"
-          AMF_INCLUDE_DIR="$AMF_DIR/amf/public/include"
-          if [ ! -d "$AMF_INCLUDE_DIR/AMF" ]; then
-            mkdir -p "$AMF_INCLUDE_DIR/AMF"
-            cp -r "$AMF_INCLUDE_DIR/core" "$AMF_INCLUDE_DIR/components" "$AMF_INCLUDE_DIR/AMF/"
-          fi
-          AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
-          CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
-          # libsnappy 的 configure 检测在 MSVC 下多传了 -lstdc++，导致链接失败；去掉它。
-          sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
-          # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
-          sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
-          sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          ./configure --toolchain=msvc --prefix="$P" \
-            --pkg-config="$PKG_CONFIG" \
-            --pkg-config-flags="--static" \
-            --extra-cflags="-I$P_MIXED/include -I${CUDA_HOME_MIXED}/include -I${AMF_INCLUDE} -I${VCPKG_INSTALLED}/include -I${VCPKG_INSTALLED}/include/vpl -DLIBTWOLAME_STATIC" \
-            --extra-ldflags="-LIBPATH:$P_MIXED/lib -LIBPATH:$CL -LIBPATH:${VCPKG_INSTALLED}/lib" \
-            --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-            --enable-cuvid --enable-nvenc --enable-opencl --enable-vulkan \
-            --enable-amf --enable-libvpl \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
-          make -j"$(nproc)" && make install
-
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        shell: bash
-        run: |
-          # 移除附带损坏 pkg-config / ccache 的 Strawberry 路径
-          __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
-          __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== pkg-config libmp3lame ==="
-          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
-          echo "=== pkg-config libfdk-aac ==="
-          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
-          echo "=== pkg-config vpl ==="
-          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
-
-      - name: 验证
-        shell: bash
-        run: |
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -version 2>&1 | head -n5
-          echo "--- NVENC ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "（无）"
-          echo "--- AMF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_amf' | head -10 || echo "（无）"
-          echo "--- QSV ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep '_qsv' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        shell: pwsh
-        run: |
-          $b = "$env:USERPROFILE\ffmpeg-install\bin"
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
-          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
-          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
-          Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-x86-all.zip -Force
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-windows-x86-all
-          path: ffmpeg-windows-x86-all.zip
-          retention-days: 30
-
-  # ============================================================
-  # LINUX — ARM64（VAAPI / CPU）
-  # ============================================================
-  linux-arm:
-    name: Linux（ARM64 VAAPI）
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 安装依赖
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates python3 xxd \
-            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
-            libva-dev libdrm-dev \
-            libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
-            libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
-            libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
-            libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
-            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
-            liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
-            sudo apt-get upgrade -y -qq
-            bash scripts/ci/linux-pc-fallbacks.sh /usr
-
-      - name: 编译 VMAF（CPU）
-        run: |
-          P="${HOME}/ffmpeg-install"
-          ARCH_LIBDIR=/usr/lib/aarch64-linux-gnu
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
-          cd vmaf/libvmaf && rm -rf build
-          meson setup build --buildtype release --prefix="$P" --libdir=lib -Denable_cuda=false
-          ninja -vC build && ninja -C build install
-          echo "PKG_CONFIG_PATH=${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
-
-      - name: 编译 FFmpeg
-        run: |
-          P="${HOME}/ffmpeg-install"
-          ARCH_LIBDIR=/usr/lib/aarch64-linux-gnu
-          bash scripts/ci/linux-pc-fallbacks.sh "$P"
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${ARCH_LIBDIR}/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
-          cd ffmpeg-src
-          ./configure --prefix="$P" --pkg-config-flags="--static" \
-            --extra-cflags="-I$P/include" \
-            --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
-            --extra-libs="-lpthread -lm -ldl" \
-            --enable-gpl --enable-version3 --enable-nonfree \
-            --enable-libvmaf --enable-vaapi --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
-          make -j"$(nproc)" && make install
-      - name: 失败时导出 ffbuild/config.log
-        if: failure()
-        run: |
-          echo "=== ffbuild/config.log ==="
-          cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-
-      - name: 裁剪与验证
-        run: |
-          export LD_LIBRARY_PATH="${HOME}/ffmpeg-install/lib:${LD_LIBRARY_PATH:-}"
-          strip "${HOME}/ffmpeg-install/bin/ffmpeg" "${HOME}/ffmpeg-install/bin/ffprobe" "${HOME}/ffmpeg-install/bin/ffplay" 2>/dev/null || true
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -version 2>&1 | head -n5
-          echo "--- VAAPI ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep '_vaapi' | head -10 || echo "（无）"
-          echo "--- VMAF ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
-
-      - name: 打包
-        run: |
-          mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
-          cd dist && tar -cJf ../ffmpeg-linux-arm.tar.xz .
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ffmpeg-linux-arm
-          path: ffmpeg-linux-arm.tar.xz
-          retention-days: 30
-
-  # ============================================================
-  # RELEASE
-  # ============================================================
   release:
     name: 创建 GitHub Release
     needs:
       - metadata
-      - linux-nvidia
-      - linux-intel-qsv
-      - linux-amd
-      - linux-arm
-      - linux-x86-all
-      - windows-nvidia
-      - windows-amd-amf
-      - windows-intel-qsv
-      - windows-x86-all
-      - windows-arm64
+      - linux
+      - windows
       - macos-arm
     if: needs.metadata.outputs.should_release == 'true'
     runs-on: ubuntu-26.04

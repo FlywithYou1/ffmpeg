@@ -28,7 +28,7 @@ for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
         export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
     fi
     if [ -n "$kvazaar_ver" ]; then
-        sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
+        sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
         echo "Patched $pc -> Version: $kvazaar_ver"
     fi
 done

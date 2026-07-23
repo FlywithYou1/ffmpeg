@@ -80,8 +80,11 @@ if (Test-Path $pcDirWin) {
 }
 
 # 重写 SvtAv1Enc.pc
+# 注意：vcpkg 的 svt-av1 在 Windows ARM64 上强制 COMPILE_C_ONLY=ON，
+# 不生成 SvtAv1Enc.lib（只有 x86/x64 或 Linux ARM64 才有 SIMD 库）。
+# 因此 ARM64 构建跳过 SvtAv1Enc.pc 生成。
 $svtLibName = $null
-foreach ($cand in @('SvtAv1Enc','svtav1')) {
+foreach ($cand in @('SvtAv1Enc','svtav1','svt-av1')) {
     foreach ($suffix in @('','-static','_static')) {
         $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
         if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
@@ -93,38 +96,41 @@ foreach ($suffix in @('','-static','_static')) {
     $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
     if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
 }
-if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
-if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
-$svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
-$svtVersion = Get-PortVersion 'svt-av1'
-if ($svtVersion -eq 'unknown') {
-    $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
-    if (Test-Path $svtHeader) {
-        $major = $null; $minor = $null; $patch = $null
-        foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
-            switch ($match.Matches[0].Groups[1].Value) {
-                'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
-                'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
-                'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+if (-not $svtLibName) {
+    Write-Host "::warning::SvtAv1Enc import library not found under $inst\lib（ARM64 上正常，跳过）"
+} else {
+    if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+    $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+    $svtVersion = Get-PortVersion 'svt-av1'
+    if ($svtVersion -eq 'unknown') {
+        $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+        if (Test-Path $svtHeader) {
+            $major = $null; $minor = $null; $patch = $null
+            foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+                switch ($match.Matches[0].Groups[1].Value) {
+                    'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                    'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                    'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+                }
             }
+            if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
         }
-        if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
     }
+    Write-Host "SvtAv1Enc.pc Version: $svtVersion"
+    Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+        "prefix=$instMixed",
+        'exec_prefix=${prefix}',
+        'libdir=${prefix}/lib',
+        'includedir=${prefix}/include',
+        '',
+        'Name: SvtAv1Enc',
+        'Description: SVT-AV1 encoder library',
+        "Version: $svtVersion",
+        "Libs: $svtLibs",
+        'Cflags: -I${includedir} -I${includedir}/svt-av1'
+    )
+    Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 }
-Write-Host "SvtAv1Enc.pc Version: $svtVersion"
-Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
-    "prefix=$instMixed",
-    'exec_prefix=${prefix}',
-    'libdir=${prefix}/lib',
-    'includedir=${prefix}/include',
-    '',
-    'Name: SvtAv1Enc',
-    'Description: SVT-AV1 encoder library',
-    "Version: $svtVersion",
-    "Libs: $svtLibs",
-    'Cflags: -I${includedir} -I${includedir}/svt-av1'
-)
-Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
 
 # libmp3lame
 $mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame')
