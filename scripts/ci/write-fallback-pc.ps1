@@ -1,4 +1,4 @@
-# 为 vcpkg 安装的依赖生成 FFmpeg 期望的 pkg-config (.pc) 文件和导入库别名。
+﻿# 为 vcpkg 安装的依赖生成 FFmpeg 期望的 pkg-config (.pc) 文件和导入库别名。
 # 用法: pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot <path> [-HasVpl]
 param(
     [Parameter(Mandatory=$true)][string]$InstallRoot,
@@ -17,8 +17,8 @@ function Find-ImportLib($candidates) {
             if (Test-Path $p) { return "${name}${suffix}.lib" }
         }
     }
-    Write-Host "${inst}\lib 下可用的 .lib 文件："
-    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+    Write-Output "${inst}\lib 下可用的 .lib 文件："
+    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name)" }
     return $null
 }
 
@@ -39,7 +39,7 @@ function Get-PortVersion($portName) {
             if (-not $ver) { $ver = $data.'version-string' }
             if (-not $ver) { $ver = $data.'version-date' }
             if ($ver) { $ver = ($ver -split '#')[0] }
-        } catch { Write-Host "警告：无法解析 $json : $_" }
+        } catch { Write-Output "警告：无法解析 $json : $_" }
     }
     if (-not $ver -and (Test-Path $control)) {
         $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
@@ -62,7 +62,7 @@ function Get-PortVersion($portName) {
         }
     }
     if (-not $ver) { $ver = 'unknown' }
-    Write-Host "Get-PortVersion $portName -> $ver"
+    Write-Output "Get-PortVersion $portName -> $ver"
     return $ver
 }
 
@@ -74,7 +74,7 @@ if (Test-Path $pcDirWin) {
         if ($content -match ' -lm') {
             $content = $content -replace ' -lm',''
             [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "Patched $($pc.Name) : removed -lm"
+            Write-Output "Patched $($pc.Name) : removed -lm"
         }
     }
 }
@@ -97,7 +97,7 @@ foreach ($suffix in @('','-static','_static')) {
     if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
 }
 if (-not $svtLibName) {
-    Write-Host "::warning::SvtAv1Enc import library not found under $inst\lib（ARM64 上正常，跳过）"
+    Write-Output "::warning::SvtAv1Enc import library not found under $inst\lib（ARM64 上正常，跳过）"
 } else {
     if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
     $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
@@ -116,7 +116,7 @@ if (-not $svtLibName) {
             if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
         }
     }
-    Write-Host "SvtAv1Enc.pc Version: $svtVersion"
+    Write-Output "SvtAv1Enc.pc Version: $svtVersion"
     Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
         "prefix=$instMixed",
         'exec_prefix=${prefix}',
@@ -129,7 +129,7 @@ if (-not $svtLibName) {
         "Libs: $svtLibs",
         'Cflags: -I${includedir} -I${includedir}/svt-av1'
     )
-    Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+    Write-Output "已重写 SvtAv1Enc.pc -> $svtLibs"
 }
 
 # libmp3lame
@@ -146,7 +146,7 @@ Write-Utf8 "$pcDir/libmp3lame.pc" @(
     "Version: $(Get-PortVersion 'mp3lame')",
     "Libs: $mp3lameLib"
 )
-Write-Host "已创建 libmp3lame.pc -> $mp3lameLib"
+Write-Output "已创建 libmp3lame.pc -> $mp3lameLib"
 
 # libfdk-aac
 $fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
@@ -181,8 +181,8 @@ if (-not (Test-Path "$pcDir/sdl2.pc")) {
         "Libs: $sdl2Libs",
         'Cflags: -I${includedir} -I${includedir}/SDL2'
     )
-    Write-Host "已创建回退 sdl2.pc"
-} else { Write-Host "使用 vcpkg 提供的 sdl2.pc" }
+    Write-Output "已创建回退 sdl2.pc"
+} else { Write-Output "使用 vcpkg 提供的 sdl2.pc" }
 
 # 软件编解码器回退 .pc（vcpkg 不总是提供）
 $fallbacks = @(
@@ -228,11 +228,11 @@ foreach ($fb in $fallbacks) {
             $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
             $lines += "Cflags: $cflags"
             Write-Utf8 $pcFile $lines
-            Write-Host "已创建回退 $($fb.Pc).pc"
-        } else { Write-Host "使用 vcpkg 提供的 $($fb.Pc).pc" }
+            Write-Output "已创建回退 $($fb.Pc).pc"
+        } else { Write-Output "使用 vcpkg 提供的 $($fb.Pc).pc" }
         Set-Variable -Name $fb.Var -Value $lib -Scope Script
     } else {
-        Write-Host "::warning::未找到 $($fb.Pc) 导入库；跳过 .pc"
+        Write-Output "::warning::未找到 $($fb.Pc) 导入库；跳过 .pc"
         Set-Variable -Name $fb.Var -Value $null -Scope Script
     }
 }
@@ -256,59 +256,59 @@ if ($HasVpl) {
         "Libs: $vplLib",
         'Cflags: -I${includedir} -I${includedir}/vpl'
     )
-    Write-Host "已创建 vpl.pc"
+    Write-Output "已创建 vpl.pc"
 }
 
 # 导入库别名
-function Ensure-LibAlias($actual, $alias) {
+function Copy-LibAlias($actual, $alias) {
     $actualPath = Join-Path "$inst\lib" $actual
     $aliasPath = Join-Path "$inst\lib" $alias
     if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
         Copy-Item $actualPath $aliasPath
-        Write-Host "Created alias $alias -> $actual"
+        Write-Output "Created alias $alias -> $actual"
     }
 }
-Ensure-LibAlias $mp3lameLib "libmp3lame.lib"
-Ensure-LibAlias $mp3lameLib "mp3lame.lib"
-Ensure-LibAlias $fdkLib "fdk-aac.lib"
-Ensure-LibAlias $fdkLib "libfdk-aac.lib"
-if ($HasVpl -and $vplLib) { Ensure-LibAlias $vplLib "vpl.lib"; Ensure-LibAlias $vplLib "libvpl.lib" }
-if ($libx264Lib) { Ensure-LibAlias $libx264Lib "libx264.lib"; Ensure-LibAlias $libx264Lib "x264.lib" }
-if ($libx265Lib) { Ensure-LibAlias $libx265Lib "libx265.lib"; Ensure-LibAlias $libx265Lib "x265.lib" }
-if ($libvpxLib) { Ensure-LibAlias $libvpxLib "libvpx.lib"; Ensure-LibAlias $libvpxLib "vpx.lib" }
-if ($opusLib) { Ensure-LibAlias $opusLib "opus.lib" }
-if ($vorbisLib) { Ensure-LibAlias $vorbisLib "vorbis.lib" }
-if ($vorbisencLib) { Ensure-LibAlias $vorbisencLib "vorbisenc.lib" }
-if ($theoraLib) { Ensure-LibAlias $theoraLib "theora.lib" }
-if ($theoradecLib) { Ensure-LibAlias $theoradecLib "theoradec.lib" }
-if ($theoraencLib) { Ensure-LibAlias $theoraencLib "theoraenc.lib" }
-if ($libaomLib) { Ensure-LibAlias $libaomLib "libaom.lib"; Ensure-LibAlias $libaomLib "aom.lib" }
-if ($libwebpLib) { Ensure-LibAlias $libwebpLib "libwebp.lib"; Ensure-LibAlias $libwebpLib "webp.lib" }
-if ($libassLib) { Ensure-LibAlias $libassLib "libass.lib"; Ensure-LibAlias $libassLib "ass.lib" }
-if ($freetype2Lib) { Ensure-LibAlias $freetype2Lib "freetype.lib" }
-if ($fontconfigLib) { Ensure-LibAlias $fontconfigLib "fontconfig.lib" }
-if ($zimgLib) { Ensure-LibAlias $zimgLib "zimg.lib" }
-if ($soxrLib) { Ensure-LibAlias $soxrLib "soxr.lib" }
-if ($libopenjp2Lib) { Ensure-LibAlias $libopenjp2Lib "libopenjp2.lib"; Ensure-LibAlias $libopenjp2Lib "openjp2.lib" }
-if ($snappyLib) { Ensure-LibAlias $snappyLib "snappy.lib" }
-if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "libtwolame.lib"; Ensure-LibAlias $libtwolameLib "twolame.lib" }
-if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib"; Ensure-LibAlias $libopenmptLib "openmpt.lib" }
+Copy-LibAlias $mp3lameLib "libmp3lame.lib"
+Copy-LibAlias $mp3lameLib "mp3lame.lib"
+Copy-LibAlias $fdkLib "fdk-aac.lib"
+Copy-LibAlias $fdkLib "libfdk-aac.lib"
+if ($HasVpl -and $vplLib) { Copy-LibAlias $vplLib "vpl.lib"; Copy-LibAlias $vplLib "libvpl.lib" }
+if ($libx264Lib) { Copy-LibAlias $libx264Lib "libx264.lib"; Copy-LibAlias $libx264Lib "x264.lib" }
+if ($libx265Lib) { Copy-LibAlias $libx265Lib "libx265.lib"; Copy-LibAlias $libx265Lib "x265.lib" }
+if ($libvpxLib) { Copy-LibAlias $libvpxLib "libvpx.lib"; Copy-LibAlias $libvpxLib "vpx.lib" }
+if ($opusLib) { Copy-LibAlias $opusLib "opus.lib" }
+if ($vorbisLib) { Copy-LibAlias $vorbisLib "vorbis.lib" }
+if ($vorbisencLib) { Copy-LibAlias $vorbisencLib "vorbisenc.lib" }
+if ($theoraLib) { Copy-LibAlias $theoraLib "theora.lib" }
+if ($theoradecLib) { Copy-LibAlias $theoradecLib "theoradec.lib" }
+if ($theoraencLib) { Copy-LibAlias $theoraencLib "theoraenc.lib" }
+if ($libaomLib) { Copy-LibAlias $libaomLib "libaom.lib"; Copy-LibAlias $libaomLib "aom.lib" }
+if ($libwebpLib) { Copy-LibAlias $libwebpLib "libwebp.lib"; Copy-LibAlias $libwebpLib "webp.lib" }
+if ($libassLib) { Copy-LibAlias $libassLib "libass.lib"; Copy-LibAlias $libassLib "ass.lib" }
+if ($freetype2Lib) { Copy-LibAlias $freetype2Lib "freetype.lib" }
+if ($fontconfigLib) { Copy-LibAlias $fontconfigLib "fontconfig.lib" }
+if ($zimgLib) { Copy-LibAlias $zimgLib "zimg.lib" }
+if ($soxrLib) { Copy-LibAlias $soxrLib "soxr.lib" }
+if ($libopenjp2Lib) { Copy-LibAlias $libopenjp2Lib "libopenjp2.lib"; Copy-LibAlias $libopenjp2Lib "openjp2.lib" }
+if ($snappyLib) { Copy-LibAlias $snappyLib "snappy.lib" }
+if ($libtwolameLib) { Copy-LibAlias $libtwolameLib "libtwolame.lib"; Copy-LibAlias $libtwolameLib "twolame.lib" }
+if ($libopenmptLib) { Copy-LibAlias $libopenmptLib "libopenmpt.lib"; Copy-LibAlias $libopenmptLib "openmpt.lib" }
 
 # 输出环境变量
 $pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
 $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
-Write-Host "pkg-config: $pkgconfMixed"
+Write-Output "pkg-config: $pkgconfMixed"
 
-Write-Host "已安装的导入库："
+Write-Output "已安装的导入库："
 Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
-Write-Host "libmp3lame.pc:"
+Write-Output "libmp3lame.pc:"
 Get-Content "$pcDir/libmp3lame.pc"
-Write-Host "libfdk-aac.pc:"
+Write-Output "libfdk-aac.pc:"
 Get-Content "$pcDir/libfdk-aac.pc"
 
-echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output \"VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output \"PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output \"PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 $shadercTools = "$inst\tools\shaderc"
-if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
+if (Test-Path "$shadercTools\glslc.exe") { Write-Output \"\$shadercTools\" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Output "shaderc tools: $shadercTools" }
