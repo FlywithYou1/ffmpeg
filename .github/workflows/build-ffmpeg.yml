@@ -5066,24 +5066,7 @@ jobs:
           Remove-Item -Recurse -Force $zimgRoot -ErrorAction SilentlyContinue
           git clone --depth 1 --recurse-submodules https://github.com/sekrit-twc/zimg.git $zimgRoot
           cd $zimgRoot
-          # 修补 zimg ARM NEON 代码：MSVC 14.51+ 要求覆盖虚函数具有兼容的 noexcept 规范
-          $neonFile = "$zimgRoot\src\zimg\colorspace\arm\operation_impl_neon.cpp"
-          if (Test-Path $neonFile) {
-            $content = [System.IO.File]::ReadAllText($neonFile, [System.Text.UTF8Encoding]::new($false))
-            # 三类 process() 覆盖缺少 noexcept（基类 Operation::process 声明了 noexcept）：
-            # ToLinearLutOperationNeon, ToGammaLutOperationNeon, MatrixOperationNeon
-            # 正则匹配 "void process(...) const override" 并替换为 "void process(...) const noexcept override"
-            $content = $content -replace '(void\s+process\s*\([^)]*\)\s+const)\s+override', '$1 noexcept override'
-            # 三类 NEON 操作类缺少 alignment_mask() 覆盖（基类 Operation::alignment_mask 是纯虚函数）
-            # 为每个 NEON 类添加 alignment_mask() = 0xF（16 字节对齐，匹配 128 位 NEON 向量宽度）
-            $content = [regex]::Replace($content, '(\t*)(void process\(const float \* const \*src, float \* const \*dst, unsigned left, unsigned right\) const noexcept override)', {
-                param($m)
-                $indent = $m.Groups[1].Value
-                return "${indent}unsigned alignment_mask() const noexcept { return 0xF; }`n`n" + $m.Groups[0].Value
-            })
-            [System.IO.File]::WriteAllText($neonFile, $content, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "已修补 operation_impl_neon.cpp (添加 noexcept + alignment_mask)"
-          }
+          # 新版 zimg 的 ARM NEON 代码已自带 noexcept 与 alignment_mask() 覆盖，无需再打补丁
           $ver = (Select-String -Path "$zimgRoot\configure.ac" -Pattern 'AC_INIT\(\[zimg\], \[([^\]]+)\]').Matches.Groups[1].Value
           if (-not $ver) { $ver = '3.0.6' }
           $plat = if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
