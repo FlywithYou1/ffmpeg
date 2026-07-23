@@ -187,6 +187,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-linux-nvidia.tar.xz .
 
       - uses: actions/upload-artifact@v7
@@ -292,6 +293,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-linux-intel-qsv.tar.xz .
 
       - uses: actions/upload-artifact@v7
@@ -403,6 +405,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-linux-amd.tar.xz .
 
       - uses: actions/upload-artifact@v7
@@ -423,11 +426,6 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
       - uses: actions/checkout@v7
-
-      - name: 设置 PowerShell UTF-8 输出编码
-        shell: pwsh
-        run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -477,7 +475,7 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
@@ -1618,6 +1616,8 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
+          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-nvidia.zip -Force
 
       - uses: actions/upload-artifact@v7
@@ -1638,11 +1638,6 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
       - uses: actions/checkout@v7
-
-      - name: 设置 PowerShell UTF-8 输出编码
-        shell: pwsh
-        run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -1692,7 +1687,7 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
@@ -2726,6 +2721,8 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
+          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-amd-amf.zip -Force
 
       - uses: actions/upload-artifact@v7
@@ -2746,11 +2743,6 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
       - uses: actions/checkout@v7
-
-      - name: 设置 PowerShell UTF-8 输出编码
-        shell: pwsh
-        run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -2800,7 +2792,7 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
@@ -3867,6 +3859,8 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
+          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-intel-qsv.zip -Force
 
       - uses: actions/upload-artifact@v7
@@ -3991,6 +3985,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-macos-arm.tar.xz .
 
       - uses: actions/upload-artifact@v7
@@ -4011,11 +4006,6 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
       - uses: actions/checkout@v7
-
-      - name: 设置 PowerShell UTF-8 输出编码
-        shell: pwsh
-        run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026 ARM64）
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -4065,7 +4055,7 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
@@ -5062,8 +5052,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
-            --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation \
-            --enable-doc
+            --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -5104,6 +5093,8 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
+          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-arm64.zip -Force
 
       - uses: actions/upload-artifact@v7
@@ -5253,6 +5244,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-linux-x86-all.tar.xz .
 
       - uses: actions/upload-artifact@v7
@@ -5273,11 +5265,6 @@ jobs:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     steps:
       - uses: actions/checkout@v7
-
-      - name: 设置 PowerShell UTF-8 输出编码
-        shell: pwsh
-        run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
       - name: 配置 MSVC（VS 2026）
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -5327,7 +5314,7 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
@@ -6503,6 +6490,8 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
+          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ffmpeg-windows-x86-all.zip -Force
 
       - uses: actions/upload-artifact@v7
@@ -6617,6 +6606,7 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-linux-arm.tar.xz .
 
       - uses: actions/upload-artifact@v7
