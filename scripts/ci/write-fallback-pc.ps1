@@ -307,8 +307,8 @@ Get-Content "$pcDir/libmp3lame.pc"
 Write-Output "libfdk-aac.pc:"
 Get-Content "$pcDir/libfdk-aac.pc"
 
-Write-Output \"VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-Write-Output \"PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-Write-Output \"PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 $shadercTools = "$inst\tools\shaderc"
-if (Test-Path "$shadercTools\glslc.exe") { Write-Output \"\$shadercTools\" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Output "shaderc tools: $shadercTools" }
+if (Test-Path "$shadercTools\glslc.exe") { Write-Output "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Output "shaderc tools: $shadercTools" }
