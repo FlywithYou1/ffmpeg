@@ -828,6 +828,62 @@ jobs:
   # ============================================================
   # WINDOWS ARM64 — Snapdragon (Software Encoders + D3D11VA)
   # ============================================================
+  # VCPKG 自动更新（每日检查并合并）
+  # ============================================================
+  vcpkg-update:
+    name: 更新 vcpkg 依赖
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 检查 vcpkg 更新
+        id: check
+        run: |
+          # 获取当前 vcpkg baseline
+          if [ -f vcpkg.json ]; then
+            CURRENT=$(grep -oP '"builtin-baseline"\s*:\s*"\K[^"]+' vcpkg.json || echo "none")
+          else
+            CURRENT="none"
+          fi
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          # 获取 vcpkg 最新 master commit
+          LATEST=$(git ls-remote https://github.com/microsoft/vcpkg.git HEAD | cut -f1)
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 创建/更新 vcpkg PR
+        if: steps.check.outputs.up_to_date == 'false'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(vcpkg): bump baseline to ${{ steps.check.outputs.latest }}"
+          title: "chore(vcpkg): bump baseline"
+          body: |
+            自动更新 vcpkg baseline 到最新 master。
+
+            由 CI 每日检查生成。
+          branch: dependabot/vcpkg-baseline
+          base: main
+          delete-branch: true
+
+      - name: 自动合并 vcpkg PR
+        if: steps.check.outputs.up_to_date == 'false'
+        run: |
+          gh pr merge --auto --squash "dependabot/vcpkg-baseline"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================
   release:
     name: 创建 GitHub Release
     needs:
