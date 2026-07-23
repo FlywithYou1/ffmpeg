@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # 自动更新 vcpkg baseline（每周检查一次）
+  - package-ecosystem: "vcpkg"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "00:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(vcpkg)"

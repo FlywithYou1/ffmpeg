@@ -1,0 +1,308 @@
+# 为 vcpkg 安装的依赖生成 FFmpeg 期望的 pkg-config (.pc) 文件和导入库别名。
+# 用法: pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot <path> [-HasVpl]
+param(
+    [Parameter(Mandatory=$true)][string]$InstallRoot,
+    [switch]$HasVpl
+)
+
+$inst = $InstallRoot
+$instMixed = $inst -replace '\\','/'
+$pcDir = "$instMixed/lib/pkgconfig"
+New-Item -ItemType Directory -Path $pcDir -Force | Out-Null
+
+function Find-ImportLib($candidates) {
+    foreach ($name in $candidates) {
+        foreach ($suffix in @('', '-static', '_static')) {
+            $p = Join-Path "$inst\lib" "${name}${suffix}.lib"
+            if (Test-Path $p) { return "${name}${suffix}.lib" }
+        }
+    }
+    Write-Host "${inst}\lib 下可用的 .lib 文件："
+    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+    return $null
+}
+
+function Write-Utf8($path, $lines) {
+    [System.IO.File]::WriteAllLines($path, $lines, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Get-PortVersion($portName) {
+    $json = "$inst\share\$portName\vcpkg.json"
+    $control = "$inst\share\$portName\CONTROL"
+    $abi = "$inst\share\$portName\vcpkg_abi_info.txt"
+    $ver = $null
+    if (Test-Path $json) {
+        try {
+            $data = Get-Content $json -Raw -Encoding UTF8 | ConvertFrom-Json
+            $ver = $data.version
+            if (-not $ver) { $ver = $data.'version-semver' }
+            if (-not $ver) { $ver = $data.'version-string' }
+            if (-not $ver) { $ver = $data.'version-date' }
+            if ($ver) { $ver = ($ver -split '#')[0] }
+        } catch { Write-Host "警告：无法解析 $json : $_" }
+    }
+    if (-not $ver -and (Test-Path $control)) {
+        $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
+        if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+    }
+    if (-not $ver -and (Test-Path $abi)) {
+        $m = Select-String -Path $abi -Pattern '^version\s+(.+)$'
+        if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim() }
+    }
+    if (-not $ver) {
+        $infoDirs = @("$inst\..\vcpkg\info", "$inst\vcpkg\info", "$inst\share\vcpkg\info")
+        foreach ($infoDir in $infoDirs) {
+            if (Test-Path $infoDir) {
+                $listFile = Get-ChildItem $infoDir -Filter "${portName}_*.list" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($listFile) {
+                    $m = [regex]::Match($listFile.BaseName, "^${portName}_(.+?)(?:#[0-9]+)?_")
+                    if ($m.Success) { $ver = $m.Groups[1].Value; break }
+                }
+            }
+        }
+    }
+    if (-not $ver) { $ver = 'unknown' }
+    Write-Host "Get-PortVersion $portName -> $ver"
+    return $ver
+}
+
+# 修复 vcpkg .pc 文件：MSVC 静态构建中 -lm 会链接成不存在的 m.lib
+$pcDirWin = "$inst/lib/pkgconfig"
+if (Test-Path $pcDirWin) {
+    foreach ($pc in (Get-ChildItem $pcDirWin -Filter '*.pc')) {
+        $content = Get-Content $pc.FullName -Raw
+        if ($content -match ' -lm') {
+            $content = $content -replace ' -lm',''
+            [System.IO.File]::WriteAllText($pc.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "Patched $($pc.Name) : removed -lm"
+        }
+    }
+}
+
+# 重写 SvtAv1Enc.pc
+$svtLibName = $null
+foreach ($cand in @('SvtAv1Enc','svtav1')) {
+    foreach ($suffix in @('','-static','_static')) {
+        $p = Join-Path "$inst\lib" "${cand}${suffix}.lib"
+        if (Test-Path $p) { $svtLibName = "${cand}${suffix}"; break }
+    }
+    if ($svtLibName) { break }
+}
+$fastfeatLibName = $null
+foreach ($suffix in @('','-static','_static')) {
+    $p = Join-Path "$inst\lib" "fastfeat${suffix}.lib"
+    if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
+}
+if (-not $svtLibName) { throw "SvtAv1Enc import library not found under $inst\lib" }
+if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+$svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
+$svtVersion = Get-PortVersion 'svt-av1'
+if ($svtVersion -eq 'unknown') {
+    $svtHeader = Join-Path "$inst\include" "EbSvtAv1Enc.h"
+    if (Test-Path $svtHeader) {
+        $major = $null; $minor = $null; $patch = $null
+        foreach ($match in (Select-String -Path $svtHeader -Pattern '#define\s+SVT_AV1_VERSION_(MAJOR|MINOR|PATCH)\s+(\d+)')) {
+            switch ($match.Matches[0].Groups[1].Value) {
+                'MAJOR' { $major = $match.Matches[0].Groups[2].Value }
+                'MINOR' { $minor = $match.Matches[0].Groups[2].Value }
+                'PATCH' { $patch = $match.Matches[0].Groups[2].Value }
+            }
+        }
+        if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
+    }
+}
+Write-Host "SvtAv1Enc.pc Version: $svtVersion"
+Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
+    "prefix=$instMixed",
+    'exec_prefix=${prefix}',
+    'libdir=${prefix}/lib',
+    'includedir=${prefix}/include',
+    '',
+    'Name: SvtAv1Enc',
+    'Description: SVT-AV1 encoder library',
+    "Version: $svtVersion",
+    "Libs: $svtLibs",
+    'Cflags: -I${includedir} -I${includedir}/svt-av1'
+)
+Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+
+# libmp3lame
+$mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame')
+if (-not $mp3lameLib) { throw "mp3lame import library not found under $inst\lib" }
+Write-Utf8 "$pcDir/libmp3lame.pc" @(
+    "prefix=$instMixed",
+    'exec_prefix=${prefix}',
+    'libdir=${prefix}/lib',
+    'includedir=${prefix}/include',
+    '',
+    'Name: libmp3lame',
+    'Description: LAME MP3 encoder library',
+    "Version: $(Get-PortVersion 'mp3lame')",
+    "Libs: $mp3lameLib"
+)
+Write-Host "已创建 libmp3lame.pc -> $mp3lameLib"
+
+# libfdk-aac
+$fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
+if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+Write-Utf8 "$pcDir/libfdk-aac.pc" @(
+    "prefix=$instMixed",
+    'exec_prefix=${prefix}',
+    'libdir=${prefix}/lib',
+    'includedir=${prefix}/include',
+    '',
+    'Name: libfdk-aac',
+    'Description: Fraunhofer FDK AAC codec library',
+    "Version: $(Get-PortVersion 'fdk-aac')",
+    "Libs: $fdkLib"
+)
+
+# sdl2（仅在缺失时创建回退）
+if (-not (Test-Path "$pcDir/sdl2.pc")) {
+    $sdl2Lib = Find-ImportLib @('SDL2')
+    if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
+    $sdl2mainLib = Find-ImportLib @('SDL2main')
+    $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+    Write-Utf8 "$pcDir/sdl2.pc" @(
+        "prefix=$instMixed",
+        'exec_prefix=${prefix}',
+        'libdir=${prefix}/lib',
+        'includedir=${prefix}/include',
+        '',
+        'Name: sdl2',
+        'Description: Simple DirectMedia Layer',
+        "Version: $(Get-PortVersion 'sdl2')",
+        "Libs: $sdl2Libs",
+        'Cflags: -I${includedir} -I${includedir}/SDL2'
+    )
+    Write-Host "已创建回退 sdl2.pc"
+} else { Write-Host "使用 vcpkg 提供的 sdl2.pc" }
+
+# 软件编解码器回退 .pc（vcpkg 不总是提供）
+$fallbacks = @(
+    @{ Var='libx264Lib';   Names=@('x264','libx264');           Pc='libx264';   Desc='libx264 library';            Port='x264' }
+    @{ Var='libx265Lib';   Names=@('x265','libx265');           Pc='libx265';   Desc='libx265 library';            Port='x265' }
+    @{ Var='libvpxLib';    Names=@('vpx','libvpx','vpxmd');     Pc='libvpx';    Desc='libvpx library';             Port='libvpx' }
+    @{ Var='opusLib';      Names=@('opus');                     Pc='opus';      Desc='opus library';               Port='opus' }
+    @{ Var='vorbisLib';    Names=@('vorbis','libvorbis');       Pc='vorbis';    Desc='vorbis library';             Port='libvorbis' }
+    @{ Var='vorbisencLib'; Names=@('vorbisenc','libvorbisenc'); Pc='vorbisenc'; Desc='vorbisenc library';          Port='libvorbis'; Requires='vorbis' }
+    @{ Var='theoraLib';    Names=@('theora','libtheora');       Pc='theora';    Desc='theora library';             Port='libtheora' }
+    @{ Var='theoradecLib'; Names=@('theoradec','libtheoradec'); Pc='theoradec'; Desc='theoradec library';          Port='libtheora' }
+    @{ Var='theoraencLib'; Names=@('theoraenc','libtheoraenc'); Pc='theoraenc'; Desc='theoraenc library';          Port='libtheora' }
+    @{ Var='libaomLib';    Names=@('aom','libaom');             Pc='libaom';    Desc='libaom library';             Port='aom' }
+    @{ Var='libwebpLib';   Names=@('webp','libwebp');           Pc='libwebp';   Desc='libwebp library';            Port='libwebp' }
+    @{ Var='libassLib';    Names=@('ass','libass');             Pc='libass';    Desc='libass library';             Port='libass' }
+    @{ Var='freetype2Lib'; Names=@('freetype','libfreetype');   Pc='freetype2'; Desc='freetype2 library';          Port='freetype'; Cflags='-I${includedir} -I${includedir}/freetype2' }
+    @{ Var='fontconfigLib';Names=@('fontconfig','libfontconfig');Pc='fontconfig';Desc='fontconfig library';        Port='fontconfig' }
+    @{ Var='zimgLib';      Names=@('zimg','libzimg');           Pc='zimg';      Desc='zimg library';               Port='zimg' }
+    @{ Var='soxrLib';      Names=@('soxr','libsoxr');           Pc='soxr';      Desc='soxr library';               Port='soxr' }
+    @{ Var='libopenjp2Lib';Names=@('openjp2','libopenjp2');     Pc='libopenjp2';Desc='libopenjp2 library';         Port='openjpeg' }
+    @{ Var='snappyLib';    Names=@('snappy','libsnappy');       Pc='snappy';    Desc='snappy library';             Port='snappy' }
+    @{ Var='libtwolameLib';Names=@('twolame','libtwolame');     Pc='libtwolame';Desc='TwoLAME MP2 encoder library';Port='libtwolame'; Cflags='-I${includedir} -DLIBTWOLAME_STATIC' }
+    @{ Var='libopenmptLib';Names=@('openmpt','libopenmpt');     Pc='libopenmpt';Desc='OpenMPT module library';     Port='libopenmpt' }
+)
+
+foreach ($fb in $fallbacks) {
+    $lib = Find-ImportLib $fb.Names
+    if ($lib) {
+        $pcFile = "$pcDir/$($fb.Pc).pc"
+        if (-not (Test-Path $pcFile)) {
+            $lines = @(
+                "prefix=$instMixed"
+                'exec_prefix=${prefix}'
+                'libdir=${prefix}/lib'
+                'includedir=${prefix}/include'
+                ''
+                "Name: $($fb.Pc)"
+                "Description: $($fb.Desc)"
+                "Version: $(Get-PortVersion $fb.Port)"
+            )
+            if ($fb.Requires) { $lines += "Requires: $($fb.Requires)" }
+            $lines += "Libs: $lib"
+            $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
+            $lines += "Cflags: $cflags"
+            Write-Utf8 $pcFile $lines
+            Write-Host "已创建回退 $($fb.Pc).pc"
+        } else { Write-Host "使用 vcpkg 提供的 $($fb.Pc).pc" }
+        Set-Variable -Name $fb.Var -Value $lib -Scope Script
+    } else {
+        Write-Host "::warning::未找到 $($fb.Pc) 导入库；跳过 .pc"
+        Set-Variable -Name $fb.Var -Value $null -Scope Script
+    }
+}
+
+# vpl.pc — vcpkg libvpl 使用 cmake-config，ffmpeg 需要 pkg-config
+if ($HasVpl) {
+    $vplLib = Find-ImportLib @('vpl','libvpl')
+    if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
+    $vplVer = Get-PortVersion 'libvpl'
+    if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
+    Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
+    Write-Utf8 "$pcDir/vpl.pc" @(
+        "prefix=$instMixed",
+        'exec_prefix=${prefix}',
+        'libdir=${prefix}/lib',
+        'includedir=${prefix}/include',
+        '',
+        'Name: vpl',
+        'Description: Intel oneVPL library',
+        "Version: $vplVer",
+        "Libs: $vplLib",
+        'Cflags: -I${includedir} -I${includedir}/vpl'
+    )
+    Write-Host "已创建 vpl.pc"
+}
+
+# 导入库别名
+function Ensure-LibAlias($actual, $alias) {
+    $actualPath = Join-Path "$inst\lib" $actual
+    $aliasPath = Join-Path "$inst\lib" $alias
+    if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
+        Copy-Item $actualPath $aliasPath
+        Write-Host "Created alias $alias -> $actual"
+    }
+}
+Ensure-LibAlias $mp3lameLib "libmp3lame.lib"
+Ensure-LibAlias $mp3lameLib "mp3lame.lib"
+Ensure-LibAlias $fdkLib "fdk-aac.lib"
+Ensure-LibAlias $fdkLib "libfdk-aac.lib"
+if ($HasVpl -and $vplLib) { Ensure-LibAlias $vplLib "vpl.lib"; Ensure-LibAlias $vplLib "libvpl.lib" }
+if ($libx264Lib) { Ensure-LibAlias $libx264Lib "libx264.lib"; Ensure-LibAlias $libx264Lib "x264.lib" }
+if ($libx265Lib) { Ensure-LibAlias $libx265Lib "libx265.lib"; Ensure-LibAlias $libx265Lib "x265.lib" }
+if ($libvpxLib) { Ensure-LibAlias $libvpxLib "libvpx.lib"; Ensure-LibAlias $libvpxLib "vpx.lib" }
+if ($opusLib) { Ensure-LibAlias $opusLib "opus.lib" }
+if ($vorbisLib) { Ensure-LibAlias $vorbisLib "vorbis.lib" }
+if ($vorbisencLib) { Ensure-LibAlias $vorbisencLib "vorbisenc.lib" }
+if ($theoraLib) { Ensure-LibAlias $theoraLib "theora.lib" }
+if ($theoradecLib) { Ensure-LibAlias $theoradecLib "theoradec.lib" }
+if ($theoraencLib) { Ensure-LibAlias $theoraencLib "theoraenc.lib" }
+if ($libaomLib) { Ensure-LibAlias $libaomLib "libaom.lib"; Ensure-LibAlias $libaomLib "aom.lib" }
+if ($libwebpLib) { Ensure-LibAlias $libwebpLib "libwebp.lib"; Ensure-LibAlias $libwebpLib "webp.lib" }
+if ($libassLib) { Ensure-LibAlias $libassLib "libass.lib"; Ensure-LibAlias $libassLib "ass.lib" }
+if ($freetype2Lib) { Ensure-LibAlias $freetype2Lib "freetype.lib" }
+if ($fontconfigLib) { Ensure-LibAlias $fontconfigLib "fontconfig.lib" }
+if ($zimgLib) { Ensure-LibAlias $zimgLib "zimg.lib" }
+if ($soxrLib) { Ensure-LibAlias $soxrLib "soxr.lib" }
+if ($libopenjp2Lib) { Ensure-LibAlias $libopenjp2Lib "libopenjp2.lib"; Ensure-LibAlias $libopenjp2Lib "openjp2.lib" }
+if ($snappyLib) { Ensure-LibAlias $snappyLib "snappy.lib" }
+if ($libtwolameLib) { Ensure-LibAlias $libtwolameLib "libtwolame.lib"; Ensure-LibAlias $libtwolameLib "twolame.lib" }
+if ($libopenmptLib) { Ensure-LibAlias $libopenmptLib "libopenmpt.lib"; Ensure-LibAlias $libopenmptLib "openmpt.lib" }
+
+# 输出环境变量
+$pkgconf = Get-ChildItem -Path "$inst\bin\pkgconf.exe", "$inst\tools\pkgconf\pkgconf.exe", "$inst\tools\pkgconf\pkg-config.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $pkgconf) { throw "pkgconf.exe not found under $inst" }
+$pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
+Write-Host "pkg-config: $pkgconfMixed"
+
+Write-Host "已安装的导入库："
+Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+Write-Host "libmp3lame.pc:"
+Get-Content "$pcDir/libmp3lame.pc"
+Write-Host "libfdk-aac.pc:"
+Get-Content "$pcDir/libfdk-aac.pc"
+
+echo "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+echo "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+echo "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+$shadercTools = "$inst\tools\shaderc"
+if (Test-Path "$shadercTools\glslc.exe") { echo "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Host "shaderc tools: $shadercTools" }
