@@ -417,25 +417,10 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 主动更新 vcpkg 到最新 baseline
-          Write-Host "Updating vcpkg baseline..."
-          $before = (git -C $v rev-parse HEAD).Trim()
-          Write-Host "Current vcpkg baseline: $before"
-          $isShallow = (git -C $v rev-parse --is-shallow-repository 2>$null).Trim()
-          if ($isShallow -eq 'true') {
-            git -C $v fetch origin --unshallow 2>$null
-          }
-          git -C $v pull --ff-only origin master
-          $after = (git -C $v rev-parse HEAD).Trim()
-          if ($before -ne $after) {
-            Write-Host "vcpkg baseline updated: $before -> $after"
-          } else {
-            Write-Host "vcpkg baseline is already up to date."
-          }
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
           pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
 
       - name: 从源码编译 zimg
@@ -941,25 +926,10 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 主动更新 vcpkg 到最新 baseline
-          Write-Host "Updating vcpkg baseline..."
-          $before = (git -C $v rev-parse HEAD).Trim()
-          Write-Host "Current vcpkg baseline: $before"
-          $isShallow = (git -C $v rev-parse --is-shallow-repository 2>$null).Trim()
-          if ($isShallow -eq 'true') {
-            git -C $v fetch origin --unshallow 2>$null
-          }
-          git -C $v pull --ff-only origin master
-          $after = (git -C $v rev-parse HEAD).Trim()
-          if ($before -ne $after) {
-            Write-Host "vcpkg baseline updated: $before -> $after"
-          } else {
-            Write-Host "vcpkg baseline is already up to date."
-          }
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
           pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
 
       - name: 从源码编译 zimg
@@ -1358,25 +1328,10 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 主动更新 vcpkg 到最新 baseline
-          Write-Host "Updating vcpkg baseline..."
-          $before = (git -C $v rev-parse HEAD).Trim()
-          Write-Host "Current vcpkg baseline: $before"
-          $isShallow = (git -C $v rev-parse --is-shallow-repository 2>$null).Trim()
-          if ($isShallow -eq 'true') {
-            git -C $v fetch origin --unshallow 2>$null
-          }
-          git -C $v pull --ff-only origin master
-          $after = (git -C $v rev-parse HEAD).Trim()
-          if ($before -ne $after) {
-            Write-Host "vcpkg baseline updated: $before -> $after"
-          } else {
-            Write-Host "vcpkg baseline is already up to date."
-          }
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
           pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
 
       - name: 从源码编译 zimg
@@ -1899,25 +1854,10 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 主动更新 vcpkg 到最新 baseline
-          Write-Host "Updating vcpkg baseline..."
-          $before = (git -C $v rev-parse HEAD).Trim()
-          Write-Host "Current vcpkg baseline: $before"
-          $isShallow = (git -C $v rev-parse --is-shallow-repository 2>$null).Trim()
-          if ($isShallow -eq 'true') {
-            git -C $v fetch origin --unshallow 2>$null
-          }
-          git -C $v pull --ff-only origin master
-          $after = (git -C $v rev-parse HEAD).Trim()
-          if ($before -ne $after) {
-            Write-Host "vcpkg baseline updated: $before -> $after"
-          } else {
-            Write-Host "vcpkg baseline is already up to date."
-          }
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\arm64-windows-static"
-          & "$v\vcpkg.exe" install --triplet arm64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
+          & "$v\vcpkg.exe" install --triplet arm64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
           pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
 
       - name: 从源码编译 zimg
@@ -2446,25 +2386,10 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # 主动更新 vcpkg 到最新 baseline
-          Write-Host "Updating vcpkg baseline..."
-          $before = (git -C $v rev-parse HEAD).Trim()
-          Write-Host "Current vcpkg baseline: $before"
-          $isShallow = (git -C $v rev-parse --is-shallow-repository 2>$null).Trim()
-          if ($isShallow -eq 'true') {
-            git -C $v fetch origin --unshallow 2>$null
-          }
-          git -C $v pull --ff-only origin master
-          $after = (git -C $v rev-parse HEAD).Trim()
-          if ($before -ne $after) {
-            Write-Host "vcpkg baseline updated: $before -> $after"
-          } else {
-            Write-Host "vcpkg baseline is already up to date."
-          }
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\x64-windows-static"
-          & "$v\vcpkg.exe" install --triplet x64-windows-static pkgconf mp3lame fdk-aac sdl2 libiconv zlib pthreads libvpl x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc
+          & "$v\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root=$env:GITHUB_WORKSPACE
           pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
 
       - name: 从源码编译 zimg

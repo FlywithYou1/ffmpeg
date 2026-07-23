@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "vcpkg"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
       time: "00:00"
       timezone: "Asia/Shanghai"
     open-pull-requests-limit: 5
