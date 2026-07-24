@@ -388,8 +388,11 @@ jobs:
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\${{ matrix.triplet }}"
           & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
-          $vplArgs = if ('${{ matrix.vpl }}' -eq 'true') { @('-HasVpl') } else { @() }
-          pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" @vplArgs
+          if ('${{ matrix.vpl }}' -eq 'true') {
+            pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
+          } else {
+            pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst"
+          }
 
       - name: 从源码编译 zimg
         shell: pwsh
