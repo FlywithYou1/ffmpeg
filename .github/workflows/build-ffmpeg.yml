@@ -395,6 +395,8 @@ jobs:
           }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\${{ matrix.triplet }}"
+          $instUnix = $inst -replace '\\', '/'
+          echo "VCPKG_INSTALLED=$instUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           for ($i = 1; $i -le 3; $i++) {
             Write-Output "Installing vcpkg packages (attempt $i/3)..."
             & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
@@ -580,13 +582,18 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+          # 转换 VCPKG_INSTALLED：C:/... → /c/...（bash 文件操作需要 Unix 路径）
+          VCPKG_INSTALLED_U=""
+          if [ -n "${VCPKG_INSTALLED:-}" ]; then
+            VCPKG_INSTALLED_U="$(echo "$VCPKG_INSTALLED" | sed 's|^[Cc]:/|/c/|;s|^[Dd]:/|/d/|')"
+          fi
           # Clang-cl 和 MSVC 分别通过不同变量找头文件
           export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
           # Clang（非 clang-cl 模式）无视 INCLUDE，需要 CPATH
           export CPATH="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${CPATH:-}"
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
+          if [ -n "${VCPKG_INSTALLED_U:-}" ] && [ -f "${VCPKG_INSTALLED_U}/include/pthread.h" ]; then
             PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
             PTHREAD_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib pthreads.lib"
           fi
@@ -617,7 +624,12 @@ jobs:
             VMAF_ENABLE_ASM=false
             echo "::warning::禁用 VMAF 汇编优化（MSVC 不兼容 GCC 风格 SIMD）"
           fi
-          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static
+          # 将 pthread 等额外 include 路径传给 meson（环境变量 CFLAGS 不一定被 meson 继承）
+          MESON_EXTRA_ARGS=""
+          if [ -n "$PTHREAD_CFLAGS" ]; then
+            MESON_EXTRA_ARGS="-Dc_args=$PTHREAD_CFLAGS -Dcpp_args=$PTHREAD_CFLAGS"
+          fi
+          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static $MESON_EXTRA_ARGS
           ninja -vC build
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
           vmaf_static_lib=""
