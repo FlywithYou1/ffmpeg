@@ -555,7 +555,7 @@ jobs:
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
           python3 -c '
           import pathlib
-          for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
+          for path in ("src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
               p = pathlib.Path(path)
               if p.exists():
                   s = p.read_text(encoding="utf-8")
