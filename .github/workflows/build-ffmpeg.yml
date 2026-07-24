@@ -562,19 +562,9 @@ jobs:
             PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
             PTHREAD_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib pthreads.lib"
           fi
-          __meson_array() {
-            local result="["
-            local first=1
-            for arg in "$@"; do
-              [ $first -eq 0 ] && result="$result, "
-              result="$result"$arg""
-              first=0
-            done
-            result="$result]"
-            echo "$result"
-          }
-          VMAF_C_ARGS=$(__meson_array "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
-          VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
+          export CFLAGS="-D_USE_MATH_DEFINES${PTHREAD_CFLAGS:+ $PTHREAD_CFLAGS}${CFLAGS:+ $CFLAGS}"
+          export CXXFLAGS="-D_USE_MATH_DEFINES${PTHREAD_CFLAGS:+ $PTHREAD_CFLAGS}${CXXFLAGS:+ $CXXFLAGS}"
+          export LDFLAGS="${PTHREAD_LDFLAGS:+$PTHREAD_LDFLAGS}${LDFLAGS:+ $LDFLAGS}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
             python3 -c "
             import pathlib
@@ -600,7 +590,7 @@ jobs:
           else
             CC_BIN="cl.exe"
           fi
-          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static             -Dc_args="$VMAF_C_ARGS" -Dcpp_args="$VMAF_C_ARGS"             -Dc_link_args="$VMAF_LINK_ARGS" -Dcpp_link_args="$VMAF_LINK_ARGS"
+          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static
           ninja -vC build
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
           vmaf_static_lib=""
