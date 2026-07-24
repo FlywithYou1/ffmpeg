@@ -553,6 +553,8 @@ jobs:
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+          # Fix mkdirp.h: mode_t is not defined on Windows (no POSIX sys/types.h)
+          sed -i '1i typedef unsigned short mode_t;' src/feature/mkdirp.h
           python3 -c '
           import pathlib
           for path in ("src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
