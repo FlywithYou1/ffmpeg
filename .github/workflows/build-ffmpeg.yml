@@ -585,8 +585,10 @@ jobs:
           # vcpkg 的 pthreads 端口在 Windows static 构建中不提供 pthread.h
           # 用 Windows 原生 SRWLOCK/CONDITION_VARIABLE 生成一个最小 pthread shim
           mkdir -p "$P_MIXED/include"
-          cat > "$P_MIXED/include/pthread.h" << 'PTHREAD_EOF'
-#ifndef PTHREAD_SHIM_H
+          python3 -c '
+import pathlib
+p = pathlib.Path(r"'"$P_MIXED"'/include/pthread.h")
+p.write_text(r"""#ifndef PTHREAD_SHIM_H
 #define PTHREAD_SHIM_H
 #include <windows.h>
 #include <stdint.h>
@@ -598,25 +600,41 @@ typedef struct { CONDITION_VARIABLE cv; int init; } pthread_cond_t;
 typedef HANDLE pthread_t;
 typedef struct { int init; int pshared; void *ptr; } pthread_mutexattr_t;
 typedef struct { int init; int pshared; } pthread_condattr_t;
-#define PTHREAD_MUTEX_INITIALIZER {{0},0}
-#define PTHREAD_COND_INITIALIZER {{0},0}
-static inline int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a) { (void)a; InitializeSRWLock(&m->lock); m->init=1; return 0; }
-static inline int pthread_mutex_destroy(pthread_mutex_t *m) { (void)m; m->init=0; return 0; }
-static inline int pthread_mutex_lock(pthread_mutex_t *m) { AcquireSRWLockExclusive(&m->lock); return 0; }
-static inline int pthread_mutex_unlock(pthread_mutex_t *m) { ReleaseSRWLockExclusive(&m->lock); return 0; }
-static inline int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a) { (void)a; InitializeConditionVariable(&c->cv); c->init=1; return 0; }
-static inline int pthread_cond_destroy(pthread_cond_t *c) { (void)c; c->init=0; return 0; }
-static inline int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m) { return SleepConditionVariableSRW(&c->cv, &m->lock, INFINITE, 0) ? 0 : -1; }
-static inline int pthread_cond_signal(pthread_cond_t *c) { WakeConditionVariable(&c->cv); return 0; }
-static inline int pthread_cond_broadcast(pthread_cond_t *c) { WakeAllConditionVariable(&c->cv); return 0; }
-static inline int pthread_create(pthread_t *t, const void *a, void *(*f)(void*), void *arg) { (void)a; *t=CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)f,arg,0,NULL); return *t?0:-1; }
-static inline int pthread_join(pthread_t t, void **ret) { WaitForSingleObject(t,INFINITE); if(ret) GetExitCodeThread(t,(LPDWORD)ret); CloseHandle(t); return 0; }
-static inline void pthread_exit(void *ret) { ExitThread((DWORD)(uintptr_t)ret); }
+#define PTHREAD_MUTEX_INITIALIZER { {0},0 }
+#define PTHREAD_COND_INITIALIZER { {0},0 }
+static inline int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a) {
+    (void)a; InitializeSRWLock(&m->lock); m->init = 1; return 0; }
+static inline int pthread_mutex_destroy(pthread_mutex_t *m) {
+    (void)m; m->init = 0; return 0; }
+static inline int pthread_mutex_lock(pthread_mutex_t *m) {
+    AcquireSRWLockExclusive(&m->lock); return 0; }
+static inline int pthread_mutex_unlock(pthread_mutex_t *m) {
+    ReleaseSRWLockExclusive(&m->lock); return 0; }
+static inline int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a) {
+    (void)a; InitializeConditionVariable(&c->cv); c->init = 1; return 0; }
+static inline int pthread_cond_destroy(pthread_cond_t *c) {
+    (void)c; c->init = 0; return 0; }
+static inline int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m) {
+    return SleepConditionVariableSRW(&c->cv, &m->lock, INFINITE, 0) ? 0 : -1; }
+static inline int pthread_cond_signal(pthread_cond_t *c) {
+    WakeConditionVariable(&c->cv); return 0; }
+static inline int pthread_cond_broadcast(pthread_cond_t *c) {
+    WakeAllConditionVariable(&c->cv); return 0; }
+static inline int pthread_create(pthread_t *t, const void *a, void *(*f)(void*), void *arg) {
+    (void)a; *t = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)f, arg, 0, NULL);
+    return *t ? 0 : -1; }
+static inline int pthread_join(pthread_t t, void **ret) {
+    WaitForSingleObject(t, INFINITE);
+    if (ret) GetExitCodeThread(t, (LPDWORD)ret);
+    CloseHandle(t); return 0; }
+static inline void pthread_exit(void *ret) {
+    ExitThread((DWORD)(uintptr_t)ret); }
 #ifdef __cplusplus
 }
 #endif
 #endif
-PTHREAD_EOF
+""")
+'
           # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，直接用 find 探测
           if [ -z "${VCPKG_INSTALLED:-}" ]; then
             for vdir in "/c/vcpkg/installed/x64-windows-static" "/c/vcpkg/installed/arm64-windows-static"; do
