@@ -647,19 +647,20 @@ jobs:
           fi
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入 vcpkg 头文件路径
           # 同时也需要 -D_USE_MATH_DEFINES，否则 M_PI 等宏未定义（meson 不继承环境 CFLAGS）
-          MESON_EXTRA_ARGS=""
+          VMAF_MESON_ARGS=()
           if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            MESON_EXTRA_ARGS="-Dc_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES -Dcpp_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES"
+            VMAF_MESON_ARGS+=("-Dc_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES")
+            VMAF_MESON_ARGS+=("-Dcpp_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES")
           fi
           echo "--- VMAF meson ---"
-          echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  PTHREAD_CFLAGS=${PTHREAD_CFLAGS:-空}  MESON_EXTRA_ARGS=${MESON_EXTRA_ARGS:-空}"
+          echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  VMAF_MESON_ARGS=${VMAF_MESON_ARGS[*]:-空}"
           echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
           echo "INCLUDE=${INCLUDE:-}"
           echo "------------------"
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
-              -Db_vscrt=mt -Ddefault_library=static $MESON_EXTRA_ARGS
+              -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
           ninja -vC build 2>&1 | tee /tmp/ninja-vmaf.log || {
             echo "::error::ninja 编译 VMAF 失败，详见下方 /tmp/ninja-vmaf.log"
             exit 1
