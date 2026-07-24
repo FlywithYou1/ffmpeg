@@ -143,7 +143,7 @@ jobs:
             libfontconfig1-dev libzimg-dev libsoxr-dev libopenjp2-7-dev \
             libsnappy-dev libvulkan-dev opencl-headers ocl-icd-opencl-dev glslc \
             libsvtav1enc-dev libdav1d-dev libkvazaar-dev libcrypto++-dev libopenh264-dev libxvidcore-dev \
-            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev \
+            libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev libnuma-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
             sudo apt-get upgrade -y -qq
             bash scripts/ci/linux-pc-fallbacks.sh /usr
@@ -580,6 +580,8 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+          # Clang-cl 和 MSVC 都通过 INCLUDE 环境变量找头文件
+          export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
           if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
@@ -601,10 +603,7 @@ jobs:
                 '-I', '${VCPKG_INSTALLED}/include',")
             mb.write_text(s, encoding='utf-8')
             "
-            export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED}/include;${CUDA_HOME}/include;${INCLUDE:-}"
-          else
-            # Clang-cl 用 INCLUDE 环境变量（不用 CFLAGS），必须设置才能找到 pthread.h
-            export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
+            export INCLUDE="${INCLUDE};${CUDA_HOME}/include"
           fi
           # MSVC 不兼容 VMAF 的 GCC 风格 x86 汇编（-mavx / __builtin_clz / __m256 cast）
           # 有 Clang 时用 Clang 编译 VMAF（兼容 GCC 风格 SIMD），否则禁用 ASM
