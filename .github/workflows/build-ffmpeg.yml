@@ -646,9 +646,10 @@ jobs:
             echo "::warning::禁用 VMAF 汇编优化（MSVC 不兼容 GCC 风格 SIMD）"
           fi
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入 vcpkg 头文件路径
+          # 同时也需要 -D_USE_MATH_DEFINES，否则 M_PI 等宏未定义（meson 不继承环境 CFLAGS）
           MESON_EXTRA_ARGS=""
           if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            MESON_EXTRA_ARGS="-Dc_args=-I${VCPKG_INSTALLED}/include -Dcpp_args=-I${VCPKG_INSTALLED}/include"
+            MESON_EXTRA_ARGS="-Dc_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES -Dcpp_args=-I${VCPKG_INSTALLED}/include -D_USE_MATH_DEFINES"
           fi
           echo "--- VMAF meson ---"
           echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  PTHREAD_CFLAGS=${PTHREAD_CFLAGS:-空}  MESON_EXTRA_ARGS=${MESON_EXTRA_ARGS:-空}"
