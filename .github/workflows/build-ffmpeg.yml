@@ -582,6 +582,16 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+          # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，直接在 bash 中探测（更可靠）
+          if [ -z "${VCPKG_INSTALLED:-}" ]; then
+            for vdir in "/c/vcpkg/installed/x64-windows-static" "/c/vcpkg/installed/arm64-windows-static"; do
+              if [ -d "$vdir" ]; then
+                VCPKG_INSTALLED="$(echo "$vdir" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"
+                echo "::notice::自动探测 VCPKG_INSTALLED=$VCPKG_INSTALLED"
+                break
+              fi
+            done
+          fi
           # 转换 VCPKG_INSTALLED：C:/... → /c/...（bash 文件操作需要 Unix 路径）
           VCPKG_INSTALLED_U=""
           if [ -n "${VCPKG_INSTALLED:-}" ]; then
@@ -635,7 +645,15 @@ jobs:
           if [ -n "$PTHREAD_CFLAGS" ]; then
             MESON_EXTRA_ARGS="-Dc_args=$PTHREAD_CFLAGS -Dcpp_args=$PTHREAD_CFLAGS"
           fi
-          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static $MESON_EXTRA_ARGS
+          echo "--- VMAF meson ---"
+          echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  PTHREAD_CFLAGS=${PTHREAD_CFLAGS:-空}  MESON_EXTRA_ARGS=${MESON_EXTRA_ARGS:-空}"
+          echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
+          echo "INCLUDE=${INCLUDE:-}"
+          echo "------------------"
+          PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
+            meson setup build --buildtype release --prefix="$P" \
+              -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
+              -Db_vscrt=mt -Ddefault_library=static $MESON_EXTRA_ARGS
           ninja -vC build
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
           vmaf_static_lib=""
