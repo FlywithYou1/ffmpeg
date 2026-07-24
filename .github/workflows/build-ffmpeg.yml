@@ -384,10 +384,27 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (Test-Path "$v\bootstrap-vcpkg.bat") {
+            $maxRetries = 3
+            for ($i = 1; $i -le $maxRetries; $i++) {
+              Write-Output "Bootstrapping vcpkg (attempt $i/$maxRetries)..."
+              & "$v\bootstrap-vcpkg.bat"
+              if ($LASTEXITCODE -eq 0) { break }
+              if ($i -eq $maxRetries) { throw "vcpkg bootstrap failed after $maxRetries attempts" }
+              Write-Output "Bootstrap failed, retrying in 10s..."
+              Start-Sleep -Seconds 10
+            }
+          }
           $env:Path = "$v;" + $env:Path
           $inst = "$v\installed\${{ matrix.triplet }}"
-          & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
+          for ($i = 1; $i -le 3; $i++) {
+            Write-Output "Installing vcpkg packages (attempt $i/3)..."
+            & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($i -eq 3) { throw "vcpkg install failed after 3 attempts" }
+            Write-Output "Install failed, retrying in 10s..."
+            Start-Sleep -Seconds 10
+          }
           if ('${{ matrix.vpl }}' -eq 'true') {
             pwsh scripts/ci/write-fallback-pc.ps1 -InstallRoot "$inst" -HasVpl
           } else {
