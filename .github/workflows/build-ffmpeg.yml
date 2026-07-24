@@ -214,10 +214,6 @@ jobs:
           fi
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
-          # Ubuntu 26.04 的 libopenjp2-7 几乎所有符号都是 hidden symbol
-          # 将 require_pkg_config 改为 require（只检查头文件+库，不检查函数符号）
-          sed -i 's/require_pkg_config libopenjpeg libopenjp2.*/require libopenjp2 openjpeg.h -lopenjp2/' configure
-          sed -i '/check_pkg_config libopenjpeg/d' configure
           ./configure --prefix="$P" --pkg-config-flags="--static" \
             --extra-cflags="-I$P/include" \
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
@@ -606,6 +602,9 @@ jobs:
             mb.write_text(s, encoding='utf-8')
             "
             export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED}/include;${CUDA_HOME}/include;${INCLUDE:-}"
+          else
+            # Clang-cl 用 INCLUDE 环境变量（不用 CFLAGS），必须设置才能找到 pthread.h
+            export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
           fi
           # MSVC 不兼容 VMAF 的 GCC 风格 x86 汇编（-mavx / __builtin_clz / __m256 cast）
           # 有 Clang 时用 Clang 编译 VMAF（兼容 GCC 风格 SIMD），否则禁用 ASM
