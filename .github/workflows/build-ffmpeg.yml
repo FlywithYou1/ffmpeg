@@ -629,7 +629,7 @@ jobs:
           fi
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入头文件路径
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
-          VMAF_C_ARGS="-D_USE_MATH_DEFINES -Dmode_t=unsigned short"
+          VMAF_C_ARGS="-D_USE_MATH_DEFINES"
           [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${VCPKG_INSTALLED}/include -I${P_MIXED}/include ${VMAF_C_ARGS}"
           VMAF_CPP_ARGS="${VMAF_C_ARGS} -std=c++14"
           VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}")
