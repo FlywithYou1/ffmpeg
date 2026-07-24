@@ -582,6 +582,8 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+          # VMAF 的 MSVC stdatomic.h 依赖 common/attributes.h（来自 dav1d），但 VMAF 没打包它
+          mkdir -p src/compat/msvc/common && echo $'#ifndef VMAF_MSVC_ATTRIBUTES_H\n#define VMAF_MSVC_ATTRIBUTES_H\n#define ALIGN(n) __declspec(align(n))\n#define offsetof(s,m) ((size_t)&(((s*)0)->m))\n#endif' > src/compat/msvc/common/attributes.h
           # 尝试从 vcpkg 找到真实的 pthread.h（PThreads4W），找不到则用 Windows SRWLOCK 生成 shim
           mkdir -p "$P_MIXED/include"
           REAL_PTHREAD=$(find /c/vcpkg -path "*/installed/*/include/pthread.h" -not -path "*/debug/*" -print -quit 2>/dev/null || true)
