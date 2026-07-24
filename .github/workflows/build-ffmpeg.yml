@@ -214,6 +214,8 @@ jobs:
           fi
           cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           cd ffmpeg-src
+          # Ubuntu 26.04 的 libopenjp2-7 将 opj_version 标记为 hidden symbol
+          sed -i 's/require_pkg_config libopenjpeg libopenjp2 >= 2.1.0 openjpeg.h opj_version/require_pkg_config libopenjpeg libopenjp2 >= 2.1.0 openjpeg.h opj_set_default_encoder_parameters/' configure
           ./configure --prefix="$P" --pkg-config-flags="--static" \
             --extra-cflags="-I$P/include" \
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
@@ -525,6 +527,11 @@ jobs:
           python3 -c '
           import pathlib
           for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
+              p = pathlib.Path(path)
+              if p.exists():
+                  s = p.read_text(encoding="utf-8")
+                  s = s.replace("#ifdef _MSC_VER\n", "#if defined(_MSC_VER) && !defined(__clang__)\n")
+                  p.write_text(s, encoding="utf-8")
           '
           if [ "${{ matrix.cuda }}" = "true" ]; then
             python3 -c '
