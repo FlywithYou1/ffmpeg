@@ -582,15 +582,19 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，直接在 bash 中探测（更可靠）
+          # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，通过搜索 pthread.h 反向定位 vcpkg（100% 可靠）
           if [ -z "${VCPKG_INSTALLED:-}" ]; then
-            for vdir in "/c/vcpkg/installed/x64-windows-static" "/c/vcpkg/installed/arm64-windows-static"; do
-              if [ -d "$vdir" ]; then
-                VCPKG_INSTALLED="$(echo "$vdir" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"
-                echo "::notice::自动探测 VCPKG_INSTALLED=$VCPKG_INSTALLED"
-                break
-              fi
+            PTHREAD_H=""
+            for search_root in "/c/vcpkg/installed" "/d/vcpkg/installed" "/c/vcpkg" "/d/vcpkg"; do
+              [ -d "$search_root" ] || continue
+              PTHREAD_H=$(find "$search_root" -path "*/include/pthread.h" -print -quit 2>/dev/null || true)
+              [ -n "$PTHREAD_H" ] && break
             done
+            if [ -n "$PTHREAD_H" ]; then
+              VCPKG_INSTALLED_U="$(dirname "$(dirname "$PTHREAD_H")")"  # .../installed/<triplet>
+              VCPKG_INSTALLED="$(echo "$VCPKG_INSTALLED_U" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"
+              echo "::notice::自动定位 VCPKG_INSTALLED=$VCPKG_INSTALLED (来自 $PTHREAD_H)"
+            fi
           fi
           # 转换 VCPKG_INSTALLED：C:/... → /c/...（bash 文件操作需要 Unix 路径）
           VCPKG_INSTALLED_U=""
@@ -598,9 +602,10 @@ jobs:
             VCPKG_INSTALLED_U="$(echo "$VCPKG_INSTALLED" | sed 's|^[Cc]:/|/c/|;s|^[Dd]:/|/d/|')"
           fi
           # Clang-cl 和 MSVC 分别通过不同变量找头文件
-          export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
+          VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
+          export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
           # Clang（非 clang-cl 模式）无视 INCLUDE，需要 CPATH
-          export CPATH="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${CPATH:-}"
+          export CPATH="${VCPKG_INC}${P_MIXED}/include;${CPATH:-}"
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
           if [ -n "${VCPKG_INSTALLED_U:-}" ] && [ -f "${VCPKG_INSTALLED_U}/include/pthread.h" ]; then
