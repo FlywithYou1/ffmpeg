@@ -303,6 +303,7 @@ $pkgconf = Get-ChildItem -Path @(
     "$vcpkgRoot\packages\pkgconf_*\tools\pkgconf\pkgconf.exe"
 ) -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $pkgconf) { throw "pkgconf.exe not found under $inst or $vcpkgRoot\packages" }
+$pkgconfDir = (Split-Path $pkgconf.FullName) -replace '\\','/'
 $pkgconfMixed = ($pkgconf.FullName -replace '\\','/')
 Write-Output "pkg-config: $pkgconfMixed"
 
@@ -314,7 +315,10 @@ Write-Output "libfdk-aac.pc:"
 Get-Content "$pcDir/libfdk-aac.pc"
 
 Write-Output "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-Write-Output "PKG_CONFIG=$pkgconfMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+# 不设全局 PKG_CONFIG：Meson 会尝试解析为脚本导致 utf-8 错误。
+# PKG_CONFIG 仅在 FFmpeg configure 步骤中临时设置。
+Write-Output "PKG_CONFIG_DIR=$pkgconfDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 Write-Output "PKG_CONFIG_PATH=$pcDir" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+Write-Output "$pkgconfDir" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
 $shadercTools = "$inst\tools\shaderc"
 if (Test-Path "$shadercTools\glslc.exe") { Write-Output "$shadercTools" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append; Write-Output "shaderc tools: $shadercTools" }

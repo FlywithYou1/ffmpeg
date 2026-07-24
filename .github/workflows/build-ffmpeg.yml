@@ -470,17 +470,26 @@ jobs:
         run: |
           __clean_path() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Ss]trawberry*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
           __clean_path
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
-          echo "PKG_CONFIG=${PKG_CONFIG}"
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+          # 优先用 PKG_CONFIG_DIR（vcpkg manifest 模式），回退到全局 PKG_CONFIG
+          if [ -z "${PKG_CONFIG:-}" ] && [ -n "${PKG_CONFIG_DIR:-}" ]; then
+            PKG_CONFIG="${PKG_CONFIG_DIR}/pkg-config.exe"
+            [ ! -f "$PKG_CONFIG" ] && PKG_CONFIG="${PKG_CONFIG_DIR}/pkgconf.exe"
+          fi
+          [ -z "${PKG_CONFIG:-}" ] && PKG_CONFIG="$(which pkg-config 2>/dev/null || echo)"
+          echo "PKG_CONFIG=${PKG_CONFIG:-未设置}"
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}"
           echo "--- .pc files ---"
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
-          $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-          $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
-          $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
-          $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
-          $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
+          if [ -n "${PKG_CONFIG:-}" ] && [ -x "$PKG_CONFIG" ]; then
+            $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
+            $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
+            $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
+            $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
+            $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
+          else
+            echo "pkg-config 未找到，跳过检查"
+          fi
 
       - name: 安装 CUDA 工具包
         if: matrix.cuda
@@ -651,7 +660,10 @@ jobs:
           __clean_path
           set -e; P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          [ -z "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未设置"; exit 1; }
+          # 从 PKG_CONFIG_DIR 找 pkg-config（不用全局 PKG_CONFIG，避免 Meson 误解析）
+          PKG_CONFIG="${PKG_CONFIG_DIR:-$(dirname "$(which pkg-config 2>/dev/null)" 2>/dev/null)}/pkg-config.exe"
+          [ ! -f "$PKG_CONFIG" ] && PKG_CONFIG="${PKG_CONFIG_DIR:-$(dirname "$(which pkgconf 2>/dev/null)" 2>/dev/null)}/pkgconf.exe"
+          [ ! -f "$PKG_CONFIG" ] && { echo "::error::PKG_CONFIG 未找到"; exit 1; }
           if command -v cygpath >/dev/null 2>&1; then
             PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
           fi
@@ -707,11 +719,11 @@ jobs:
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
           echo "=== pkg-config libmp3lame ==="
-          $PKG_CONFIG --debug libmp3lame 2>&1 | head -40 || true
+          ${PKG_CONFIG:-true} --debug libmp3lame 2>&1 | head -40 || true
           echo "=== pkg-config libfdk-aac ==="
-          $PKG_CONFIG --debug libfdk-aac 2>&1 | head -40 || true
+          ${PKG_CONFIG:-true} --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
-          $PKG_CONFIG --debug vpl 2>&1 | head -40 || true
+          ${PKG_CONFIG:-true} --debug vpl 2>&1 | head -40 || true
 
       - name: 验证
         shell: bash
