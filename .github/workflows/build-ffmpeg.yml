@@ -608,17 +608,14 @@ jobs:
             export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED}/include;${CUDA_HOME}/include;${INCLUDE:-}"
           fi
           # MSVC 不兼容 VMAF 的 GCC 风格 x86 汇编（-mavx / __builtin_clz / __m256 cast）
-          # 仅在使用 Clang 编译时才启用 ASM
+          # 有 Clang 时用 Clang 编译 VMAF（兼容 GCC 风格 SIMD），否则禁用 ASM
           if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ] && command -v nasm >/dev/null 2>&1; then
+            export CC="${CLANG_BIN}/clang.exe"
+            export CXX="${CLANG_BIN}/clang.exe"
             VMAF_ENABLE_ASM=true
           else
             VMAF_ENABLE_ASM=false
             echo "::warning::禁用 VMAF 汇编优化（MSVC 不兼容 GCC 风格 SIMD）"
-          fi
-          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
-            CC_BIN="$CLANG_BIN/clang.exe"
-          else
-            CC_BIN="cl.exe"
           fi
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"           meson setup build --buildtype release --prefix="$P" -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM -Db_vscrt=mt -Ddefault_library=static
           ninja -vC build
