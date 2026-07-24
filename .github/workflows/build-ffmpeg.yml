@@ -580,8 +580,10 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          # Clang-cl 和 MSVC 都通过 INCLUDE 环境变量找头文件
+          # Clang-cl 和 MSVC 分别通过不同变量找头文件
           export INCLUDE="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${INCLUDE:-}"
+          # Clang（非 clang-cl 模式）无视 INCLUDE，需要 CPATH
+          export CPATH="${VCPKG_INSTALLED}/include;${P_MIXED}/include;${CPATH:-}"
           PTHREAD_CFLAGS=""
           PTHREAD_LDFLAGS=""
           if [ -n "${VCPKG_INSTALLED:-}" ] && [ -f "${VCPKG_INSTALLED}/include/pthread.h" ]; then
