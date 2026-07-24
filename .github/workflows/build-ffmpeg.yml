@@ -659,7 +659,10 @@ jobs:
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
               -Db_vscrt=mt -Ddefault_library=static $MESON_EXTRA_ARGS
-          ninja -vC build
+          ninja -vC build 2>&1 | tee /tmp/ninja-vmaf.log || {
+            echo "::error::ninja 编译 VMAF 失败，详见下方 /tmp/ninja-vmaf.log"
+            exit 1
+          }
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf"
           vmaf_static_lib=""
           for cand in build/src/libvmaf.a build/src/vmaf.lib build/src/libvmaf.lib; do
@@ -693,6 +696,14 @@ jobs:
           if [ -f /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ]; then
             echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
             cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
+          fi
+      - name: 导出 VMAF ninja 日志
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f /tmp/ninja-vmaf.log ]; then
+            echo "=== /tmp/ninja-vmaf.log ==="
+            cat /tmp/ninja-vmaf.log
           fi
 
       - name: 编译 FFmpeg
