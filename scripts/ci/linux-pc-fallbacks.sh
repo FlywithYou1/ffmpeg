@@ -6,11 +6,13 @@ set -euo pipefail
 P="${1:?Usage: $0 <install_prefix>}"
 mkdir -p "$P/lib/pkgconfig"
 
-# libopenjp2.pc — 强制覆盖：Ubuntu 26.04 的系统 .pc 带 -DOPJ_STATIC，
-# 导致所有符号变 hidden，FFmpeg configure 函数检测失败。
-OPENJP2_INCLUDE=$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)
-printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$OPENJP2_INCLUDE" > "$P/lib/pkgconfig/libopenjp2.pc"
-echo "Created libopenjp2.pc (without -DOPJ_STATIC)"
+# libopenjp2.pc — 在自定义安装目录强制覆盖不带 -DOPJ_STATIC。
+# 不在系统目录（/usr）操作，避免权限问题。
+if [ "$P" != "/usr" ] && [ "$P" != "/usr/local" ]; then
+    OPENJP2_INCLUDE=$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)
+    printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$OPENJP2_INCLUDE" > "$P/lib/pkgconfig/libopenjp2.pc"
+    echo "Created libopenjp2.pc (without -DOPJ_STATIC)"
+fi
 
 # x265.pc — 某些发行版不附带
 if ! pkg-config --exists x265 2>/dev/null; then
