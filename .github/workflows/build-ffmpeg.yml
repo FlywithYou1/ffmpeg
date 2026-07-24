@@ -582,39 +582,50 @@ jobs:
           CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
           [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
-          # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，通过搜索 pthread.h 反向定位 vcpkg（100% 可靠）
+          # vcpkg 的 pthreads 端口在 Windows static 构建中不提供 pthread.h
+          # 用 Windows 原生 SRWLOCK/CONDITION_VARIABLE 生成一个最小 pthread shim
+          mkdir -p "$P_MIXED/include"
+          cat > "$P_MIXED/include/pthread.h" << 'PTHREAD_EOF'
+#ifndef PTHREAD_SHIM_H
+#define PTHREAD_SHIM_H
+#include <windows.h>
+#include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+typedef struct { SRWLOCK lock; int init; } pthread_mutex_t;
+typedef struct { CONDITION_VARIABLE cv; int init; } pthread_cond_t;
+typedef HANDLE pthread_t;
+typedef struct { int init; int pshared; void *ptr; } pthread_mutexattr_t;
+typedef struct { int init; int pshared; } pthread_condattr_t;
+#define PTHREAD_MUTEX_INITIALIZER {{0},0}
+#define PTHREAD_COND_INITIALIZER {{0},0}
+static inline int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *a) { (void)a; InitializeSRWLock(&m->lock); m->init=1; return 0; }
+static inline int pthread_mutex_destroy(pthread_mutex_t *m) { (void)m; m->init=0; return 0; }
+static inline int pthread_mutex_lock(pthread_mutex_t *m) { AcquireSRWLockExclusive(&m->lock); return 0; }
+static inline int pthread_mutex_unlock(pthread_mutex_t *m) { ReleaseSRWLockExclusive(&m->lock); return 0; }
+static inline int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a) { (void)a; InitializeConditionVariable(&c->cv); c->init=1; return 0; }
+static inline int pthread_cond_destroy(pthread_cond_t *c) { (void)c; c->init=0; return 0; }
+static inline int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m) { return SleepConditionVariableSRW(&c->cv, &m->lock, INFINITE, 0) ? 0 : -1; }
+static inline int pthread_cond_signal(pthread_cond_t *c) { WakeConditionVariable(&c->cv); return 0; }
+static inline int pthread_cond_broadcast(pthread_cond_t *c) { WakeAllConditionVariable(&c->cv); return 0; }
+static inline int pthread_create(pthread_t *t, const void *a, void *(*f)(void*), void *arg) { (void)a; *t=CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)f,arg,0,NULL); return *t?0:-1; }
+static inline int pthread_join(pthread_t t, void **ret) { WaitForSingleObject(t,INFINITE); if(ret) GetExitCodeThread(t,(LPDWORD)ret); CloseHandle(t); return 0; }
+static inline void pthread_exit(void *ret) { ExitThread((DWORD)(uintptr_t)ret); }
+#ifdef __cplusplus
+}
+#endif
+#endif
+PTHREAD_EOF
+          # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，直接用 find 探测
           if [ -z "${VCPKG_INSTALLED:-}" ]; then
-            PTHREAD_H=""
-            for search_root in "/c/vcpkg/installed" "/d/vcpkg/installed" "/c/vcpkg" "/d/vcpkg"; do
-              [ -d "$search_root" ] || continue
-              PTHREAD_H=$(find "$search_root" -path "*/include/pthread.h" -print -quit 2>/dev/null || true)
-              [ -n "$PTHREAD_H" ] && break
+            for vdir in "/c/vcpkg/installed/x64-windows-static" "/c/vcpkg/installed/arm64-windows-static"; do
+              [ -d "$vdir" ] && { VCPKG_INSTALLED="$(echo "$vdir" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"; break; }
             done
-            if [ -n "$PTHREAD_H" ]; then
-              VCPKG_INSTALLED_U="$(dirname "$(dirname "$PTHREAD_H")")"  # .../installed/<triplet>
-              VCPKG_INSTALLED="$(echo "$VCPKG_INSTALLED_U" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"
-              echo "::notice::自动定位 VCPKG_INSTALLED=$VCPKG_INSTALLED (来自 $PTHREAD_H)"
-            fi
-          fi
-          # 转换 VCPKG_INSTALLED：C:/... → /c/...（bash 文件操作需要 Unix 路径）
-          VCPKG_INSTALLED_U=""
-          if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            VCPKG_INSTALLED_U="$(echo "$VCPKG_INSTALLED" | sed 's|^[Cc]:/|/c/|;s|^[Dd]:/|/d/|')"
           fi
           # Clang-cl 和 MSVC 分别通过不同变量找头文件
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
           export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
-          # Clang（非 clang-cl 模式）无视 INCLUDE，需要 CPATH
-          export CPATH="${VCPKG_INC}${P_MIXED}/include;${CPATH:-}"
-          PTHREAD_CFLAGS=""
-          PTHREAD_LDFLAGS=""
-          if [ -n "${VCPKG_INSTALLED_U:-}" ] && [ -f "${VCPKG_INSTALLED_U}/include/pthread.h" ]; then
-            PTHREAD_CFLAGS="-I${VCPKG_INSTALLED}/include"
-            PTHREAD_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib pthreads.lib"
-          fi
-          export CFLAGS="-D_USE_MATH_DEFINES${PTHREAD_CFLAGS:+ $PTHREAD_CFLAGS}${CFLAGS:+ $CFLAGS}"
-          export CXXFLAGS="-D_USE_MATH_DEFINES${PTHREAD_CFLAGS:+ $PTHREAD_CFLAGS}${CXXFLAGS:+ $CXXFLAGS}"
-          export LDFLAGS="${PTHREAD_LDFLAGS:+$PTHREAD_LDFLAGS}${LDFLAGS:+ $LDFLAGS}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
             python3 -c "
             import pathlib
@@ -645,25 +656,11 @@ jobs:
             VMAF_ENABLE_ASM=false
             echo "::warning::禁用 VMAF 汇编优化（MSVC 不兼容 GCC 风格 SIMD）"
           fi
-          # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入所有外部头文件路径
-          # 同时也需要 -D_USE_MATH_DEFINES，否则 M_PI 等宏未定义（meson 不继承环境 CFLAGS）
-          VMAF_EXTRA_INCLUDES="-D_USE_MATH_DEFINES"
-          if [ -n "${VCPKG_INSTALLED:-}" ]; then
-            # vcpkg root include
-            VMAF_EXTRA_INCLUDES="-I${VCPKG_INSTALLED}/include ${VMAF_EXTRA_INCLUDES}"
-            # vcpkg 的 pthreads 端口可能把 pthread.h 放在子目录下，用 find 定位
-            VCPKG_U="$(echo "${VCPKG_INSTALLED}" | sed 's|^[Cc]:/|/c/|;s|^[Dd]:/|/d/|')"
-            PTHREAD_REAL=$(find "$VCPKG_U" -name "pthread.h" -not -path "*/buildtrees/*" -print -quit 2>/dev/null || true)
-            if [ -n "$PTHREAD_REAL" ]; then
-              PTHREAD_DIR="$(dirname "$PTHREAD_REAL")"
-              PTHREAD_DIR_M="$(echo "$PTHREAD_DIR" | sed 's|^/c/|C:/|;s|^/d/|D:/|')"
-              VMAF_EXTRA_INCLUDES="-I${PTHREAD_DIR_M} ${VMAF_EXTRA_INCLUDES}"
-              echo "::notice::pthread.h 实际位置: $PTHREAD_REAL"
-            else
-              echo "::warning::未找到 pthread.h，VMAF 编译可能失败"
-            fi
-          fi
-          VMAF_MESON_ARGS=("-Dc_args=${VMAF_EXTRA_INCLUDES}" "-Dcpp_args=${VMAF_EXTRA_INCLUDES}")
+          # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入头文件路径
+          # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
+          VMAF_C_ARGS="-D_USE_MATH_DEFINES"
+          [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${VCPKG_INSTALLED}/include -I${P_MIXED}/include ${VMAF_C_ARGS}"
+          VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_C_ARGS}")
           echo "--- VMAF meson ---"
           echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  VMAF_MESON_ARGS=${VMAF_MESON_ARGS[*]}"
           echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
@@ -711,15 +708,6 @@ jobs:
             echo "=== /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt ==="
             cat /tmp/vmaf/libvmaf/build/meson-logs/meson-log.txt
           fi
-          echo "=== vcpkg include 目录内容 ==="
-          for d in /c/vcpkg/installed/*/include; do
-            [ -d "$d" ] || continue
-            echo "--- $d ---"
-            ls "$d"/pthread* 2>/dev/null || echo "(无 pthread*)"
-            echo "--- find pthread.h ---"
-            find /c/vcpkg -name "pthread.h" 2>/dev/null | head -5 || echo "(无)"
-            break
-          done
       - name: 导出 VMAF ninja 日志
         if: failure()
         shell: bash
