@@ -651,7 +651,7 @@ jobs:
                     "{ .compute_score = 1, .supported_by_any = 1, .ref = 1, .main = 1 }",
                     "{ 1, 1, 1, 1 }")
                 p.write_text(s, encoding="utf-8")
-          PYEOF5
+            PYEOF5
             export CUDA_HOME="/c/cuda"
             export CUDA_PATH="/c/cuda"
             export CUDACXX="/c/cuda/bin/nvcc"
@@ -687,7 +687,7 @@ jobs:
                 '-I', '${P_MIXED}/include',
                 '-I', '${VCPKG_INSTALLED}/include',")
             mb.write_text(s, encoding='utf-8')
-          PYEOF6
+            PYEOF6
             export INCLUDE="${INCLUDE};${CUDA_HOME}/include"
           fi
           # MSVC 不兼容 VMAF 的 GCC 风格 x86 汇编（-mavx / __builtin_clz / __m256 cast）
