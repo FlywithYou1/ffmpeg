@@ -553,9 +553,8 @@ jobs:
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
-          # MSVC does not allow pointer arithmetic on void*, but VifBuffer uses void *ref/dis
-          sed -i 's/    void \*ref;/    unsigned char *ref;/' src/feature/integer_vif.h
-          sed -i 's/    void \*dis;/    unsigned char *dis;/' src/feature/integer_vif.h
+          # MSVC does not allow pointer arithmetic on void*, init() uses void *data locally
+          sed -i 's/    void \*data = aligned_malloc/    unsigned char *data = (unsigned char *)aligned_malloc/' src/feature/integer_vif.c
           # Fix mkdirp.h: mode_t is not defined on Windows (no POSIX sys/types.h)
           sed -i '1i typedef unsigned short mode_t;' src/feature/mkdirp.h
           python3 -c '
