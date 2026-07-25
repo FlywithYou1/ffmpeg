@@ -195,7 +195,7 @@ $fallbacks = @(
     @{ Var='theoraLib';    Names=@('theora','libtheora');       Pc='theora';    Desc='theora library';             Port='libtheora' }
     @{ Var='theoradecLib'; Names=@('theoradec','libtheoradec'); Pc='theoradec'; Desc='theoradec library';          Port='libtheora' }
     @{ Var='theoraencLib'; Names=@('theoraenc','libtheoraenc'); Pc='theoraenc'; Desc='theoraenc library';          Port='libtheora' }
-    @{ Var='libaomLib';    Names=@('aom','libaom');             Pc='libaom';    Desc='libaom library';             Port='aom' }
+    @{ Var='libaomLib';    Names=@('aom','libaom');             Pc='aom';       Desc='aom library';                Port='aom' }
     @{ Var='libwebpLib';   Names=@('webp','libwebp');           Pc='libwebp';   Desc='libwebp library';            Port='libwebp' }
     @{ Var='libassLib';    Names=@('ass','libass');             Pc='libass';    Desc='libass library';             Port='libass' }
     @{ Var='freetype2Lib'; Names=@('freetype','libfreetype');   Pc='freetype2'; Desc='freetype2 library';          Port='freetype'; Cflags='-I${includedir} -I${includedir}/freetype2' }
