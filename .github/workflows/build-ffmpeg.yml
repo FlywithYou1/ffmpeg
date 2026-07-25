@@ -391,7 +391,7 @@ jobs:
           # NuGet still has empty stubs from previous runs; we need clean source builds.
           $env:VCPKG_BINARY_SOURCES = 'clear'
           # Also purge local caches that may contain stale empty stubs
-          foreach ($dir in @("$v\archives", "$v\packages", "$v\installed")) {
+          foreach ($dir in @("$v\archives", "$v\packages", "$v\installed", "$env:GITHUB_WORKSPACE\vcpkg_installed")) {
             if (Test-Path $dir) {
               $libCount = (Get-ChildItem $dir -Recurse -Filter '*.lib' -ErrorAction SilentlyContinue).Count
               Write-Output "Cache dir $dir : $libCount .lib files"
@@ -415,7 +415,8 @@ jobs:
             }
           }
           $env:Path = "$v;" + $env:Path
-          $inst = "$v\installed\${{ matrix.triplet }}"
+          # --x-manifest-root installs to vcpkg_installed/ next to the manifest, NOT $VCPKG_ROOT/installed/
+          $inst = "$env:GITHUB_WORKSPACE\vcpkg_installed\${{ matrix.triplet }}"
           $instUnix = $inst -replace '\\', '/'
           echo "VCPKG_INSTALLED=$instUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           for ($i = 1; $i -le 3; $i++) {
