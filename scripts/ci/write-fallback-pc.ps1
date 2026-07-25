@@ -283,28 +283,32 @@ foreach ($fb in $fallbacks) {
     }
 }
 
-# vpl.pc — vcpkg libvpl 使用 cmake-config，ffmpeg 需要 pkg-config
+# vpl.pc — vcpkg libvpl (>=2.17.0) 已自带 vpl.pc，优先使用；不存在时才生成回退
 if ($HasVpl) {
-    $vplLib = Find-ImportLib @('vpl','libvpl','vpl_arm64','vpl-shared')
-    if (-not $vplLib) {
-        Write-Host "::warning::vpl import library not found under $inst\lib"
+    $vplPc = "$pcDir/vpl.pc"
+    if (Test-Path $vplPc) {
+        Write-Host "使用 vcpkg 提供的 vpl.pc"
     } else {
-        $vplVer = Get-PortVersion 'libvpl'
-        if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
-        Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
-        Write-Utf8 "$pcDir/vpl.pc" @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: vpl',
-            'Description: Intel oneVPL library',
-            "Version: $vplVer",
-            "Libs: $vplLib",
-            'Cflags: -I${includedir} -I${includedir}/vpl'
-        )
-        Write-Host "已创建 vpl.pc"
+        $vplLib = Find-ImportLib @('vpl','libvpl','libmfx','vpl_arm64','vpl-shared')
+        if (-not $vplLib) {
+            Write-Host "::warning::vpl import library not found under $inst\lib"
+        } else {
+            $vplVer = Get-PortVersion 'libvpl'
+            if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
+            Write-Utf8 $vplPc @(
+                "prefix=$instMixed",
+                'exec_prefix=${prefix}',
+                'libdir=${prefix}/lib',
+                'includedir=${prefix}/include',
+                '',
+                'Name: vpl',
+                'Description: Intel oneVPL library',
+                "Version: $vplVer",
+                "Libs: $vplLib",
+                'Cflags: -I${includedir} -I${includedir}/vpl'
+            )
+            Write-Host "已创建 vpl.pc"
+        }
     }
 }
 
