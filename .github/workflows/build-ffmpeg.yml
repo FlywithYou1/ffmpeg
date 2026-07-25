@@ -387,9 +387,8 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # Force source build: purge stale caches, then override NuGet cache config.
-          # NuGet still has empty stubs from previous runs; we need clean source builds.
-          $env:VCPKG_BINARY_SOURCES = 'clear'
+          # NuGet binary cache: readwrite（首次上传预编译包，后续直接下载）
+          $env:VCPKG_BINARY_SOURCES = "clear;nuget,$env:FEED_URL,readwrite"
           # Also purge local caches that may contain stale empty stubs
           foreach ($dir in @("$v\archives", "$v\packages", "$v\installed", "$env:GITHUB_WORKSPACE\vcpkg_installed")) {
             if (Test-Path $dir) {
@@ -709,7 +708,7 @@ jobs:
           fi
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入头文件路径
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
-          VMAF_C_ARGS="-D_USE_MATH_DEFINES"
+          VMAF_C_ARGS="-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS"
           [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${VCPKG_INSTALLED}/include -I${P_MIXED}/include ${VMAF_C_ARGS}"
           # MSVC cl.exe 需要 /experimental:c11atomics 启用 C11 <stdatomic.h>；Clang 不认识此标志
           if [ "${CC}" != "${CLANG_BIN}/clang.exe" ]; then
