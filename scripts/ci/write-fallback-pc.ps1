@@ -62,6 +62,12 @@ function Get-PortVersion($portName) {
         }
     }
     if (-not $ver) { $ver = 'unknown' }
+    # vcpkg 无法提取版本时的兜底：已知满足 FFmpeg 最低版本要求的默认值
+    $knownVersions = @{ 'aom' = '3.0.0' }
+    if ($ver -eq 'unknown' -and $knownVersions.ContainsKey($portName)) {
+        $ver = $knownVersions[$portName]
+        Write-Host "Get-PortVersion $portName fallback -> $ver"
+    }
     Write-Host "Get-PortVersion $portName -> $ver"
     return $ver
 }
