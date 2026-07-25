@@ -572,7 +572,6 @@ jobs:
           s = p.read_text(encoding="utf-8")
           s = s.replace("double scores[model_collection->cnt];", "double *scores = malloc(model_collection->cnt * sizeof(double));")
           s = s.replace("char name[name_sz];", "char name[256];")
-          s = s.replace("free_node:\n    free(node);\n    return err;", "free_node:\n    free(node);\n    free(scores);\n    return err;")
           p.write_text(s, encoding="utf-8")
           '
           # Fix mkdirp.h: mode_t is not defined on Windows (no POSIX sys/types.h)
