@@ -39,7 +39,7 @@ function Get-PortVersion($portName) {
             if (-not $ver) { $ver = $data.'version-string' }
             if (-not $ver) { $ver = $data.'version-date' }
             if ($ver) { $ver = ($ver -split '#')[0] }
-        } catch { Write-Output "警告：无法解析 $json : $_" }
+        } catch { Write-Host "警告：无法解析 $json : $_" }
     }
     if (-not $ver -and (Test-Path $control)) {
         $m = Select-String -Path $control -Pattern '^Version:\s*(.+)$'
@@ -62,7 +62,7 @@ function Get-PortVersion($portName) {
         }
     }
     if (-not $ver) { $ver = 'unknown' }
-    Write-Output "Get-PortVersion $portName -> $ver"
+    Write-Host "Get-PortVersion $portName -> $ver"
     return $ver
 }
 
