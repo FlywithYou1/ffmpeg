@@ -30,6 +30,10 @@
     "dav1d",
     "openh264",
     "libtwolame",
+    {
+      "name": "libvpl",
+      "platform": "(x64 | x86) & windows"
+    },
     "speex",
     "libjxl",
     "shaderc"
