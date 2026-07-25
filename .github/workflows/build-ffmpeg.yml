@@ -493,10 +493,8 @@ jobs:
 
       - name: 安装 CUDA 工具包
         if: matrix.cuda
-        uses: mjun0812/setup-cuda@v1.5.0
-        with:
-          version: latest
-          method: network
+        shell: pwsh
+        run: winget install --id Nvidia.CUDA -e --accept-source-agreements --accept-package-agreements --silent
 
       - name: 检测 CUDA
         if: matrix.cuda
