@@ -237,6 +237,20 @@ $fallbacks = @(
 $expatLib = Find-ImportLib @('expat','libexpat','expatMD','expat-static')
 if ($expatLib) { Write-Host "expat found: $expatLib" } else { Write-Host '::warning::expat not found (fontconfig will miss XML support)' }
 
+# freetype2 需要 libpng / brotli / zlib / bz2（字体格式解压）
+$libpngLib = Find-ImportLib @('libpng16','libpng','png16','png')
+$brotliDecLib = Find-ImportLib @('brotlidec','brotlidec-static')
+$brotliCommonLib = Find-ImportLib @('brotlicommon','brotlicommon-static')
+$bz2Lib = Find-ImportLib @('bz2','libbz2','bzip2','bzip2-static')
+$zlibLib = Find-ImportLib @('zlib','z','libz','zlibstatic')
+$ftExtraLibs = @()
+if ($libpngLib) { $ftExtraLibs += $libpngLib } else { Write-Host '::warning::libpng not found (freetype PNG support disabled)' }
+if ($brotliDecLib) { $ftExtraLibs += $brotliDecLib }
+if ($brotliCommonLib) { $ftExtraLibs += $brotliCommonLib }
+if ($brotliDecLib) { Write-Host "brotli found: $brotliDecLib + $brotliCommonLib" } else { Write-Host '::warning::brotli not found' }
+if ($bz2Lib) { $ftExtraLibs += $bz2Lib } else { Write-Host '::warning::bz2 not found' }
+if ($zlibLib) { $ftExtraLibs += $zlibLib } else { Write-Host '::warning::zlib not found' }
+
 foreach ($fb in $fallbacks) {
     $lib = Find-ImportLib $fb.Names
     if ($lib) {
@@ -253,8 +267,10 @@ foreach ($fb in $fallbacks) {
             "Version: $(Get-PortVersion $fb.Port)"
         )
         if ($fb.Requires) { $lines += "Requires: $($fb.Requires)" }
-        # fontconfig 额外需要 expat.lib（XML 解析）
-        $libs = if ($fb.Pc -eq 'fontconfig' -and $expatLib) { "$lib $expatLib" } else { $lib }
+        # fontconfig 额外需要 expat.lib（XML 解析）；freetype2 需要 libpng+brotli+zlib+bz2
+        $libs = $lib
+        if ($fb.Pc -eq 'fontconfig' -and $expatLib) { $libs = "$libs $expatLib" }
+        if ($fb.Pc -eq 'freetype2' -and $ftExtraLibs.Count -gt 0) { $libs = "$libs $($ftExtraLibs -join ' ')" }
         $lines += "Libs: $libs"
         $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
         $lines += "Cflags: $cflags"
