@@ -640,8 +640,8 @@ jobs:
           echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
           echo "INCLUDE=${INCLUDE:-}"
           echo "------------------"
-          # Windows 没有 getopt.h，不需要 vmaf CLI 和 test（test 依赖 tools/meson.build 中的 compat_cflags）
-          sed -i "/subdir('tools')/d; /subdir('test')/d" meson.build
+          # VMAF CLI (tools) 需要 getopt.h，Windows 没有 — 生成桩
+          mkdir -p "$P_MIXED/include" && echo $'#ifndef GETOPT_SHIM_H\n#define GETOPT_SHIM_H\n#ifdef __cplusplus\nextern "C" {\n#endif\nstruct option { const char *name; int has_arg; int *flag; int val; };\n#define no_argument 0\n#define required_argument 1\n#define optional_argument 2\nstatic char *optarg = 0;\nstatic int optind = 1;\nstatic inline int getopt_long(int argc, char * const argv[], const char *optstring, const struct option *longopts, int *longindex){(void)argc;(void)argv;(void)optstring;(void)longopts;(void)longindex;return -1;}\n#ifdef __cplusplus\n}\n#endif\n#endif' > "$P_MIXED/include/getopt.h"
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
