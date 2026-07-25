@@ -224,7 +224,7 @@ $fallbacks = @(
     @{ Var='libwebpLib';   Names=@('webp','libwebp');           Pc='libwebp';   Desc='libwebp library';            Port='libwebp' }
     @{ Var='libassLib';    Names=@('ass','libass');             Pc='libass';    Desc='libass library';             Port='libass' }
     @{ Var='freetype2Lib'; Names=@('freetype','libfreetype');   Pc='freetype2'; Desc='freetype2 library';          Port='freetype'; Cflags='-I${includedir} -I${includedir}/freetype2' }
-    @{ Var='fontconfigLib';Names=@('fontconfig','libfontconfig');Pc='fontconfig';Desc='fontconfig library';        Port='fontconfig' }
+    @{ Var='fontconfigLib';Names=@('fontconfig','libfontconfig');Pc='fontconfig';Desc='fontconfig library';        Port='fontconfig'; Requires='freetype2' }
     @{ Var='zimgLib';      Names=@('zimg','libzimg');           Pc='zimg';      Desc='zimg library';               Port='zimg' }
     @{ Var='soxrLib';      Names=@('soxr','libsoxr');           Pc='soxr';      Desc='soxr library';               Port='soxr' }
     @{ Var='libopenjp2Lib';Names=@('openjp2','libopenjp2');     Pc='libopenjp2';Desc='libopenjp2 library';         Port='openjpeg' }
@@ -232,6 +232,10 @@ $fallbacks = @(
     @{ Var='libtwolameLib';Names=@('twolame','libtwolame');     Pc='libtwolame';Desc='TwoLAME MP2 encoder library';Port='libtwolame'; Cflags='-I${includedir} -DLIBTWOLAME_STATIC' }
     @{ Var='libopenmptLib';Names=@('openmpt','libopenmpt');     Pc='libopenmpt';Desc='OpenMPT module library';     Port='libopenmpt' }
 )
+
+# fontconfig 需要 expat（XML 解析），由 vcpkg 作为传递依赖提供
+$expatLib = Find-ImportLib @('expat','libexpat','expatMD','expat-static')
+if ($expatLib) { Write-Host "expat found: $expatLib" } else { Write-Host '::warning::expat not found (fontconfig will miss XML support)' }
 
 foreach ($fb in $fallbacks) {
     $lib = Find-ImportLib $fb.Names
@@ -249,7 +253,9 @@ foreach ($fb in $fallbacks) {
             "Version: $(Get-PortVersion $fb.Port)"
         )
         if ($fb.Requires) { $lines += "Requires: $($fb.Requires)" }
-        $lines += "Libs: $lib"
+        # fontconfig 额外需要 expat.lib（XML 解析）
+        $libs = if ($fb.Pc -eq 'fontconfig' -and $expatLib) { "$lib $expatLib" } else { $lib }
+        $lines += "Libs: $libs"
         $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
         $lines += "Cflags: $cflags"
         Write-Utf8 $pcFile $lines
