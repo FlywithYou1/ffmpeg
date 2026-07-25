@@ -387,6 +387,17 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
+          # Force source build: purge stale caches, then override NuGet cache config.
+          # NuGet still has empty stubs from previous runs; we need clean source builds.
+          $env:VCPKG_BINARY_SOURCES = 'clear'
+          # Also purge local caches that may contain stale empty stubs
+          foreach ($dir in @("$v\archives", "$v\packages", "$v\installed")) {
+            if (Test-Path $dir) {
+              $libCount = (Get-ChildItem $dir -Recurse -Filter '*.lib' -ErrorAction SilentlyContinue).Count
+              Write-Output "Cache dir $dir : $libCount .lib files"
+              if ($libCount -eq 0) { Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue; Write-Output "  -> purged (empty)" }
+            }
+          }
           # Update vcpkg itself (ports / tool) to latest — runner ships an old snapshot
           Write-Output "Updating vcpkg to latest..."
           Push-Location $v
@@ -407,25 +418,6 @@ jobs:
           $inst = "$v\installed\${{ matrix.triplet }}"
           $instUnix = $inst -replace '\\', '/'
           echo "VCPKG_INSTALLED=$instUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          # Purge local packages cache — may contain empty stubs from old NuGet restores.
-          # Without this, vcpkg skips compilation (ABI match) even though .lib files are missing.
-          $packagesDir = "$v\packages"
-          if (Test-Path $packagesDir) {
-            $count = (Get-ChildItem $packagesDir -Recurse -Filter '*.lib' -ErrorAction SilentlyContinue).Count
-            Write-Output "Local packages cache: $count .lib files"
-            if ($count -lt 50) {
-              Write-Output "::warning::Local packages cache appears incomplete, purging $packagesDir"
-              Remove-Item $packagesDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          if (Test-Path $inst) {
-            $libCount = (Get-ChildItem "$inst\lib\*.lib" -ErrorAction SilentlyContinue).Count
-            Write-Output "Installed lib count: $libCount"
-            if ($libCount -lt 10) {
-              Write-Output "::warning::Installed libs incomplete, purging $inst"
-              Remove-Item $inst -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
           for ($i = 1; $i -le 3; $i++) {
             Write-Output "Installing vcpkg packages (attempt $i/3)..."
             & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
