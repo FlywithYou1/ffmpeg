@@ -640,8 +640,8 @@ jobs:
           echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
           echo "INCLUDE=${INCLUDE:-}"
           echo "------------------"
-          # Windows 没有 getopt.h，不需要 vmaf CLI 工具，只需 libvmaf 静态库
-          sed -i "/subdir('tools')/d" meson.build
+          # Windows 没有 getopt.h，不需要 vmaf CLI 和 test（test 依赖 tools/meson.build 中的 compat_cflags）
+          sed -i "/subdir('tools')/d; /subdir('test')/d" meson.build
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
