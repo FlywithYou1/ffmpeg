@@ -366,12 +366,12 @@ jobs:
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
-          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
           if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
-          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "::warning::GITHUB_TOKEN not set, building from source"; exit 0 }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "::warning::GH_PACKAGES_TOKEN not set, building from source"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
           if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
