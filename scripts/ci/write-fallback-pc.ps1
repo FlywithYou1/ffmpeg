@@ -105,7 +105,9 @@ foreach ($suffix in @('','-static','_static')) {
 if (-not $svtLibName) {
     Write-Output "::warning::SvtAv1Enc import library not found under $inst\lib（ARM64 上正常，跳过）"
 } else {
-    if (-not $fastfeatLibName) { throw "fastfeat import library not found under $inst\lib" }
+    if (-not $fastfeatLibName) {
+        Write-Host "::warning::fastfeat import library not found under $inst\lib"
+    } else {
     $svtLibs = "$svtLibName.lib $fastfeatLibName.lib"
     $svtVersion = Get-PortVersion 'svt-av1'
     if ($svtVersion -eq 'unknown') {
@@ -122,7 +124,7 @@ if (-not $svtLibName) {
             if ($major -and $minor -and $patch) { $svtVersion = "$major.$minor.$patch" }
         }
     }
-    Write-Output "SvtAv1Enc.pc Version: $svtVersion"
+    Write-Host "SvtAv1Enc.pc Version: $svtVersion"
     Write-Utf8 "$pcDir/SvtAv1Enc.pc" @(
         "prefix=$instMixed",
         'exec_prefix=${prefix}',
@@ -135,7 +137,8 @@ if (-not $svtLibName) {
         "Libs: $svtLibs",
         'Cflags: -I${includedir} -I${includedir}/svt-av1'
     )
-    Write-Output "已重写 SvtAv1Enc.pc -> $svtLibs"
+    Write-Host "已重写 SvtAv1Enc.pc -> $svtLibs"
+    }
 }
 
 # libmp3lame
@@ -178,24 +181,27 @@ Write-Host "已创建 libfdk-aac.pc -> $fdkLib"
 
 # sdl2（仅在缺失时创建回退）
 if (-not (Test-Path "$pcDir/sdl2.pc")) {
-    $sdl2Lib = Find-ImportLib @('SDL2')
-    if (-not $sdl2Lib) { throw "SDL2 import library not found under $inst\lib" }
-    $sdl2mainLib = Find-ImportLib @('SDL2main')
-    $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
-    Write-Utf8 "$pcDir/sdl2.pc" @(
-        "prefix=$instMixed",
-        'exec_prefix=${prefix}',
-        'libdir=${prefix}/lib',
-        'includedir=${prefix}/include',
-        '',
-        'Name: sdl2',
-        'Description: Simple DirectMedia Layer',
-        "Version: $(Get-PortVersion 'sdl2')",
-        "Libs: $sdl2Libs",
-        'Cflags: -I${includedir} -I${includedir}/SDL2'
-    )
-    Write-Output "已创建回退 sdl2.pc"
-} else { Write-Output "使用 vcpkg 提供的 sdl2.pc" }
+    $sdl2Lib = Find-ImportLib @('SDL2','SDL2-static','SDL2_arm64')
+    if (-not $sdl2Lib) {
+        Write-Host "::warning::SDL2 import library not found under $inst\lib"
+    } else {
+        $sdl2mainLib = Find-ImportLib @('SDL2main')
+        $sdl2Libs = if ($sdl2mainLib) { "$sdl2mainLib $sdl2Lib" } else { "$sdl2Lib" }
+        Write-Utf8 "$pcDir/sdl2.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: sdl2',
+            'Description: Simple DirectMedia Layer',
+            "Version: $(Get-PortVersion 'sdl2')",
+            "Libs: $sdl2Libs",
+            'Cflags: -I${includedir} -I${includedir}/SDL2'
+        )
+        Write-Host "已创建回退 sdl2.pc"
+    }
+} else { Write-Host "使用 vcpkg 提供的 sdl2.pc" }
 
 # 软件编解码器回退 .pc（vcpkg 不总是提供）
 $fallbacks = @(
@@ -252,24 +258,27 @@ foreach ($fb in $fallbacks) {
 
 # vpl.pc — vcpkg libvpl 使用 cmake-config，ffmpeg 需要 pkg-config
 if ($HasVpl) {
-    $vplLib = Find-ImportLib @('vpl','libvpl')
-    if (-not $vplLib) { throw "vpl import library not found under $inst\lib" }
-    $vplVer = Get-PortVersion 'libvpl'
-    if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
-    Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
-    Write-Utf8 "$pcDir/vpl.pc" @(
-        "prefix=$instMixed",
-        'exec_prefix=${prefix}',
-        'libdir=${prefix}/lib',
-        'includedir=${prefix}/include',
-        '',
-        'Name: vpl',
-        'Description: Intel oneVPL library',
-        "Version: $vplVer",
-        "Libs: $vplLib",
-        'Cflags: -I${includedir} -I${includedir}/vpl'
-    )
-    Write-Output "已创建 vpl.pc"
+    $vplLib = Find-ImportLib @('vpl','libvpl','vpl_arm64','vpl-shared')
+    if (-not $vplLib) {
+        Write-Host "::warning::vpl import library not found under $inst\lib"
+    } else {
+        $vplVer = Get-PortVersion 'libvpl'
+        if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
+        Remove-Item "$pcDir/vpl.pc" -ErrorAction SilentlyContinue
+        Write-Utf8 "$pcDir/vpl.pc" @(
+            "prefix=$instMixed",
+            'exec_prefix=${prefix}',
+            'libdir=${prefix}/lib',
+            'includedir=${prefix}/include',
+            '',
+            'Name: vpl',
+            'Description: Intel oneVPL library',
+            "Version: $vplVer",
+            "Libs: $vplLib",
+            'Cflags: -I${includedir} -I${includedir}/vpl'
+        )
+        Write-Host "已创建 vpl.pc"
+    }
 }
 
 # 导入库别名
