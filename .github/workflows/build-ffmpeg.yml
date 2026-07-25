@@ -683,7 +683,7 @@ jobs:
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
-              -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
+              -Denable_tests=false -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
           ninja -vC build 2>&1 | tee /tmp/ninja-vmaf.log || {
             echo "::error::ninja 编译 VMAF 失败，详见下方 /tmp/ninja-vmaf.log"
             exit 1
