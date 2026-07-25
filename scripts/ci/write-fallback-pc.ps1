@@ -17,8 +17,14 @@ function Find-ImportLib($candidates) {
             if (Test-Path $p) { return "${name}${suffix}.lib" }
         }
     }
+    # 精确名未匹配时，用通配符搜索（vcpkg 某些 port 会重命名 .lib）
+    $allLibs = Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue
+    foreach ($cand in $candidates) {
+        $match = $allLibs | Where-Object { $_.Name -match "^${cand}.*\.lib$" } | Select-Object -First 1
+        if ($match) { Write-Host "  Find-ImportLib wildcard: $($match.Name)"; return $match.Name }
+    }
     Write-Host "${inst}\lib 下可用的 .lib 文件："
-    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+    $allLibs | ForEach-Object { Write-Host "  $($_.Name)" }
     return $null
 }
 
