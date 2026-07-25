@@ -769,7 +769,7 @@ jobs:
             PKG_CONFIG="$(cygpath -u "$PKG_CONFIG")"
           fi
           export PKG_CONFIG
-          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           cd /tmp && rm -rf ffmpeg-src
           git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
           python3 "${GITHUB_WORKSPACE}/scripts/ci/patch-ffmpeg-msvc.py" /tmp/ffmpeg-src
@@ -777,6 +777,9 @@ jobs:
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
           sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
+          # MSVC has no libm; math functions are in ucrt.lib (linked by default)
+          # Remove -lm from configure checks to avoid LINK : fatal error LNK1181: cannot open 'm.lib'
+          sed -i 's/ -lm//g' configure
           CUDA_FLAGS=""
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
