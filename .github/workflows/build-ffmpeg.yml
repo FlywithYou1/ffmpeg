@@ -407,6 +407,25 @@ jobs:
           $inst = "$v\installed\${{ matrix.triplet }}"
           $instUnix = $inst -replace '\\', '/'
           echo "VCPKG_INSTALLED=$instUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          # Purge local packages cache — may contain empty stubs from old NuGet restores.
+          # Without this, vcpkg skips compilation (ABI match) even though .lib files are missing.
+          $packagesDir = "$v\packages"
+          if (Test-Path $packagesDir) {
+            $count = (Get-ChildItem $packagesDir -Recurse -Filter '*.lib' -ErrorAction SilentlyContinue).Count
+            Write-Output "Local packages cache: $count .lib files"
+            if ($count -lt 50) {
+              Write-Output "::warning::Local packages cache appears incomplete, purging $packagesDir"
+              Remove-Item $packagesDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (Test-Path $inst) {
+            $libCount = (Get-ChildItem "$inst\lib\*.lib" -ErrorAction SilentlyContinue).Count
+            Write-Output "Installed lib count: $libCount"
+            if ($libCount -lt 10) {
+              Write-Output "::warning::Installed libs incomplete, purging $inst"
+              Remove-Item $inst -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
           for ($i = 1; $i -le 3; $i++) {
             Write-Output "Installing vcpkg packages (attempt $i/3)..."
             & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
