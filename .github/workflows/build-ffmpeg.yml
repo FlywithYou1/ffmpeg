@@ -709,7 +709,8 @@ jobs:
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入头文件路径
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
           VMAF_C_ARGS="-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS"
-          [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${VCPKG_INSTALLED}/include -I${P_MIXED}/include ${VMAF_C_ARGS}"
+          # pthread shim MUST come before vcpkg include (vcpkg has its own pthread.h that needs pthreads.lib)
+          [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${P_MIXED}/include -I${VCPKG_INSTALLED}/include ${VMAF_C_ARGS}"
           # MSVC cl.exe 需要 /experimental:c11atomics 启用 C11 <stdatomic.h>；Clang 不认识此标志
           if [ "${CC}" != "${CLANG_BIN}/clang.exe" ]; then
             VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
@@ -727,7 +728,9 @@ jobs:
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
               -Denable_tests=false -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
-          ninja -vC build 2>&1 | tee /tmp/ninja-vmaf.log || {
+          # Only build libvmaf.a static library (FFmpeg only needs the lib, not the vmaf CLI tool).
+          # The CLI tool depends on pthread_create etc. which our inline shim can't satisfy at link time.
+          ninja -vC build src/libvmaf.a 2>&1 | tee /tmp/ninja-vmaf.log || {
             echo "::error::ninja 编译 VMAF 失败，详见下方 /tmp/ninja-vmaf.log"
             exit 1
           }
