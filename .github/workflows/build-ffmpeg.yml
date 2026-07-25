@@ -52,9 +52,8 @@ jobs:
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # 定时触发时，先更新 vcpkg 依赖版本，再构建
+      # 每次 CI 运行时检查并更新 vcpkg baseline
       - name: 更新 vcpkg baseline
-        if: github.event_name == 'schedule'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
