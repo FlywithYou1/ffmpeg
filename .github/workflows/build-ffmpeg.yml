@@ -263,7 +263,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     permissions:
-      packages: write    # 需要删除旧 NuGet 包
+      packages: write    # NuGet readwrite via vcpkg binary cache
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
     strategy:
@@ -363,53 +363,30 @@ jobs:
           if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
           if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
 
-      - name: 清除破损的 NuGet 缓存
-        continue-on-error: true
+      - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
-          $owner = "${{ github.repository_owner }}"
-          $token = "${{ secrets.GH_PACKAGES_TOKEN }}"
-          $headers = @{
-            Authorization = "Bearer $token"
-            Accept        = "application/vnd.github+json"
-          }
-          # GitHub API: try both /orgs/{owner} and /users/{owner}
-          $basePaths = @("/orgs/$owner", "/users/$owner")
-          $deleted = 0
-          foreach ($base in $basePaths) {
-            $listUrl = "https://api.github.com${base}/packages?package_type=nuget&per_page=100"
-            try {
-              $pkgs = Invoke-RestMethod -Uri $listUrl -Headers $headers -Method Get -ContentType "application/json" -ErrorAction Stop
-              if (-not $pkgs -or $pkgs.Count -eq 0) { continue }
-              foreach ($pkg in $pkgs) {
-                $pkgName = $pkg.name
-                Write-Host "  Package: $pkgName"
-                $verUrl = "https://api.github.com${base}/packages/nuget/$([uri]::EscapeDataString($pkgName))/versions?per_page=100"
-                try {
-                  $vers = Invoke-RestMethod -Uri $verUrl -Headers $headers -Method Get -ContentType "application/json" -ErrorAction Stop
-                  foreach ($ver in $vers) {
-                    $delUrl = "https://api.github.com${base}/packages/nuget/$([uri]::EscapeDataString($pkgName))/versions/$($ver.id)"
-                    try {
-                      Invoke-RestMethod -Uri $delUrl -Headers $headers -Method Delete -ContentType "application/json" -ErrorAction Stop | Out-Null
-                      $deleted++
-                      Write-Host "    Deleted: $($ver.name)"
-                    } catch { Write-Host "    Skip (delete failed): $($_.Exception.Message)" }
-                  }
-                } catch { Write-Host "    (no versions)" }
-              }
-              break  # 找到正确的 base path 后退出
-            } catch { Write-Host "  ${base}: $($_.Exception.Message)" }
-          }
-          Write-Host "Cleaned up $deleted NuGet package versions"
+          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $env:VCPKG_ROOT = $v
+          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "::warning::GH_PACKAGES_TOKEN not set, building from source"; exit 0 }
+          $vcpkgExe = "$v\vcpkg.exe"
+          $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
+          if (-not $nuget) { throw "Failed to fetch vcpkg nuget" }
+          Write-Host "nuget: $nuget"
+          cmd /c "`"$nuget`" sources Remove -Name GitHubPackages 2>nul || exit /b 0"
+          & $nuget sources add -Source "$env:FEED_URL" -StorePasswordInClearText -Name GitHubPackages -UserName "${{ github.repository_owner }}" -Password "$env:GH_PACKAGES_TOKEN"
+          & $nuget setapikey "$env:GH_PACKAGES_TOKEN" -Source "$env:FEED_URL"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,$env:FEED_URL,readwrite" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+        continue-on-error: true
 
       - name: 安装 vcpkg 依赖
         shell: pwsh
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
-          # Build from source for now (old NuGet cache deleted in previous step).
-          # TODO: switch to readwrite after this run succeeds.
-          echo "VCPKG_BINARY_SOURCES=clear" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           # Update vcpkg itself (ports / tool) to latest — runner ships an old snapshot
           Write-Output "Updating vcpkg to latest..."
           Push-Location $v
