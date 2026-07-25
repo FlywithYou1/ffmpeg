@@ -561,7 +561,7 @@ jobs:
           s = re.sub(r"data \+= (.+?);", r"data = (void *)((unsigned char *)data + \1);", s)
           p.write_text(s, encoding="utf-8")
           '
-          # MSVC does not support C99 VLAs; fix VLAs in libvmaf.c and predict.c
+          # MSVC does not support C99 VLAs; fix VLAs in libvmaf.c, predict.c, read_json_model.c
           python3 -c '
           import pathlib
           p = pathlib.Path("src/libvmaf.c")
@@ -572,6 +572,11 @@ jobs:
           s = p.read_text(encoding="utf-8")
           s = s.replace("double scores[model_collection->cnt];", "double *scores = malloc(model_collection->cnt * sizeof(double));")
           s = s.replace("char name[name_sz];", "char name[256];")
+          p.write_text(s, encoding="utf-8")
+          p = pathlib.Path("src/read_json_model.c")
+          s = p.read_text(encoding="utf-8")
+          s = s.replace("char cfg_name[cfg_name_sz];", "char cfg_name[256];")
+          s = s.replace("char generated_key[generated_key_sz];", "char generated_key[5];")
           p.write_text(s, encoding="utf-8")
           '
           # Fix mkdirp.h: mode_t is not defined on Windows (no POSIX sys/types.h)
