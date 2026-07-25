@@ -17,8 +17,8 @@ function Find-ImportLib($candidates) {
             if (Test-Path $p) { return "${name}${suffix}.lib" }
         }
     }
-    Write-Output "${inst}\lib 下可用的 .lib 文件："
-    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name)" }
+    Write-Host "${inst}\lib 下可用的 .lib 文件："
+    Get-ChildItem "${inst}\lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
     return $null
 }
 
