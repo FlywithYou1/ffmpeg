@@ -288,6 +288,7 @@ if ($HasVpl) {
 
 # 导入库别名
 function Copy-LibAlias($actual, $alias) {
+    if (-not $actual) { Write-Host "::warning::Copy-LibAlias: source is null, skip $alias"; return }
     $actualPath = Join-Path "$inst\lib" $actual
     $aliasPath = Join-Path "$inst\lib" $alias
     if ((Test-Path $actualPath) -and (-not (Test-Path $aliasPath))) {
