@@ -587,8 +587,9 @@ jobs:
           s = s.replace("VmafFeatureExtractorContext *fex_ctx[n_threads];", "VmafFeatureExtractorContext *fex_ctx[128];")
           p.write_text(s, encoding="utf-8")
           '
-          # Fix ARM64 MSVC missing intrinsics: __builtin_clz / __lzcnt / __lzcnt64
-          # MSVC ARM64 provides _CountLeadingZeros / _CountLeadingZeros64 in <intrin.h>
+          # Fix ARM64 MSVC missing intrinsics: __builtin_clz / __lzcnt / __lzcnt64 -> _CountLeadingZeros
+          # Only ARM64 MSVC cl.exe needs this; x64 Clang has __builtin_clz natively
+          if [ "$TGT_ARCH" = "arm64" ]; then
           python3 -c '
           import pathlib
           p = pathlib.Path("src/feature/integer_vif.h")
@@ -599,13 +600,13 @@ jobs:
           p = pathlib.Path("src/feature/integer_adm.c")
           s = p.read_text(encoding="utf-8")
           s = s.replace("__builtin_clz(", "_CountLeadingZeros(")
-          # Ensure <intrin.h> is included (required by _CountLeadingZeros on MSVC ARM64)
           if "#include <intrin.h>" not in s:
               s = s.replace("#include <stddef.h>", "#include <stddef.h>\n#include <intrin.h>", 1)
               if "#include <intrin.h>" not in s:
                   s = "#include <intrin.h>\n" + s
           p.write_text(s, encoding="utf-8")
           '
+          fi
           sed -i '1i typedef unsigned short mode_t;' src/feature/mkdirp.h
           python3 -c '
           import pathlib
