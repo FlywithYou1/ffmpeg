@@ -552,15 +552,15 @@ jobs:
           cd vmaf/libvmaf && rm -rf build
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
           # MSVC does not allow pointer arithmetic on void*; integer_vif.c init() has data+=N
-          python3 -c '
+          python3 << 'PYEOF1'
           import pathlib, re
           p = pathlib.Path("src/feature/integer_vif.c")
           s = p.read_text(encoding="utf-8")
           s = re.sub(r"data \+= (.+?);", r"data = (void *)((unsigned char *)data + \1);", s)
           p.write_text(s, encoding="utf-8")
-          '
+          PYEOF1
           # MSVC does not support C99 VLAs; fix VLAs in libvmaf.c, predict.c, read_json_model.c, tools/vmaf.c, test/test_feature_extractor.c
-          python3 -c '
+          python3 << 'PYEOF2'
           import pathlib
           p = pathlib.Path("src/libvmaf.c")
           s = p.read_text(encoding="utf-8")
@@ -584,12 +584,12 @@ jobs:
           s = p.read_text(encoding="utf-8")
           s = s.replace("VmafFeatureExtractorContext *fex_ctx[n_threads];", "VmafFeatureExtractorContext *fex_ctx[128];")
           p.write_text(s, encoding="utf-8")
-          '
+          PYEOF2
           # Fix ARM64 MSVC missing intrinsics: __builtin_clz / __lzcnt / __lzcnt64 -> _CountLeadingZeros
           # Only ARM64 MSVC cl.exe needs this; x64 Clang has __builtin_clz natively
           # TGT_ARCH is set later in this block; use VSCMD_ARG_TGT_ARCH (set by msvc-dev-cmd) instead
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ]; then
-          python3 -c '
+          python3 << 'PYEOF3'
           import pathlib
           p = pathlib.Path("src/feature/integer_vif.h")
           s = p.read_text(encoding="utf-8")
@@ -606,10 +606,10 @@ jobs:
               if "#include <intrin.h>" not in s:
                   s = "#include <intrin.h>\n" + s
           p.write_text(s, encoding="utf-8")
-          '
+          PYEOF3
           fi
           sed -i '1i typedef unsigned short mode_t;' src/feature/mkdirp.h
-          python3 -c '
+          python3 << 'PYEOF4'
           import pathlib
           for path in ("src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
               p = pathlib.Path(path)
@@ -617,9 +617,9 @@ jobs:
                   s = p.read_text(encoding="utf-8")
                   s = s.replace("#ifdef _MSC_VER\n", "#if defined(_MSC_VER) && !defined(__clang__)\n")
                   p.write_text(s, encoding="utf-8")
-          '
+          PYEOF4
           if [ "${{ matrix.cuda }}" = "true" ]; then
-            python3 -c '
+            python3 << 'PYEOF5'
             import pathlib
             p = pathlib.Path("src/feature/integer_adm.h")
             if p.exists():
@@ -628,7 +628,7 @@ jobs:
                     "{ .compute_score = 1, .supported_by_any = 1, .ref = 1, .main = 1 }",
                     "{ 1, 1, 1, 1 }")
                 p.write_text(s, encoding="utf-8")
-            '
+            PYEOF5
             export CUDA_HOME="/c/cuda"
             export CUDA_PATH="/c/cuda"
             export CUDACXX="/c/cuda/bin/nvcc"
@@ -654,7 +654,7 @@ jobs:
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
           export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
-            python3 -c "
+            python3 << PYEOF6
             import pathlib
             mb = pathlib.Path('src/meson.build')
             s = mb.read_text(encoding='utf-8')
@@ -664,7 +664,7 @@ jobs:
                 '-I', '${P_MIXED}/include',
                 '-I', '${VCPKG_INSTALLED}/include',")
             mb.write_text(s, encoding='utf-8')
-            "
+            PYEOF6
             export INCLUDE="${INCLUDE};${CUDA_HOME}/include"
           fi
           # MSVC 不兼容 VMAF 的 GCC 风格 x86 汇编（-mavx / __builtin_clz / __m256 cast）

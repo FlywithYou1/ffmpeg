@@ -1,0 +1,5 @@
+# Force LF line endings for shell scripts and YAML to prevent CRLF issues on Windows runners
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=lf
