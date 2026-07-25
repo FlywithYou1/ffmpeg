@@ -368,7 +368,7 @@ jobs:
         shell: pwsh
         run: |
           $owner = "${{ github.repository_owner }}"
-          $token = "${{ secrets.GITHUB_TOKEN }}"
+          $token = "${{ secrets.GH_PACKAGES_TOKEN }}"
           $headers = @{
             Authorization = "Bearer $token"
             Accept        = "application/vnd.github+json"
