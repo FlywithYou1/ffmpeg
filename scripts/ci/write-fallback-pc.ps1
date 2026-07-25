@@ -139,8 +139,10 @@ if (-not $svtLibName) {
 }
 
 # libmp3lame
-$mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame')
-if (-not $mp3lameLib) { throw "mp3lame import library not found under $inst\lib" }
+$mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame','lame','libmp3lame-0')
+if (-not $mp3lameLib) {
+    Write-Host "::warning::mp3lame import library not found under $inst\lib"
+} else {
 Write-Utf8 "$pcDir/libmp3lame.pc" @(
     "prefix=$instMixed",
     'exec_prefix=${prefix}',
@@ -152,11 +154,14 @@ Write-Utf8 "$pcDir/libmp3lame.pc" @(
     "Version: $(Get-PortVersion 'mp3lame')",
     "Libs: $mp3lameLib"
 )
-Write-Output "已创建 libmp3lame.pc -> $mp3lameLib"
+Write-Host "已创建 libmp3lame.pc -> $mp3lameLib"
+}
 
 # libfdk-aac
-$fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2')
-if (-not $fdkLib) { throw "fdk-aac import library not found under $inst\lib" }
+$fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2','fdk-aac-2-static')
+if (-not $fdkLib) {
+    Write-Host "::warning::fdk-aac import library not found under $inst\lib"
+} else {
 Write-Utf8 "$pcDir/libfdk-aac.pc" @(
     "prefix=$instMixed",
     'exec_prefix=${prefix}',
@@ -168,6 +173,8 @@ Write-Utf8 "$pcDir/libfdk-aac.pc" @(
     "Version: $(Get-PortVersion 'fdk-aac')",
     "Libs: $fdkLib"
 )
+Write-Host "已创建 libfdk-aac.pc -> $fdkLib"
+}
 
 # sdl2（仅在缺失时创建回退）
 if (-not (Test-Path "$pcDir/sdl2.pc")) {
