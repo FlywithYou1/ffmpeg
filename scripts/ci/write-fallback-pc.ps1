@@ -336,10 +336,18 @@ Write-Output "pkg-config: $pkgconfMixed"
 
 Write-Output "已安装的导入库："
 Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
+Write-Output "已生成的 .pc 文件："
+Get-ChildItem "$pcDir\*.pc" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
 Write-Output "libmp3lame.pc:"
 Get-Content "$pcDir/libmp3lame.pc"
 Write-Output "libfdk-aac.pc:"
 Get-Content "$pcDir/libfdk-aac.pc"
+Write-Output "aom.pc status:"
+if (Test-Path "$pcDir\aom.pc") {
+    Get-Content "$pcDir\aom.pc"
+} else {
+    Write-Host "::warning::aom.pc was NOT generated (aom.lib may not be found)"
+}
 
 Write-Output "VCPKG_INSTALLED=$instMixed" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 # 不设全局 PKG_CONFIG：Meson 会尝试解析为脚本导致 utf-8 错误。

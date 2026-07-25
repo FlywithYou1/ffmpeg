@@ -321,6 +321,9 @@ jobs:
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
             artifact: ffmpeg-windows-x86-all.zip
     steps:
+      - name: 禁用 Git CRLF 自动转换
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
 
       - name: 配置 MSVC（VS 2026）
