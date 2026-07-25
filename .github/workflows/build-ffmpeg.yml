@@ -487,6 +487,7 @@ jobs:
             $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
             $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
             $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
+            $PKG_CONFIG --exists aom && echo "aom OK: version=$($PKG_CONFIG --modversion aom) libs=$($PKG_CONFIG --libs aom) cflags=$($PKG_CONFIG --cflags aom)" || echo "未找到 aom"
           else
             echo "pkg-config 未找到，跳过检查"
           fi

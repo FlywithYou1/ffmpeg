@@ -237,24 +237,23 @@ foreach ($fb in $fallbacks) {
     $lib = Find-ImportLib $fb.Names
     if ($lib) {
         $pcFile = "$pcDir/$($fb.Pc).pc"
-        if (-not (Test-Path $pcFile)) {
-            $lines = @(
-                "prefix=$instMixed"
-                'exec_prefix=${prefix}'
-                'libdir=${prefix}/lib'
-                'includedir=${prefix}/include'
-                ''
-                "Name: $($fb.Pc)"
-                "Description: $($fb.Desc)"
-                "Version: $(Get-PortVersion $fb.Port)"
-            )
-            if ($fb.Requires) { $lines += "Requires: $($fb.Requires)" }
-            $lines += "Libs: $lib"
-            $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
-            $lines += "Cflags: $cflags"
-            Write-Utf8 $pcFile $lines
-            Write-Output "已创建回退 $($fb.Pc).pc"
-        } else { Write-Output "使用 vcpkg 提供的 $($fb.Pc).pc" }
+        # Always overwrite: vcpkg's generated .pc may have wrong paths or Unix-style flags for MSVC static builds
+        $lines = @(
+            "prefix=$instMixed"
+            'exec_prefix=${prefix}'
+            'libdir=${prefix}/lib'
+            'includedir=${prefix}/include'
+            ''
+            "Name: $($fb.Pc)"
+            "Description: $($fb.Desc)"
+            "Version: $(Get-PortVersion $fb.Port)"
+        )
+        if ($fb.Requires) { $lines += "Requires: $($fb.Requires)" }
+        $lines += "Libs: $lib"
+        $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
+        $lines += "Cflags: $cflags"
+        Write-Utf8 $pcFile $lines
+        Write-Output "已覆写 $($fb.Pc).pc -> $lib"
         Set-Variable -Name $fb.Var -Value $lib -Scope Script
     } else {
         Write-Output "::warning::未找到 $($fb.Pc) 导入库；跳过 .pc"
