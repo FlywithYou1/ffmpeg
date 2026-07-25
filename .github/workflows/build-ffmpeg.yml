@@ -663,6 +663,9 @@ jobs:
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
           VMAF_C_ARGS="-D_USE_MATH_DEFINES"
           [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${VCPKG_INSTALLED}/include -I${P_MIXED}/include ${VMAF_C_ARGS}"
+          # MSVC cl.exe 需要此标志才能启用 C11 <stdatomic.h>（VMAF test 和 predict.c 依赖）
+          # Clang 会忽略此未知标志（仅产生 warning），不影响编译
+          VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
           VMAF_CPP_ARGS="${VMAF_C_ARGS} -std=c++14"
           VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}")
           echo "--- VMAF meson ---"
