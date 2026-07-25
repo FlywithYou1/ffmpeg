@@ -387,6 +387,11 @@ jobs:
         run: |
           $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
           $env:VCPKG_ROOT = $v
+          # Update vcpkg itself (ports / tool) to latest — runner ships an old snapshot
+          Write-Output "Updating vcpkg to latest..."
+          Push-Location $v
+          git stash 2>$null; git pull --ff-only origin master 2>$null || Write-Host "::warning::git pull failed (will use existing version)"
+          Pop-Location
           if (Test-Path "$v\bootstrap-vcpkg.bat") {
             $maxRetries = 3
             for ($i = 1; $i -le $maxRetries; $i++) {
