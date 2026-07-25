@@ -803,6 +803,8 @@ jobs:
           # MSVC has no libm; math functions are in ucrt.lib (linked by default)
           # Remove -lm from configure checks to avoid LINK : fatal error LNK1181: cannot open 'm.lib'
           sed -i 's/ -lm//g' configure
+          # Use pkg-config for libmp3lame (check_lib mangles function names on MSVC)
+          sed -i 's/^require libmp3lame lame\//require_pkg_config libmp3lame libmp3lame lame\//' configure
           CUDA_FLAGS=""
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
