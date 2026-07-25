@@ -283,51 +283,12 @@ foreach ($fb in $fallbacks) {
     }
 }
 
-# vpl.pc — vcpkg libvpl (>=2.17.0) 已自带 vpl.pc，优先使用；不存在时强制创建回退
+# vpl.pc — vcpkg libvpl (>=2.17.0) 自带 vpl.pc，直接用
 if ($HasVpl) {
-    $vplPc = "$pcDir/vpl.pc"
-    if (Test-Path $vplPc) {
+    if (Test-Path "$pcDir/vpl.pc") {
         Write-Host "使用 vcpkg 提供的 vpl.pc"
-        # vcpkg 的 vpl.pc 可能写 -lvpl（Unix 风格），pkgconf --static 在 MSVC 下不翻译；
-        # 用 sed 把 -lvpl 替换为实际 .lib 文件名
-        $vplContent = Get-Content $vplPc -Raw
-        if ($vplContent -match '-lvpl\b') {
-            $vplActual = Find-ImportLib @('vpl','libvpl','libmfx','vpl_arm64','vpl-shared')
-            if ($vplActual) {
-                $vplContent = $vplContent -replace '-lvpl\b', $vplActual
-                [System.IO.File]::WriteAllText($vplPc, $vplContent, [System.Text.UTF8Encoding]::new($false))
-                Write-Host "vpl.pc: -lvpl -> $vplActual"
-            } else {
-                # 找不到 .lib 也保留 -lvpl，FFmpeg 的 mslink 会翻译成 vpl.lib
-                Write-Host "vpl.pc: keeping -lvpl (no .lib found, mslink will resolve)"
-            }
-        }
-        Set-Variable -Name 'vplLib' -Value ($vplActual ? $vplActual : 'vpl.lib') -Scope Script
     } else {
-        # vcpkg 没给 vpl.pc — 自己创建一个
-        $vplLib = Find-ImportLib @('vpl','libvpl','libmfx','vpl_arm64','vpl-shared')
-        if (-not $vplLib) {
-            # libvpl dispatcher 在 static triplet 下可能只有头文件而无 .lib
-            # 用 -lvpl 交给 mslink 翻译（会变成 vpl.lib，即使不存在 configure 也会继续）
-            $vplLib = '-lvpl'
-            Write-Host "::warning::vpl .lib not found under $inst\lib, using -lvpl fallback in .pc"
-        }
-        $vplVer = Get-PortVersion 'libvpl'
-        if (-not $vplVer -or $vplVer -eq 'unknown') { $vplVer = '2.14.0' }
-        Write-Utf8 $vplPc @(
-            "prefix=$instMixed",
-            'exec_prefix=${prefix}',
-            'libdir=${prefix}/lib',
-            'includedir=${prefix}/include',
-            '',
-            'Name: vpl',
-            'Description: Intel oneVPL library',
-            "Version: $vplVer",
-            "Libs: $vplLib",
-            'Cflags: -I${includedir} -I${includedir}/vpl'
-        )
-        Write-Host "已创建 vpl.pc -> $vplLib"
-        Set-Variable -Name 'vplLib' -Value $vplLib -Scope Script
+        Write-Host "::warning::vpl.pc not found, Intel QSV may not be detected"
     }
 }
 
@@ -345,7 +306,6 @@ Copy-LibAlias $mp3lameLib "libmp3lame.lib"
 Copy-LibAlias $mp3lameLib "mp3lame.lib"
 Copy-LibAlias $fdkLib "fdk-aac.lib"
 Copy-LibAlias $fdkLib "libfdk-aac.lib"
-if ($HasVpl -and $vplLib) { Copy-LibAlias $vplLib "vpl.lib"; Copy-LibAlias $vplLib "libvpl.lib" }
 if ($libx264Lib) { Copy-LibAlias $libx264Lib "libx264.lib"; Copy-LibAlias $libx264Lib "x264.lib" }
 if ($libx265Lib) { Copy-LibAlias $libx265Lib "libx265.lib"; Copy-LibAlias $libx265Lib "x265.lib" }
 if ($libvpxLib) { Copy-LibAlias $libvpxLib "libvpx.lib"; Copy-LibAlias $libvpxLib "vpx.lib" }
