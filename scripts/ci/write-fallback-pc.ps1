@@ -249,6 +249,12 @@ if ($sharpyuvLib) { Write-Host "sharpyuv found: $sharpyuvLib" } else { Write-Hos
 $expatLib = Find-ImportLib @('expat','libexpat','expatMD','expat-static')
 if ($expatLib) { Write-Host "expat found: $expatLib" } else { Write-Host '::warning::expat not found (fontconfig will miss XML support)' }
 
+# libass 静态链接需要 harfbuzz + fribidi（shaper）
+$harfbuzzLib = Find-ImportLib @('harfbuzz','libharfbuzz','harfbuzz-static')
+$fribidiLib = Find-ImportLib @('fribidi','libfribidi','fribidi-static')
+if ($harfbuzzLib) { Write-Host "harfbuzz found: $harfbuzzLib" } else { Write-Host '::warning::harfbuzz not found (libass will miss hb_* symbols)' }
+if ($fribidiLib) { Write-Host "fribidi found: $fribidiLib" } else { Write-Host '::warning::fribidi not found (libass will miss fribidi_* symbols)' }
+
 # freetype2 需要 libpng / brotli / zlib / bz2（字体格式解压）
 $libpngLib = Find-ImportLib @('libpng16','libpng','png16','png')
 $brotliDecLib = Find-ImportLib @('brotlidec','brotlidec-static')
@@ -286,6 +292,10 @@ foreach ($fb in $fallbacks) {
         if ($fb.Pc -eq 'vorbis' -and $oggLib) { $libs = "$libs $oggLib" }
         if ($fb.Pc -eq 'vorbisenc' -and $oggLib) { $libs = "$libs $oggLib" }
         if ($fb.Pc -eq 'libwebp' -and $sharpyuvLib) { $libs = "$libs $sharpyuvLib" }
+        if ($fb.Pc -eq 'libass') {
+            if ($harfbuzzLib) { $libs = "$libs $harfbuzzLib" }
+            if ($fribidiLib) { $libs = "$libs $fribidiLib" }
+        }
         $lines += "Libs: $libs"
         $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
         $lines += "Cflags: $cflags"

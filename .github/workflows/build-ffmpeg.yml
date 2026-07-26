@@ -291,7 +291,8 @@ jobs:
             cuda: false
             amf: false
             vpl: false
-            configure_extra: --enable-libvmaf --disable-libsvtav1
+            # ARM64 禁止 x86 NASM 目标，否则 LNK1112 x64 vs ARM64
+            configure_extra: --enable-libvmaf --disable-libsvtav1 --disable-x86asm --disable-inline-asm
             artifact: ffmpeg-windows-arm64.zip
           - id: x86-all
             name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
@@ -921,6 +922,12 @@ jobs:
           if [ "${{ matrix.vpl }}" = "true" ]; then
             VPL_FLAGS="--enable-libvpl"
           fi
+          # 交叉 ARM64：PATH 里的 x64 nasm 会误开 x86asm，先摘掉
+          if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ] || [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm" ]; then
+            __clean_nasm() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Nn][Aa][Ss][Mm]*) ;; *[Yy][Aa][Ss][Mm]*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
+            __clean_nasm
+            hash -r 2>/dev/null || true
+          fi
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -984,16 +991,25 @@ jobs:
 
       - name: 编译 VMAF（CPU）
         run: |
+          export CC="$(xcrun --find clang)"
+          export CXX="$(xcrun --find clang++)"
+          export OBJC="$CC"
+          echo "Apple Clang: $CC ($("$CC" --version | head -1))"
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+          CC="$CC" CXX="$CXX" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: 编译 FFmpeg
         run: |
+          export CC="$(xcrun --find clang)"
+          export CXX="$(xcrun --find clang++)"
+          export OBJC="$CC"
+          echo "Apple Clang: $CC ($("$CC" --version | head -1))"
           P="${HOME}/ffmpeg-install"
           LAME_PREFIX="$(brew --prefix lame)"
           FDK_PREFIX="$(brew --prefix fdk-aac)"
@@ -1041,6 +1057,7 @@ jobs:
           sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           rm -f configure.bak
           ./configure --prefix="$P" \
+            --cc="$CC" --cxx="$CXX" \
             --extra-cflags="-I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
             --extra-ldflags="-L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
