@@ -757,7 +757,7 @@ jobs:
             'Version: 3.0.0' \
             'Libs: -L${libdir} -lvmaf' \
             'Libs.private: -lstdc++ -lm' \
-            'Cflags: -I${includedir}' \
+            'Cflags: -I${includedir} -I${includedir}/libvmaf' \
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
