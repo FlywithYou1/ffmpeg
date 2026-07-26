@@ -38,15 +38,6 @@
     },
     "speex",
     "libjxl",
-    "shaderc",
-    "kvazaar",
-    "xvid",
-    "codec2",
-    "libopenmpt",
-    "libbs2b",
-    "aribb24",
-    "libplacebo",
-    "rubberband",
-    "libvidstab"
+    "shaderc"
   ]
 }

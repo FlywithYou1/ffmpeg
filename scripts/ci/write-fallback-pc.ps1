@@ -232,14 +232,6 @@ $fallbacks = @(
     @{ Var='snappyLib';    Names=@('snappy','libsnappy');       Pc='snappy';    Desc='snappy library';             Port='snappy' }
     @{ Var='libtwolameLib';Names=@('twolame','libtwolame');     Pc='libtwolame';Desc='TwoLAME MP2 encoder library';Port='libtwolame'; Cflags='-I${includedir} -DLIBTWOLAME_STATIC' }
     @{ Var='libopenmptLib';Names=@('openmpt','libopenmpt');     Pc='libopenmpt';Desc='OpenMPT module library';     Port='libopenmpt' }
-    @{ Var='kvazaarLib';   Names=@('kvazaar','libkvazaar');     Pc='kvazaar';   Desc='kvazaar HEVC encoder';       Port='kvazaar' }
-    @{ Var='xvidLib';      Names=@('xvid','xvidcore','libxvid'); Pc='xvid';      Desc='Xvid MPEG-4 library';       Port='xvid' }
-    @{ Var='codec2Lib';    Names=@('codec2','libcodec2');       Pc='codec2';    Desc='Codec 2 speech codec';      Port='codec2' }
-    @{ Var='libbs2bLib';   Names=@('bs2b','libbs2b');           Pc='libbs2b';   Desc='Bauer stereophonic-to-binaural'; Port='libbs2b' }
-    @{ Var='aribb24Lib';   Names=@('aribb24','libaribb24');     Pc='aribb24';   Desc='ARIB STD-B24 caption';       Port='aribb24' }
-    @{ Var='libplaceboLib';Names=@('placebo','libplacebo');     Pc='libplacebo';Desc='libplacebo GPU processing';  Port='libplacebo' }
-    @{ Var='rubberbandLib';Names=@('rubberband','librubberband'); Pc='rubberband'; Desc='Rubber Band Library';    Port='rubberband' }
-    @{ Var='vidstabLib';   Names=@('vidstab','libvidstab');     Pc='vidstab';   Desc='vid.stab video stabilization'; Port='libvidstab' }
 )
 
 # vorbis 需要 libogg（oggpack_* 符号）
@@ -360,14 +352,6 @@ if ($libopenjp2Lib) { Copy-LibAlias $libopenjp2Lib "libopenjp2.lib"; Copy-LibAli
 if ($snappyLib) { Copy-LibAlias $snappyLib "snappy.lib" }
 if ($libtwolameLib) { Copy-LibAlias $libtwolameLib "libtwolame.lib"; Copy-LibAlias $libtwolameLib "twolame.lib" }
 if ($libopenmptLib) { Copy-LibAlias $libopenmptLib "libopenmpt.lib"; Copy-LibAlias $libopenmptLib "openmpt.lib" }
-if ($kvazaarLib) { Copy-LibAlias $kvazaarLib "kvazaar.lib"; Copy-LibAlias $kvazaarLib "libkvazaar.lib" }
-if ($xvidLib) { Copy-LibAlias $xvidLib "xvidcore.lib"; Copy-LibAlias $xvidLib "xvid.lib" }
-if ($codec2Lib) { Copy-LibAlias $codec2Lib "codec2.lib"; Copy-LibAlias $codec2Lib "libcodec2.lib" }
-if ($libbs2bLib) { Copy-LibAlias $libbs2bLib "bs2b.lib"; Copy-LibAlias $libbs2bLib "libbs2b.lib" }
-if ($aribb24Lib) { Copy-LibAlias $aribb24Lib "aribb24.lib"; Copy-LibAlias $aribb24Lib "libaribb24.lib" }
-if ($libplaceboLib) { Copy-LibAlias $libplaceboLib "placebo.lib"; Copy-LibAlias $libplaceboLib "libplacebo.lib" }
-if ($rubberbandLib) { Copy-LibAlias $rubberbandLib "rubberband.lib"; Copy-LibAlias $rubberbandLib "librubberband.lib" }
-if ($vidstabLib) { Copy-LibAlias $vidstabLib "vidstab.lib"; Copy-LibAlias $vidstabLib "libvidstab.lib" }
 
 # 输出环境变量
 $vcpkgRoot = Split-Path (Split-Path $inst) -Parent
