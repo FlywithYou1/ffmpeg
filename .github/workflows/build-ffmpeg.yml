@@ -183,7 +183,7 @@ jobs:
       - name: 编译 nv-codec-headers
         if: matrix.cuda
         run: |
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
+          cd /tmp && git clone --depth 1 https://github.com/FFmpeg/nv-codec-headers
           cd nv-codec-headers
           make -j"$(nproc)" PREFIX=/usr/local
           sudo make PREFIX=/usr/local install
@@ -214,7 +214,7 @@ jobs:
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export PATH="${CUDA_HOME}/bin:${PATH}"
           fi
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd /tmp && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
           ./configure --prefix="$P" --pkg-config-flags="--static" \
             --extra-cflags="-I$P/include" \
@@ -559,7 +559,7 @@ jobs:
         run: |
           P="${HOME}/ffmpeg-install"
           P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/nv-codec-headers.git
+          cd /tmp && git clone --depth 1 https://github.com/FFmpeg/nv-codec-headers
           cd nv-codec-headers
           make -j"$(nproc)" PREFIX="$P" && make PREFIX="$P" install
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
@@ -794,7 +794,7 @@ jobs:
           export PKG_CONFIG
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${VCPKG_INSTALLED}/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           cd /tmp && rm -rf ffmpeg-src
-          git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           python3 "${GITHUB_WORKSPACE}/scripts/ci/patch-ffmpeg-msvc.py" /tmp/ffmpeg-src
           cd ffmpeg-src
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
@@ -948,7 +948,7 @@ jobs:
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           pkg-config --exists libmp3lame && echo "pkg-config libmp3lame: OK ($(pkg-config --modversion libmp3lame))" || echo "pkg-config libmp3lame: FAIL"
           pkg-config --exists libfdk-aac  && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))"   || echo "pkg-config libfdk-aac: FAIL"
-          cd /tmp && git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
+          cd /tmp && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
           # macOS 使用 libc++，configure 里 libsnappy 的 -lstdc++ 会导致检测失败
           sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
