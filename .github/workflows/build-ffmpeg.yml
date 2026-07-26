@@ -800,11 +800,11 @@ jobs:
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
           sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          # MSVC has no libm; math functions are in ucrt.lib (linked by default)
-          # Remove -lm from configure checks to avoid LINK : fatal error LNK1181: cannot open 'm.lib'
-          sed -i 's/ -lm//g' configure
-          # Use digit-free lame.lib alias (mslink appends digits from lib name to check function)
+          # Use digit-free lame.lib alias BEFORE -lm removal (mslink appends digits to check function)
           sed -i '/libmp3lame/s/ -lmp3lame/ lame.lib/' configure
+          # MSVC has no libm; math functions are in ucrt.lib (linked by default)
+          # Remove -lm from configure checks (NOT -lmp3lame — run after libmp3lame sed)
+          sed -i 's/ -lm//g' configure
           CUDA_FLAGS=""
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
