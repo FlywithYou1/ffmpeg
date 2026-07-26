@@ -832,9 +832,10 @@ jobs:
           sed -i 's/ -lm//g' configure
           # Compile pthread_shim.lib (VMAF needs non-inline pthread wrappers at link time)
           # Use -nologo (dash) not /nologo: MSYS2 bash translates /prefix to Windows paths
+          # Use $P_MIXED (Windows-style C:/...) not $P (MSYS2 /c/...) to avoid double-translation
           if [ -f "$P/lib/pthread_shim.c" ]; then
-            cl.exe -nologo -c "-Fo:$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
-              lib -nologo "-out:$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
+            cl.exe -nologo -c "-Fo:${P_MIXED}/lib/pthread_shim.obj" "${P_MIXED}/lib/pthread_shim.c" && \
+              lib -nologo "-out:${P_MIXED}/lib/pthread_shim.lib" "${P_MIXED}/lib/pthread_shim.obj" && \
               echo "pthread_shim.lib created" || { echo "::error::failed to create pthread_shim.lib"; exit 1; }
           fi
           CUDA_FLAGS=""
