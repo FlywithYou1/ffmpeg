@@ -745,7 +745,7 @@ jobs:
           # VMAF internally calls pthread_*; our shim header uses static inline
           # which MSVC may not inline, leaving unresolved externals at link time.
           # Build a small pthread_shim.lib with non-inline wrappers for linking.
-          cat > /tmp/pthread_shim.c << 'PTSHIM_EOF'
+          cat > "$P/lib/pthread_shim.c" << 'PTSHIM_EOF'
           #include <windows.h>
           #include <stdint.h>
           typedef struct { SRWLOCK lock; int init; } pthread_mutex_t;
@@ -767,8 +767,8 @@ jobs:
           int pthread_detach(pthread_t t) { CloseHandle(t); return 0; }
           void pthread_exit(void *ret) { ExitThread((DWORD)(uintptr_t)ret); }
           PTSHIM_EOF
-          cl.exe /nologo /c /Fo:/tmp/pthread_shim.obj /tmp/pthread_shim.c && \
-            lib /nologo /out:"$P/lib/pthread_shim.lib" /tmp/pthread_shim.obj && \
+          cl.exe /nologo /c /Fo:"$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
+            lib /nologo /out:"$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
             echo "pthread_shim.lib created" || echo "::warning::failed to create pthread_shim.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
