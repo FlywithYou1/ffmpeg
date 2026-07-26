@@ -149,10 +149,10 @@ if (-not $svtLibName) {
 
 # libmp3lame
 $mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame','lame','libmp3lame-0')
-# vcpkg mp3lame also builds mpglib (internal decoder); needed at link time
-$mpglib = Find-ImportLib @('mpglib','mpglib-static')
+# vcpkg mp3lame also builds mpglib (internal decoder); named "mpghip" by upstream, needed at link time
+$mpglib = Find-ImportLib @('libmpghip-static','mpghip','mpglib','mpglib-static')
 $lameLibs = 'lame.lib'
-if ($mpglib) { $lameLibs = "$lameLibs $mpglib" }
+if ($mpglib) { $lameLibs = "$lameLibs mpglib.lib" }
 if (-not $mp3lameLib) {
     Write-Host "::warning::mp3lame import library not found under $inst\lib"
 } else {

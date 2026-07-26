@@ -677,15 +677,17 @@ jobs:
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
           export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
-          python3 << PYEOF6
-          import pathlib
+          P_MIXED="$P_MIXED" VCPKG_INSTALLED="$VCPKG_INSTALLED" python3 << 'PYEOF6'
+          import pathlib, os
+          p_mixed = os.environ['P_MIXED']
+          vcpkg_installed = os.environ.get('VCPKG_INSTALLED', '')
           mb = pathlib.Path('src/meson.build')
           s = mb.read_text(encoding='utf-8')
           s = s.replace(
               "'-I', '../src/' + cuda_dir,",
-              "'-I', '../src/' + cuda_dir,
-              '-I', '${P_MIXED}/include',
-              '-I', '${VCPKG_INSTALLED}/include',")
+              f"'-I', '../src/' + cuda_dir,\n"
+              f"'-I', '{p_mixed}/include',\n"
+              f"'-I', '{vcpkg_installed}/include',")
           mb.write_text(s, encoding='utf-8')
           PYEOF6
             export INCLUDE="${INCLUDE};${CUDA_HOME}/include"
