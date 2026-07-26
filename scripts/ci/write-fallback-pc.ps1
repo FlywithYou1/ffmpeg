@@ -91,10 +91,7 @@ if (Test-Path $pcDirWin) {
     }
 }
 
-# 重写 SvtAv1Enc.pc
-# 注意：vcpkg 的 svt-av1 在 Windows ARM64 上强制 COMPILE_C_ONLY=ON，
-# 不生成 SvtAv1Enc.lib（只有 x86/x64 或 Linux ARM64 才有 SIMD 库）。
-# 因此 ARM64 构建跳过 SvtAv1Enc.pc 生成。
+# 重写 SvtAv1Enc.pc（x64 / ARM64 均尝试；找不到库则告警）
 $svtLibName = $null
 foreach ($cand in @('SvtAv1Enc','svtav1','svt-av1')) {
     foreach ($suffix in @('','-static','_static')) {
@@ -109,7 +106,7 @@ foreach ($suffix in @('','-static','_static')) {
     if (Test-Path $p) { $fastfeatLibName = "fastfeat${suffix}"; break }
 }
 if (-not $svtLibName) {
-    Write-Output "::warning::SvtAv1Enc import library not found under $inst\lib（ARM64 上正常，跳过）"
+    Write-Output "::warning::SvtAv1Enc import library not found under $inst\lib"
 } else {
     if (-not $fastfeatLibName) {
         Write-Host "::warning::fastfeat import library not found under $inst\lib"

@@ -292,7 +292,7 @@ jobs:
             amf: false
             vpl: false
             # 交叉编译必须 --arch=arm64，否则当成 x86（_tzcnt / x86asm LNK1112）
-            configure_extra: --enable-libvmaf --disable-libsvtav1 --arch=arm64 --enable-neon
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon
             artifact: ffmpeg-windows-arm64.zip
           - id: x86-all
             name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
