@@ -202,7 +202,7 @@ jobs:
             --extra-cflags="-I$P/include" \
             --extra-ldflags="-L$P/lib -Wl,-rpath,$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
-            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
           make -j"$(nproc)" && make install
@@ -319,7 +319,7 @@ jobs:
       - name: 安装构建工具
         shell: pwsh
         run: |
-          choco install -y --no-progress nasm make ninja
+          choco install -y --no-progress nasm make ninja strawberryperl
           pip install meson
           refreshenv
           $nasmDir = $null
@@ -922,11 +922,38 @@ jobs:
           if [ "${{ matrix.vpl }}" = "true" ]; then
             VPL_FLAGS="--enable-libvpl"
           fi
-          # 交叉 ARM64：PATH 里的 x64 nasm 会误开 x86asm，先摘掉
+          # 交叉 ARM64：摘掉 x64 nasm；装 gas-preprocessor（armasm64 编 NEON 汇编需要）
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ] || [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm" ]; then
             __clean_nasm() { local __new="" __e; IFS=':' read -ra __entries <<< "$PATH"; for __e in "${__entries[@]}"; do case "$__e" in *[Nn][Aa][Ss][Mm]*) ;; *[Yy][Aa][Ss][Mm]*) ;; *) __new="${__new:+${__new}:}${__e}" ;; esac; done; export PATH="$__new"; }
             __clean_nasm
             hash -r 2>/dev/null || true
+            GAS_BIN="${HOME}/bin"
+            mkdir -p "$GAS_BIN"
+            curl -fsSL -o "$GAS_BIN/gas-preprocessor.pl" \
+              https://raw.githubusercontent.com/FFmpeg/gas-preprocessor/master/gas-preprocessor.pl
+            PERL=""
+            for c in \
+              "/c/Program Files/Git/usr/bin/perl.exe" \
+              "/usr/bin/perl" \
+              "/c/Strawberry/perl/bin/perl.exe" \
+              "$(command -v perl 2>/dev/null || true)"; do
+              if [ -n "$c" ] && [ -x "$c" ]; then PERL="$c"; break; fi
+            done
+            if [ -z "$PERL" ]; then
+              echo "::error::perl not found (gas-preprocessor needs perl for armasm64)"
+              exit 1
+            fi
+            # 包装：MSYS 下 shebang 不可靠，用 perl 显式调用
+            mv "$GAS_BIN/gas-preprocessor.pl" "$GAS_BIN/gas-preprocessor.pl.bin"
+            printf '%s\n' "#!/bin/sh" "exec \"$PERL\" \"$GAS_BIN/gas-preprocessor.pl.bin\" \"\$@\"" \
+              > "$GAS_BIN/gas-preprocessor.pl"
+            chmod +x "$GAS_BIN/gas-preprocessor.pl" "$GAS_BIN/gas-preprocessor.pl.bin"
+            export PATH="$GAS_BIN:${PATH}"
+            command -v gas-preprocessor.pl
+            command -v armasm64 || command -v armasm64.exe || echo "::warning::armasm64 not in PATH yet"
+            gas-preprocessor.pl -arch aarch64 -as-type armasm -- armasm64 -h >/dev/null 2>&1 \
+              || gas-preprocessor.pl -arch aarch64 -as-type armasm -- armasm64.exe -h \
+              || { echo "::error::gas-preprocessor + armasm64 smoke test failed"; exit 1; }
           fi
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
@@ -1072,7 +1099,7 @@ jobs:
             --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
             --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
-            --enable-gpl --enable-version3 --enable-nonfree \
+            --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
             --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
