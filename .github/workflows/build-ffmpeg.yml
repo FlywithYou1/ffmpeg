@@ -963,7 +963,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-libkvazaar --enable-libxvid --enable-libcodec2 --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1220,7 +1220,7 @@ jobs:
             |---|---|---|---|
             | `ffmpeg-macos-arm.tar.xz` | Apple | VideoToolbox | ✅ CPU |
 
-            > 所有构建均包含： libmp3lame + libfdk-aac + SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
+            > 软件编解码/滤镜（各平台尽量对齐）：mp3lame, fdk-aac, x264, x265, vpx, opus, vorbis, theora, aom, svt-av1, dav1d, openh264, twolame, speex, jxl, webp, kvazaar, xvid, codec2, openmpt, bs2b, aribb24, placebo, rubberband, vidstab, ass, freetype, fontconfig, zimg, soxr, openjpeg, snappy, SDL2(ffplay), VMAF
             > Windows 构建使用 MSVC 2026 编译，需要 VC++ 可再发行组件。
           files: release-assets/*
           draft: false
