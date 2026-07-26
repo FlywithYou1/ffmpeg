@@ -831,9 +831,10 @@ jobs:
           # Remove -lm from configure checks (NOT -lmp3lame — run after libmp3lame sed)
           sed -i 's/ -lm//g' configure
           # Compile pthread_shim.lib (VMAF needs non-inline pthread wrappers at link time)
+          # //nologo: double-slash prevents MSYS2 bash from translating /nologo to a Windows path
           if [ -f "$P/lib/pthread_shim.c" ]; then
-            cl.exe /nologo /c /Fo:"$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
-              lib /nologo /out:"$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
+            cl.exe //nologo /c "/Fo:$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
+              lib //nologo "/out:$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
               echo "pthread_shim.lib created" || { echo "::error::failed to create pthread_shim.lib"; exit 1; }
           fi
           CUDA_FLAGS=""
