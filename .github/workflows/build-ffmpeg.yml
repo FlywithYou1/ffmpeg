@@ -677,7 +677,6 @@ jobs:
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
           export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
-          if [ "${{ matrix.cuda }}" = "true" ]; then
           python3 << PYEOF6
           import pathlib
           mb = pathlib.Path('src/meson.build')
