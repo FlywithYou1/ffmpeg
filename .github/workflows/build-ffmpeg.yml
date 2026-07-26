@@ -991,25 +991,36 @@ jobs:
 
       - name: 编译 VMAF（CPU）
         run: |
-          export CC="$(xcrun --find clang)"
-          export CXX="$(xcrun --find clang++)"
-          export OBJC="$CC"
-          echo "Apple Clang: $CC ($("$CC" --version | head -1))"
+          # 用 xcrun 包装，避免绝对路径 clang 缺 -isysroot 导致 meson “cannot compile”
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export CC="clang"
+          export CXX="clang++"
+          export OBJC="clang"
+          export CFLAGS="${CFLAGS:-} -isysroot ${SDKROOT}"
+          export CXXFLAGS="${CXXFLAGS:-} -isysroot ${SDKROOT}"
+          export LDFLAGS="${LDFLAGS:-} -isysroot ${SDKROOT}"
+          echo "Apple Clang: $(clang --version | head -1)"
+          echo "SDKROOT=${SDKROOT}"
           P="${HOME}/ffmpeg-install"
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           PKG_CONFIG_PATH="$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-          CC="$CC" CXX="$CXX" \
+          CC="$CC" CXX="$CXX" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
           meson setup build --buildtype release --prefix="$P" -Denable_cuda=false
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
       - name: 编译 FFmpeg
         run: |
-          export CC="$(xcrun --find clang)"
-          export CXX="$(xcrun --find clang++)"
-          export OBJC="$CC"
-          echo "Apple Clang: $CC ($("$CC" --version | head -1))"
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export CC="clang"
+          export CXX="clang++"
+          export OBJC="clang"
+          export CFLAGS="${CFLAGS:-} -isysroot ${SDKROOT}"
+          export CXXFLAGS="${CXXFLAGS:-} -isysroot ${SDKROOT}"
+          export LDFLAGS="${LDFLAGS:-} -isysroot ${SDKROOT}"
+          echo "Apple Clang: $(clang --version | head -1)"
+          echo "SDKROOT=${SDKROOT}"
           P="${HOME}/ffmpeg-install"
           LAME_PREFIX="$(brew --prefix lame)"
           FDK_PREFIX="$(brew --prefix fdk-aac)"
@@ -1058,8 +1069,8 @@ jobs:
           rm -f configure.bak
           ./configure --prefix="$P" \
             --cc="$CC" --cxx="$CXX" \
-            --extra-cflags="-I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
-            --extra-ldflags="-L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
+            --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
+            --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
