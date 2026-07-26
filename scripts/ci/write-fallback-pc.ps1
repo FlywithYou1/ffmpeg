@@ -218,7 +218,7 @@ $fallbacks = @(
     @{ Var='libx264Lib';   Names=@('x264','libx264');           Pc='libx264';   Desc='libx264 library';            Port='x264' }
     @{ Var='libx265Lib';   Names=@('x265','libx265');           Pc='libx265';   Desc='libx265 library';            Port='x265' }
     @{ Var='libvpxLib';    Names=@('vpx','libvpx','vpxmd');     Pc='libvpx';    Desc='libvpx library';             Port='libvpx' }
-    @{ Var='opusLib';      Names=@('opus');                     Pc='opus';      Desc='opus library';               Port='opus' }
+    @{ Var='opusLib';      Names=@('opus');                     Pc='opus';      Desc='opus library';               Port='opus'; Cflags='-I${includedir} -I${includedir}/opus' }
     @{ Var='vorbisLib';    Names=@('vorbis','libvorbis');       Pc='vorbis';    Desc='vorbis library';             Port='libvorbis' }
     @{ Var='vorbisencLib'; Names=@('vorbisenc','libvorbisenc'); Pc='vorbisenc'; Desc='vorbisenc library';          Port='libvorbis'; Requires='vorbis' }
     @{ Var='theoraLib';    Names=@('theora','libtheora');       Pc='theora';    Desc='theora library';             Port='libtheora' }

@@ -643,13 +643,12 @@ jobs:
           PYEOF4
           if [ "${{ matrix.cuda }}" = "true" ]; then
           python3 << 'PYEOF5'
-          import pathlib
+          import pathlib, re
           p = pathlib.Path("src/feature/integer_adm.h")
           if p.exists():
               s = p.read_text(encoding="utf-8")
-              s = s.replace(
-                  "{ .compute_score = 1, .supported_by_any = 1, .ref = 1, .main = 1 }",
-                  "{ 1, 1, 1, 1 }")
+              # Strip ALL C99 designated initializers (nvcc doesn't support .field = syntax)
+              s = re.sub(r'\.\w+\s*=\s*', '', s)
               p.write_text(s, encoding="utf-8")
           PYEOF5
             export CUDA_HOME="/c/cuda"
