@@ -237,6 +237,10 @@ $fallbacks = @(
     @{ Var='libopenmptLib';Names=@('openmpt','libopenmpt');     Pc='libopenmpt';Desc='OpenMPT module library';     Port='libopenmpt' }
 )
 
+# vorbis 需要 libogg（oggpack_* 符号）
+$oggLib = Find-ImportLib @('ogg','libogg','ogg_static','libogg_static')
+if ($oggLib) { Write-Host "ogg found: $oggLib" } else { Write-Host '::warning::ogg not found (vorbis will miss oggpack symbols)' }
+
 # fontconfig 需要 expat（XML 解析），由 vcpkg 作为传递依赖提供
 $expatLib = Find-ImportLib @('expat','libexpat','expatMD','expat-static')
 if ($expatLib) { Write-Host "expat found: $expatLib" } else { Write-Host '::warning::expat not found (fontconfig will miss XML support)' }
@@ -275,6 +279,8 @@ foreach ($fb in $fallbacks) {
         $libs = $lib
         if ($fb.Pc -eq 'fontconfig' -and $expatLib) { $libs = "$libs $expatLib" }
         if ($fb.Pc -eq 'freetype2' -and $ftExtraLibs.Count -gt 0) { $libs = "$libs $($ftExtraLibs -join ' ')" }
+        if ($fb.Pc -eq 'vorbis' -and $oggLib) { $libs = "$libs $oggLib" }
+        if ($fb.Pc -eq 'vorbisenc' -and $oggLib) { $libs = "$libs $oggLib" }
         $lines += "Libs: $libs"
         $cflags = if ($fb.Cflags) { $fb.Cflags } else { '-I${includedir}' }
         $lines += "Cflags: $cflags"
