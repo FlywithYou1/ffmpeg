@@ -807,8 +807,8 @@ jobs:
           # it goes straight to check_lib which mangles function names on MSVC (lame_set_VBR_qualityp3lame).
           # Line: enabled libmp3lame && require "libmp3lame >= 3.98.3" lame/lame.h ...
           sed -i 's/require "libmp3lame/require_pkg_config libmp3lame "libmp3lame/' configure
-          # Remove trailing -lmp3lame $libm_extralibs (require_pkg_config gets libs from .pc, not args)
-          sed -i '/libmp3lame.*require_pkg_config/s/ -lmp3lame \$libm_extralibs//' configure
+          # Remove trailing -lmp3lame (already stripped $libm_extralibs via -lm removal above)
+          sed -i '/libmp3lame.*require_pkg_config/s/ -lmp3lame//' configure
           CUDA_FLAGS=""
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
