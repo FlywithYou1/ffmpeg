@@ -828,8 +828,8 @@ jobs:
           # Use digit-free lame.lib alias + mpglib (mslink appends digits to check function)
           sed -i '/libmp3lame/s/ -lmp3lame/ lame.lib mpglib.lib/' configure
           # MSVC has no libm; math functions are in ucrt.lib (linked by default)
-          # Remove -lm from configure checks (NOT -lmp3lame — run after libmp3lame sed)
-          sed -i 's/ -lm//g' configure
+          # Remove standalone -lm from configure checks (space-delimited, NOT -lmfplat/-lmfuuid etc.)
+          sed -i 's/ -lm / /g; s/ -lm$//' configure
           # Compile pthread_shim.lib (VMAF needs non-inline pthread wrappers at link time)
           # Use -nologo (dash) not /nologo: MSYS2 bash translates /prefix to Windows paths
           # Use $P_MIXED (Windows-style C:/...) not $P (MSYS2 /c/...) to avoid double-translation
