@@ -767,9 +767,6 @@ jobs:
           int pthread_detach(pthread_t t) { CloseHandle(t); return 0; }
           void pthread_exit(void *ret) { ExitThread((DWORD)(uintptr_t)ret); }
           PTSHIM_EOF
-          cl.exe /nologo /c /Fo:"$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
-            lib /nologo /out:"$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
-            echo "pthread_shim.lib created" || echo "::warning::failed to create pthread_shim.lib"
           cp include/libvmaf/*.h "$P/include/libvmaf/"
           [ -f build/include/version.h ] && cp build/include/version.h "$P/include/libvmaf/"
           [ -f build/include/libvmaf/version.h ] && cp build/include/libvmaf/version.h "$P/include/libvmaf/"
@@ -833,6 +830,12 @@ jobs:
           # MSVC has no libm; math functions are in ucrt.lib (linked by default)
           # Remove -lm from configure checks (NOT -lmp3lame — run after libmp3lame sed)
           sed -i 's/ -lm//g' configure
+          # Compile pthread_shim.lib (VMAF needs non-inline pthread wrappers at link time)
+          if [ -f "$P/lib/pthread_shim.c" ]; then
+            cl.exe /nologo /c /Fo:"$P/lib/pthread_shim.obj" "$P/lib/pthread_shim.c" && \
+              lib /nologo /out:"$P/lib/pthread_shim.lib" "$P/lib/pthread_shim.obj" && \
+              echo "pthread_shim.lib created" || { echo "::error::failed to create pthread_shim.lib"; exit 1; }
+          fi
           CUDA_FLAGS=""
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
