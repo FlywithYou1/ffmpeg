@@ -54,25 +54,7 @@ jobs:
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # 每次 CI 运行时检查并更新 vcpkg baseline
-      - name: 更新 vcpkg baseline
-        continue-on-error: true
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          CURRENT=$(grep -oP '"builtin-baseline"\s*:\s*"\K[^"]+' vcpkg.json || echo "none")
-          LATEST=$(git ls-remote https://github.com/microsoft/vcpkg.git HEAD | cut -f1)
-
-          if [ "$CURRENT" != "$LATEST" ] && [ -n "$LATEST" ]; then
-            sed -i "s/\"builtin-baseline\": \"[^\"]*\"/\"builtin-baseline\": \"$LATEST\"/" vcpkg.json
-            git add vcpkg.json
-            git commit -m "chore(vcpkg): bump baseline to $LATEST"
-            git push
-            echo "vcpkg updated: $CURRENT -> $LATEST"
-          else
-            echo "vcpkg already up to date: $CURRENT"
-          fi
+  # vcpkg baseline 自动更新在 windows job（本轮构建即用最新 ports）
 
   # ============================================================
   # LINUX — Matrix（NVIDIA / Intel QSV / AMD VAAPI / x86 整合 / ARM64）
@@ -263,6 +245,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     permissions:
+      contents: write    # 回写 vcpkg.json builtin-baseline
       packages: write    # NuGet readwrite via vcpkg binary cache
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
@@ -363,14 +346,100 @@ jobs:
           if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
           if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
 
+      - name: 准备 vcpkg（对齐 baseline / 自动更新）
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Join-Path $env:GITHUB_WORKSPACE 'vcpkg.json'
+          $json = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+          $current = [string]$json.'builtin-baseline'
+          if (-not $current) { throw 'vcpkg.json missing builtin-baseline' }
+
+          $latest = (git ls-remote https://github.com/microsoft/vcpkg.git HEAD).Split("`t")[0].Trim()
+          if (-not $latest) { throw 'failed to resolve microsoft/vcpkg HEAD' }
+          $target = $latest
+          if ($current -ne $latest) {
+            Write-Host "vcpkg baseline: $current -> $latest"
+            $raw = Get-Content -LiteralPath $manifest -Raw
+            $updated = [regex]::Replace($raw, '("builtin-baseline"\s*:\s*")[^"]*(")', "`${1}$latest`${2}")
+            [System.IO.File]::WriteAllText($manifest, $updated)
+            echo "VCPKG_BASELINE_CHANGED=true" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            Write-Host "vcpkg baseline already latest: $current"
+            echo "VCPKG_BASELINE_CHANGED=false" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          echo "VCPKG_BASELINE=$target" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $v = if (Test-Path 'C:\vcpkg') { 'C:\vcpkg' } elseif ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
+          if (-not (Test-Path $v)) {
+            git clone --filter=blob:none https://github.com/microsoft/vcpkg.git $v
+          }
+          Push-Location $v
+          try {
+            git remote set-url origin https://github.com/microsoft/vcpkg.git 2>$null
+            $head = (git rev-parse HEAD 2>$null)
+            if ($head -ne $target) {
+              Write-Host "Checking out vcpkg @$target (was $head)"
+              git fetch --depth 1 origin $target
+              git checkout --force FETCH_HEAD
+              git reset --hard FETCH_HEAD
+            } else {
+              Write-Host "vcpkg tree already at $target"
+            }
+          } finally { Pop-Location }
+
+          $env:VCPKG_ROOT = $v
+          echo "VCPKG_ROOT=$v" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "$v" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+
+          $needBootstrap = -not (Test-Path "$v\vcpkg.exe")
+          $marker = Join-Path $v '.ffmpeg-bootstrapped-sha'
+          $prev = if (Test-Path $marker) { (Get-Content -LiteralPath $marker -Raw).Trim() } else { '' }
+          if ($prev -ne $target) { $needBootstrap = $true }
+          if ($needBootstrap) {
+            $maxRetries = 3
+            for ($i = 1; $i -le $maxRetries; $i++) {
+              Write-Host "Bootstrapping vcpkg (attempt $i/$maxRetries)..."
+              & "$v\bootstrap-vcpkg.bat" -disableMetrics
+              if ($LASTEXITCODE -eq 0) {
+                Set-Content -LiteralPath $marker -Value $target -NoNewline
+                break
+              }
+              if ($i -eq $maxRetries) { throw "vcpkg bootstrap failed after $maxRetries attempts" }
+              Start-Sleep -Seconds 10
+            }
+          } else {
+            Write-Host "Skip bootstrap (vcpkg.exe matches $target)"
+          }
+
+      - name: 回写 vcpkg baseline
+        if: >
+          matrix.id == 'nvidia' &&
+          env.VCPKG_BASELINE_CHANGED == 'true' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vcpkg.json
+          $staged = @(git diff --cached --name-only)
+          if ($staged.Count -eq 0) {
+            Write-Host "No baseline change to commit"
+            exit 0
+          }
+          $sha = $env:VCPKG_BASELINE
+          git commit -m "chore(vcpkg): bump baseline to $sha"
+          git push origin "HEAD:${{ github.ref_name }}"
+          Write-Host "Pushed vcpkg baseline $sha"
+
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
         env:
           GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
-          $env:VCPKG_ROOT = $v
-          if (Test-Path "$v\bootstrap-vcpkg.bat") { & "$v\bootstrap-vcpkg.bat" }
+          $v = $env:VCPKG_ROOT
+          if (-not $v) { $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" } }
           if (-not $env:GH_PACKAGES_TOKEN) { Write-Host "::warning::GH_PACKAGES_TOKEN not set, building from source"; exit 0 }
           $vcpkgExe = "$v\vcpkg.exe"
           $nuget = & $vcpkgExe fetch nuget | Where-Object { $_ } | Select-Object -Last 1
@@ -385,11 +454,12 @@ jobs:
       - name: 安装 vcpkg 依赖
         shell: pwsh
         run: |
-          $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" }
+          $v = $env:VCPKG_ROOT
+          if (-not $v) { $v = if (Test-Path "C:\vcpkg") { "C:\vcpkg" } else { "$env:VCPKG_INSTALLATION_ROOT" } }
           $env:VCPKG_ROOT = $v
-          # NuGet binary cache: readwrite（首次上传预编译包，后续直接下载）
-          $env:VCPKG_BINARY_SOURCES = "clear;nuget,$env:FEED_URL,readwrite"
-          # Also purge local caches that may contain stale empty stubs
+          if (-not $env:VCPKG_BINARY_SOURCES) {
+            $env:VCPKG_BINARY_SOURCES = "clear;nuget,$env:FEED_URL,readwrite"
+          }
           foreach ($dir in @("$v\archives", "$v\packages", "$v\installed", "$env:GITHUB_WORKSPACE\vcpkg_installed")) {
             if (Test-Path $dir) {
               $libCount = (Get-ChildItem $dir -Recurse -Filter '*.lib' -ErrorAction SilentlyContinue).Count
@@ -397,27 +467,11 @@ jobs:
               if ($libCount -eq 0) { Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue; Write-Output "  -> purged (empty)" }
             }
           }
-          # Update vcpkg itself (ports / tool) to latest — runner ships an old snapshot
-          Write-Output "Updating vcpkg to latest..."
-          Push-Location $v
-          git stash 2>$null; git pull --ff-only origin master 2>$null || Write-Host "::warning::git pull failed (will use existing version)"
-          Pop-Location
-          if (Test-Path "$v\bootstrap-vcpkg.bat") {
-            $maxRetries = 3
-            for ($i = 1; $i -le $maxRetries; $i++) {
-              Write-Output "Bootstrapping vcpkg (attempt $i/$maxRetries)..."
-              & "$v\bootstrap-vcpkg.bat"
-              if ($LASTEXITCODE -eq 0) { break }
-              if ($i -eq $maxRetries) { throw "vcpkg bootstrap failed after $maxRetries attempts" }
-              Write-Output "Bootstrap failed, retrying in 10s..."
-              Start-Sleep -Seconds 10
-            }
-          }
           $env:Path = "$v;" + $env:Path
-          # --x-manifest-root installs to vcpkg_installed/ next to the manifest, NOT $VCPKG_ROOT/installed/
           $inst = "$env:GITHUB_WORKSPACE\vcpkg_installed\${{ matrix.triplet }}"
           $instUnix = $inst -replace '\\', '/'
           echo "VCPKG_INSTALLED=$instUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "vcpkg install @ $($env:VCPKG_BASELINE) triplet=${{ matrix.triplet }}"
           for ($i = 1; $i -le 3; $i++) {
             Write-Output "Installing vcpkg packages (attempt $i/3)..."
             & "$v\vcpkg.exe" install --triplet ${{ matrix.triplet }} --x-manifest-root=$env:GITHUB_WORKSPACE
