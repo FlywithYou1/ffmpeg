@@ -800,8 +800,8 @@ jobs:
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
           sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          # Use digit-free lame.lib alias BEFORE -lm removal (mslink appends digits to check function)
-          sed -i '/libmp3lame/s/ -lmp3lame/ lame.lib/' configure
+          # Use digit-free lame.lib alias + mpglib (mslink appends digits to check function)
+          sed -i '/libmp3lame/s/ -lmp3lame/ lame.lib mpglib.lib/' configure
           # MSVC has no libm; math functions are in ucrt.lib (linked by default)
           # Remove -lm from configure checks (NOT -lmp3lame — run after libmp3lame sed)
           sed -i 's/ -lm//g' configure

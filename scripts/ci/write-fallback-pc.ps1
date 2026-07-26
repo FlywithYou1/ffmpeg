@@ -149,6 +149,10 @@ if (-not $svtLibName) {
 
 # libmp3lame
 $mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame','lame','libmp3lame-0')
+# vcpkg mp3lame also builds mpglib (internal decoder); needed at link time
+$mpglib = Find-ImportLib @('mpglib','mpglib-static')
+$lameLibs = 'lame.lib'
+if ($mpglib) { $lameLibs = "$lameLibs $mpglib" }
 if (-not $mp3lameLib) {
     Write-Host "::warning::mp3lame import library not found under $inst\lib"
 } else {
@@ -161,9 +165,9 @@ Write-Utf8 "$pcDir/libmp3lame.pc" @(
     'Name: libmp3lame',
     'Description: LAME MP3 encoder library',
     "Version: $(Get-PortVersion 'mp3lame')",
-    "Libs: lame.lib"
+    "Libs: $lameLibs"
 )
-Write-Host "已创建 libmp3lame.pc -> lame.lib (alias for $mp3lameLib)"
+Write-Host "已创建 libmp3lame.pc -> $lameLibs (alias for $mp3lameLib)"
 }
 
 # libfdk-aac
@@ -306,6 +310,8 @@ Copy-LibAlias $mp3lameLib "libmp3lame.lib"
 Copy-LibAlias $mp3lameLib "mp3lame.lib"
 # Use a digit-free alias: mslink appends digits from lib name to the check function (e.g. 3lame → p3lame)
 Copy-LibAlias $mp3lameLib "lame.lib"
+# mpglib (internal MP3 decoder in libmp3lame)
+if ($mpglib) { Copy-LibAlias $mpglib "mpglib.lib" }
 Copy-LibAlias $fdkLib "fdk-aac.lib"
 Copy-LibAlias $fdkLib "libfdk-aac.lib"
 if ($libx264Lib) { Copy-LibAlias $libx264Lib "libx264.lib"; Copy-LibAlias $libx264Lib "x264.lib" }
