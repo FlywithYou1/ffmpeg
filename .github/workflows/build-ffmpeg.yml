@@ -291,8 +291,8 @@ jobs:
             cuda: false
             amf: false
             vpl: false
-            # ARM64 禁止 x86 NASM 目标，否则 LNK1112 x64 vs ARM64
-            configure_extra: --enable-libvmaf --disable-libsvtav1 --disable-x86asm --disable-inline-asm
+            # 交叉编译必须 --arch=arm64，否则当成 x86（_tzcnt / x86asm LNK1112）
+            configure_extra: --enable-libvmaf --disable-libsvtav1 --arch=arm64 --cpu=armv8-a --enable-neon
             artifact: ffmpeg-windows-arm64.zip
           - id: x86-all
             name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
