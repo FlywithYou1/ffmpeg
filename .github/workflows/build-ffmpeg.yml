@@ -249,6 +249,7 @@ jobs:
       packages: write    # NuGet readwrite via vcpkg binary cache
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BASELINE_CHANGED: 'false'
     strategy:
       fail-fast: false
       matrix:
