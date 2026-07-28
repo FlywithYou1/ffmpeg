@@ -1174,7 +1174,7 @@ jobs:
           find artifacts -type f \( -name '*.tar.xz' -o -name '*.zip' \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
 
-      - uses: softprops/action-gh-release@v3.0.1
+      - uses: softprops/action-gh-release@v3.0.2
         with:
           tag_name: ${{ needs.metadata.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
