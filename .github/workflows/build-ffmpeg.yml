@@ -349,6 +349,7 @@ jobs:
           if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
 
       - name: 准备 vcpkg（对齐 baseline / 自动更新）
+        id: vcpkg-prep
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -366,9 +367,11 @@ jobs:
             $updated = [regex]::Replace($raw, '("builtin-baseline"\s*:\s*")[^"]*(")', "`${1}$latest`${2}")
             [System.IO.File]::WriteAllText($manifest, $updated)
             echo "VCPKG_BASELINE_CHANGED=true" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+            echo "baseline_changed=true" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else {
             Write-Host "vcpkg baseline already latest: $current"
             echo "VCPKG_BASELINE_CHANGED=false" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+            echo "baseline_changed=false" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           }
           echo "VCPKG_BASELINE=$target" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -417,7 +420,7 @@ jobs:
       - name: 回写 vcpkg baseline
         if: >
           matrix.id == 'nvidia' &&
-          env.VCPKG_BASELINE_CHANGED == 'true' &&
+          steps.vcpkg-prep.outputs.baseline_changed == 'true' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         continue-on-error: true
         shell: pwsh
