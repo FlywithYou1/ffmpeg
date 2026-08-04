@@ -883,10 +883,12 @@ jobs:
           echo 'C:\doctools\bin' >> "${GITHUB_PATH}"
           export PATH="$DOCBIN:${PATH}"
           # 验证
+          # 注意：pod2man（podlators）官方只支持 -h/--help，没有 --version 选项，
+          # 用 --version 会报 "Unknown option: version" 并在 set -e -o pipefail 下失败。
           command -v makeinfo >/dev/null || { echo "错误：makeinfo 不可用"; exit 1; }
           makeinfo --version 2>&1 | head -n1
           command -v pod2man >/dev/null || { echo "错误：pod2man 不可用"; exit 1; }
-          pod2man --version 2>&1 | head -n1
+          pod2man --help 2>&1 | head -n1
           command -v perl >/dev/null || { echo "错误：perl 不可用"; exit 1; }
           perl -v 2>&1 | sed -n '2p'
 
