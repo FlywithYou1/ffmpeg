@@ -848,8 +848,9 @@ jobs:
       - name: 安装文档工具（makeinfo / pod2man，--enable-doc 需要）
         shell: bash
         run: |
-          # --enable-doc 需要 makeinfo（texinfo）与 pod2man（perl），Windows runner 上两者皆缺。
-          # choco/vcpkg 均无 texinfo 包；唯一可靠来源是 MSYS2 的 pacman。
+          # --enable-doc 需要 makeinfo（texinfo 包）与 pod2man（perl 包自带），
+          # Windows runner 上两者皆缺；choco/vcpkg 均无 texinfo 包，唯一可靠来源是
+          # MSYS2 的 pacman。
           # x64 4 端（windows-2025-vs2026）镜像预装 MSYS2；ARM64 端（windows-11-vs2026-arm）
           # 镜像无 MSYS2（其 toolset 只含 x86_64 mingw64，无 texinfo），需先安装 MSYS2。
           # 注意：MSYS2 官方 ARM64 安装器资产名为 msys2-arm64-*.exe（不是 aarch64），
@@ -862,10 +863,22 @@ jobs:
             curl -fsSL -o /tmp/msys2-arm64.exe "${INSTALLER_URL}"
             /tmp/msys2-arm64.exe in --confirm-command --accept-messages --root C:/msys64
           fi
-          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo
-          # 把 MSYS2 usr/bin 前置到后续步骤的 PATH（含 makeinfo/texi2any、pod2man、perl）
-          echo 'C:\msys64\usr\bin' >> "${GITHUB_PATH}"
-          export PATH="/c/msys64/usr/bin:${PATH}"
+          # makeinfo/texi2any 来自 texinfo 包；pod2man 是 perl 包自带的工具，两者都要装
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo perl
+          # 不要把整个 MSYS2 usr/bin 塞进全局 PATH！其 link.exe（coreutils）会遮蔽
+          # MSVC 的 link.exe 导致链接失败，make 也会顶掉 choco make 改变子 shell 行为。
+          # 只把文档工具做成包装脚本放进独立目录，仅 prepend 该目录。
+          DOCBIN="/c/doctools/bin"
+          mkdir -p "$DOCBIN"
+          MSYS_PERL="/c/msys64/usr/bin/perl.exe"
+          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/makeinfo "$@"\n' "$MSYS_PERL" > "$DOCBIN/makeinfo"
+          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/texi2any "$@"\n' "$MSYS_PERL" > "$DOCBIN/texi2any"
+          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/pod2man "$@"\n' "$MSYS_PERL" > "$DOCBIN/pod2man"
+          chmod +x "$DOCBIN"/*
+          # 仅 prepend 包装目录（无 link.exe / make 冲突）；makeinfo 由 MSYS2 perl
+          # 直接解释，其 @INC 内置 MSYS2 模块路径，无需 MSYS2 bin 进 PATH
+          echo 'C:\doctools\bin' >> "${GITHUB_PATH}"
+          export PATH="$DOCBIN:${PATH}"
           # 验证
           command -v makeinfo >/dev/null || { echo "错误：makeinfo 不可用"; exit 1; }
           makeinfo --version 2>&1 | head -n1
