@@ -853,8 +853,7 @@ jobs:
           # MSYS2 的 pacman。
           # x64 4 端（windows-2025-vs2026）镜像预装 MSYS2；ARM64 端（windows-11-vs2026-arm）
           # 镜像无 MSYS2（其 toolset 只含 x86_64 mingw64，无 texinfo），需先安装 MSYS2。
-          # 注意：MSYS2 官方 ARM64 安装器资产名为 msys2-arm64-*.exe（不是 aarch64），
-          # 内容为 x86_64 二进制，经 Windows on ARM 的 x64 仿真运行 —— 官方支持的安装方式。
+          # 注意：MSYS2 官方 ARM64 安装器资产名为 msys2-arm64-*.exe（不是 aarch64）。
           if [ ! -x "/c/msys64/usr/bin/pacman.exe" ]; then
             echo "==> MSYS2 未找到，为 ARM64 安装 MSYS2（msys2-arm64-*.exe）..."
             INSTALLER_URL="$(curl -fsSL https://api.github.com/repos/msys2/msys2-installer/releases/latest | \
@@ -863,23 +862,39 @@ jobs:
             curl -fsSL -o /tmp/msys2-arm64.exe "${INSTALLER_URL}"
             /tmp/msys2-arm64.exe in --confirm-command --accept-messages --root C:/msys64
           fi
+          # 按架构选择原生工具链（避免 ARM64 端 x86_64 仿真执行文档工具）：
+          #   ARM64：clangarm64 仓库的 mingw-w64-clang-aarch64-{texinfo,perl}（原生 aarch64，
+          #          perl.exe 为原生 ARM64 二进制，pod2man 在 core_perl 子目录）
+          #   x64 ：msys 仓库的 texinfo/perl（x86_64）
+          if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ]; then
+            PACMAN_PKGS="mingw-w64-clang-aarch64-texinfo mingw-w64-clang-aarch64-perl"
+            MSYS_PERL="/c/msys64/clangarm64/bin/perl.exe"
+            MAKEINFO_SCRIPT="/c/msys64/clangarm64/bin/makeinfo"
+            POD2MAN_SCRIPT="/c/msys64/clangarm64/bin/core_perl/pod2man"
+            echo "==> 使用 clangarm64 原生文档工具（aarch64）"
+          else
+            PACMAN_PKGS="texinfo perl"
+            MSYS_PERL="/c/msys64/usr/bin/perl.exe"
+            MAKEINFO_SCRIPT="/c/msys64/usr/bin/makeinfo"
+            POD2MAN_SCRIPT="/c/msys64/usr/bin/core_perl/pod2man"
+            echo "==> 使用 msys x86_64 文档工具"
+          fi
           # makeinfo/texi2any 来自 texinfo 包；pod2man 是 perl 包自带工具，两者都要装。
-          # 注意：MSYS2 的 perl 包把 pod2man 等核心工具装在 /usr/bin/core_perl/ 子目录
-          #（MSYS2 的 /etc/profile.d/perlbin.sh 负责把该目录加入 PATH，但只在 MSYS2
-          # 登录 shell 生效；Git Bash 不加载它，所以这里必须显式指向 core_perl 路径）。
-          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo perl
-          # 不要把整个 MSYS2 usr/bin 塞进全局 PATH！其 link.exe（coreutils）会遮蔽
+          # 注意：MSYS2 的 perl 包把 pod2man 等核心工具装在 core_perl/ 子目录
+          #（/etc/profile.d/perlbin.sh 负责把该目录加入 PATH，但只在 MSYS2 登录 shell
+          # 生效；Git Bash 不加载它，所以这里必须显式指向 core_perl 路径）。
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed $PACMAN_PKGS
+          # 不要把 MSYS2 的 bin 塞进全局 PATH！其 link.exe（coreutils）会遮蔽
           # MSVC 的 link.exe 导致链接失败，make 也会顶掉 choco make 改变子 shell 行为。
           # 只把文档工具做成包装脚本放进独立目录，仅 prepend 该目录。
           DOCBIN="/c/doctools/bin"
           mkdir -p "$DOCBIN"
-          MSYS_PERL="/c/msys64/usr/bin/perl.exe"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/makeinfo "$@"\n' "$MSYS_PERL" > "$DOCBIN/makeinfo"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/texi2any "$@"\n' "$MSYS_PERL" > "$DOCBIN/texi2any"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/core_perl/pod2man "$@"\n' "$MSYS_PERL" > "$DOCBIN/pod2man"
+          printf '#!/bin/sh\nexec %s %s "$@"\n' "$MSYS_PERL" "$MAKEINFO_SCRIPT" > "$DOCBIN/makeinfo"
+          printf '#!/bin/sh\nexec %s %s "$@"\n' "$MSYS_PERL" "$MAKEINFO_SCRIPT" > "$DOCBIN/texi2any"
+          printf '#!/bin/sh\nexec %s %s "$@"\n' "$MSYS_PERL" "$POD2MAN_SCRIPT" > "$DOCBIN/pod2man"
           chmod +x "$DOCBIN"/*
-          # 仅 prepend 包装目录（无 link.exe / make 冲突）；makeinfo 由 MSYS2 perl
-          # 直接解释，其 @INC 内置 MSYS2 模块路径，无需 MSYS2 bin 进 PATH
+          # 仅 prepend 包装目录（无 link.exe / make 冲突）；makeinfo 由对应架构的
+          # MSYS2 perl 直接解释，其 @INC 内置 MSYS2 模块路径，无需 MSYS2 bin 进 PATH
           echo 'C:\doctools\bin' >> "${GITHUB_PATH}"
           export PATH="$DOCBIN:${PATH}"
           # 验证
