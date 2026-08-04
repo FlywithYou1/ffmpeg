@@ -863,7 +863,10 @@ jobs:
             curl -fsSL -o /tmp/msys2-arm64.exe "${INSTALLER_URL}"
             /tmp/msys2-arm64.exe in --confirm-command --accept-messages --root C:/msys64
           fi
-          # makeinfo/texi2any 来自 texinfo 包；pod2man 是 perl 包自带的工具，两者都要装
+          # makeinfo/texi2any 来自 texinfo 包；pod2man 是 perl 包自带工具，两者都要装。
+          # 注意：MSYS2 的 perl 包把 pod2man 等核心工具装在 /usr/bin/core_perl/ 子目录
+          #（MSYS2 的 /etc/profile.d/perlbin.sh 负责把该目录加入 PATH，但只在 MSYS2
+          # 登录 shell 生效；Git Bash 不加载它，所以这里必须显式指向 core_perl 路径）。
           /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo perl
           # 不要把整个 MSYS2 usr/bin 塞进全局 PATH！其 link.exe（coreutils）会遮蔽
           # MSVC 的 link.exe 导致链接失败，make 也会顶掉 choco make 改变子 shell 行为。
@@ -873,7 +876,7 @@ jobs:
           MSYS_PERL="/c/msys64/usr/bin/perl.exe"
           printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/makeinfo "$@"\n' "$MSYS_PERL" > "$DOCBIN/makeinfo"
           printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/texi2any "$@"\n' "$MSYS_PERL" > "$DOCBIN/texi2any"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/pod2man "$@"\n' "$MSYS_PERL" > "$DOCBIN/pod2man"
+          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/core_perl/pod2man "$@"\n' "$MSYS_PERL" > "$DOCBIN/pod2man"
           chmod +x "$DOCBIN"/*
           # 仅 prepend 包装目录（无 link.exe / make 冲突）；makeinfo 由 MSYS2 perl
           # 直接解释，其 @INC 内置 MSYS2 模块路径，无需 MSYS2 bin 进 PATH
