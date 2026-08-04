@@ -119,7 +119,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates gnupg python3 xxd \
+            cmake git wget curl ca-certificates gnupg python3 xxd texinfo \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             ${{ matrix.extra_packages }} \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
@@ -845,6 +845,35 @@ jobs:
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
+      - name: 安装文档工具（makeinfo / pod2man，--enable-doc 需要）
+        shell: bash
+        run: |
+          # --enable-doc 需要 makeinfo（texinfo）与 pod2man（perl），Windows runner 上两者皆缺。
+          # choco/vcpkg 均无 texinfo 包；唯一可靠来源是 MSYS2 的 pacman。
+          # x64 4 端（windows-2025-vs2026）镜像预装 MSYS2；ARM64 端（windows-11-vs2026-arm）
+          # 镜像无 MSYS2（其 toolset 只含 x86_64 mingw64，无 texinfo），需先安装 MSYS2。
+          # 注意：MSYS2 官方 ARM64 安装器资产名为 msys2-arm64-*.exe（不是 aarch64），
+          # 内容为 x86_64 二进制，经 Windows on ARM 的 x64 仿真运行 —— 官方支持的安装方式。
+          if [ ! -x "/c/msys64/usr/bin/pacman.exe" ]; then
+            echo "==> MSYS2 未找到，为 ARM64 安装 MSYS2（msys2-arm64-*.exe）..."
+            INSTALLER_URL="$(curl -fsSL https://api.github.com/repos/msys2/msys2-installer/releases/latest | \
+              python3 -c "import json,sys;d=json.load(sys.stdin);print([a['browser_download_url'] for a in d['assets'] if ('arm64' in a['name'] or 'aarch64' in a['name']) and a['name'].endswith('.exe')][0])")"
+            echo "   安装器: ${INSTALLER_URL}"
+            curl -fsSL -o /tmp/msys2-arm64.exe "${INSTALLER_URL}"
+            /tmp/msys2-arm64.exe in --confirm-command --accept-messages --root C:/msys64
+          fi
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo
+          # 把 MSYS2 usr/bin 前置到后续步骤的 PATH（含 makeinfo/texi2any、pod2man、perl）
+          echo 'C:\msys64\usr\bin' >> "${GITHUB_PATH}"
+          export PATH="/c/msys64/usr/bin:${PATH}"
+          # 验证
+          command -v makeinfo >/dev/null || { echo "错误：makeinfo 不可用"; exit 1; }
+          makeinfo --version 2>&1 | head -n1
+          command -v pod2man >/dev/null || { echo "错误：pod2man 不可用"; exit 1; }
+          pod2man --version 2>&1 | head -n1
+          command -v perl >/dev/null || { echo "错误：perl 不可用"; exit 1; }
+          perl -v 2>&1 | sed -n '2p'
+
       - name: 导出 VMAF meson 日志
         if: failure()
         shell: bash
@@ -1018,7 +1047,7 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget texinfo lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
 
       - name: 编译 VMAF（CPU）
         run: |
