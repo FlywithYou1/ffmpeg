@@ -191,7 +191,7 @@ NM="${NM_BIN}" \
 RANLIB="${RANLIB_BIN}" \
 ./configure \
   --prefix=/usr/local \
-  --docdir=/usr/local/share/doc/ffmpeg \
+  --disable-doc \
   --cc="${CC_BIN}" \
   --cxx="${CXX_BIN}" \
   --extra-cflags="-I/usr/local/include -I${CUDA_HOME}/include" \

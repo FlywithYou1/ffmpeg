@@ -3,7 +3,9 @@ name: FFmpeg 多厂商构建
 on:
   workflow_dispatch:
   schedule:
-    # 北京时间每天 0:00 = UTC 前一天 16:00
+    # 北京时间每天 22:00 = UTC 14:00 — 仅更新 vcpkg baseline（比编译提前 2 小时）
+    - cron: '0 14 * * *'
+    # 北京时间每天 0:00 = UTC 16:00 — 完整构建 / nightly Release
     - cron: '0 16 * * *'
   push:
     branches: [main, master]
@@ -18,10 +20,64 @@ concurrency:
 
 jobs:
   # ============================================================
+  # 每日 22:00（北京）— 仅回写 vcpkg baseline（Dependabot 已移除）
+  # github.event.schedule 区分两个 cron
+  # ============================================================
+  vcpkg-update:
+    name: 更新 vcpkg baseline
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 检查并回写 builtin-baseline
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CURRENT=$(python3 -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+          LATEST=$(git ls-remote https://github.com/microsoft/vcpkg.git HEAD | cut -f1)
+          echo "current=$CURRENT"
+          echo "latest=$LATEST"
+
+          if [ -z "$LATEST" ]; then
+            echo "::error::failed to resolve microsoft/vcpkg HEAD"
+            exit 1
+          fi
+
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "vcpkg baseline already latest: $CURRENT"
+            exit 0
+          fi
+
+          python3 -c "
+          import re, pathlib
+          p = pathlib.Path('vcpkg.json')
+          text = p.read_text(encoding='utf-8')
+          text2, n = re.subn(
+              r'(\"builtin-baseline\"\\s*:\\s*\")[^\"]*(\")',
+              r'\\g<1>${LATEST}\\g<2>',
+              text,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit('builtin-baseline replace failed')
+          p.write_text(text2, encoding='utf-8')
+          "
+          git add vcpkg.json
+          git commit -m "chore(vcpkg): bump baseline to $LATEST"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "Pushed vcpkg baseline: $CURRENT -> $LATEST"
+
+  # ============================================================
   # 构建元数据（决定 Release 标签与类型）
   # ============================================================
   metadata:
     name: 构建元数据
+    if: github.event.schedule != '0 14 * * *'
     runs-on: ubuntu-26.04
     outputs:
       release_tag: ${{ steps.vars.outputs.release_tag }}
@@ -34,11 +90,12 @@ jobs:
         id: vars
         run: |
           EVENT_NAME="${{ github.event_name }}"
+          SCHEDULE="${{ github.event.schedule }}"
           if [ "$EVENT_NAME" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "release_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT_NAME" = "schedule" ]; then
+          elif [ "$EVENT_NAME" = "schedule" ] && [ "$SCHEDULE" = "0 16 * * *" ]; then
             TAG="nightly-$(date -u +%Y-%m-%d-%H%M%S)"
             echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
@@ -54,13 +111,12 @@ jobs:
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # vcpkg baseline 自动更新在 windows job（本轮构建即用最新 ports）
-
   # ============================================================
   # LINUX — Matrix（NVIDIA / Intel QSV / AMD VAAPI / x86 整合 / ARM64）
   # ============================================================
   linux:
     name: ${{ matrix.name }}
+    if: github.event.schedule != '0 14 * * *'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -119,7 +175,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             build-essential yasm nasm pkg-config meson ninja-build \
-            cmake git wget curl ca-certificates gnupg python3 xxd texinfo \
+            cmake git wget curl ca-certificates gnupg python3 xxd \
             libmp3lame-dev libfdk-aac-dev libsdl2-dev \
             ${{ matrix.extra_packages }} \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
@@ -204,7 +260,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -226,7 +282,6 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../${{ matrix.artifact }} .
 
       - uses: actions/upload-artifact@v7
@@ -243,13 +298,12 @@ jobs:
   # ============================================================
   windows:
     name: ${{ matrix.name }}
+    if: github.event.schedule != '0 14 * * *'
     runs-on: ${{ matrix.runner }}
     permissions:
-      contents: write    # 回写 vcpkg.json builtin-baseline
       packages: write    # NuGet readwrite via vcpkg binary cache
     env:
       FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BASELINE_CHANGED: 'false'
     strategy:
       fail-fast: false
       matrix:
@@ -348,31 +402,16 @@ jobs:
           if ($clangDirUnix) { echo "CLANG_BIN=$clangDirUnix" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append }
           if (-not $clangDir) { Write-Host "::warning::VS Clang not found" }
 
-      - name: 准备 vcpkg（对齐 baseline / 自动更新）
+      - name: 准备 vcpkg（使用仓库锁定的 builtin-baseline）
         id: vcpkg-prep
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $manifest = Join-Path $env:GITHUB_WORKSPACE 'vcpkg.json'
           $json = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-          $current = [string]$json.'builtin-baseline'
-          if (-not $current) { throw 'vcpkg.json missing builtin-baseline' }
-
-          $latest = (git ls-remote https://github.com/microsoft/vcpkg.git HEAD).Split("`t")[0].Trim()
-          if (-not $latest) { throw 'failed to resolve microsoft/vcpkg HEAD' }
-          $target = $latest
-          if ($current -ne $latest) {
-            Write-Host "vcpkg baseline: $current -> $latest"
-            $raw = Get-Content -LiteralPath $manifest -Raw
-            $updated = [regex]::Replace($raw, '("builtin-baseline"\s*:\s*")[^"]*(")', "`${1}$latest`${2}")
-            [System.IO.File]::WriteAllText($manifest, $updated)
-            echo "VCPKG_BASELINE_CHANGED=true" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "baseline_changed=true" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          } else {
-            Write-Host "vcpkg baseline already latest: $current"
-            echo "VCPKG_BASELINE_CHANGED=false" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "baseline_changed=false" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          }
+          $target = [string]$json.'builtin-baseline'
+          if (-not $target) { throw 'vcpkg.json missing builtin-baseline' }
+          Write-Host "vcpkg baseline (locked): $target"
           echo "VCPKG_BASELINE=$target" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
           $v = if (Test-Path 'C:\vcpkg') { 'C:\vcpkg' } elseif ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
@@ -416,27 +455,6 @@ jobs:
           } else {
             Write-Host "Skip bootstrap (vcpkg.exe matches $target)"
           }
-
-      - name: 回写 vcpkg baseline
-        if: >
-          matrix.id == 'nvidia' &&
-          steps.vcpkg-prep.outputs.baseline_changed == 'true' &&
-          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add vcpkg.json
-          $staged = @(git diff --cached --name-only)
-          if ($staged.Count -eq 0) {
-            Write-Host "No baseline change to commit"
-            exit 0
-          }
-          $sha = $env:VCPKG_BASELINE
-          git commit -m "chore(vcpkg): bump baseline to $sha"
-          git push origin "HEAD:${{ github.ref_name }}"
-          Write-Host "Pushed vcpkg baseline $sha"
 
       - name: 配置 vcpkg NuGet 缓存
         shell: pwsh
@@ -845,56 +863,6 @@ jobs:
             > "$P/lib/pkgconfig/libvmaf.pc"
           echo "PKG_CONFIG_PATH=$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
-      - name: 安装文档工具（makeinfo / pod2man，--enable-doc 需要）
-        shell: bash
-        run: |
-          # --enable-doc 需要 makeinfo（texinfo 包）与 pod2man（perl 包自带），
-          # Windows runner 上两者皆缺；choco/vcpkg 均无 texinfo 包，唯一可靠来源是
-          # MSYS2 的 pacman。x64 4 端镜像预装 MSYS2；ARM64 端需先安装 MSYS2。
-          # 注意：MSYS2 官方 ARM64 安装器资产名为 msys2-arm64-*.exe（不是 aarch64）。
-          #
-          # 曾尝试 ARM64 端用 clangarm64 原生 aarch64 包（mingw-w64-clang-aarch64-*），
-          # 但该环境下 perl 包安装时 relocation 步骤失败（realpath/sed/gzip 报错，包提取
-          # 不完整），且原生 perl 运行 texinfo makeinfo 崩溃（Can't call method "name"
-          # on an undefined value）——属于 MSYS2 包层问题，workflow 无法修复。
-          # 故统一用 msys x86_64 包：ARM64 端经 x64 仿真运行，文档生成仅多 1-3 分钟。
-          if [ ! -x "/c/msys64/usr/bin/pacman.exe" ]; then
-            echo "==> MSYS2 未找到，为 ARM64 安装 MSYS2（msys2-arm64-*.exe）..."
-            INSTALLER_URL="$(curl -fsSL https://api.github.com/repos/msys2/msys2-installer/releases/latest | \
-              python3 -c "import json,sys;d=json.load(sys.stdin);print([a['browser_download_url'] for a in d['assets'] if ('arm64' in a['name'] or 'aarch64' in a['name']) and a['name'].endswith('.exe')][0])")"
-            echo "   安装器: ${INSTALLER_URL}"
-            curl -fsSL -o /tmp/msys2-arm64.exe "${INSTALLER_URL}"
-            /tmp/msys2-arm64.exe in --confirm-command --accept-messages --root C:/msys64
-          fi
-          # makeinfo/texi2any 来自 texinfo 包；pod2man 是 perl 包自带工具，两者都要装。
-          # 注意：MSYS2 的 perl 包把 pod2man 等核心工具装在 /usr/bin/core_perl/ 子目录
-          #（/etc/profile.d/perlbin.sh 负责把该目录加入 PATH，但只在 MSYS2 登录 shell
-          # 生效；Git Bash 不加载它，所以这里必须显式指向 core_perl 路径）。
-          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed texinfo perl
-          # 不要把整个 MSYS2 usr/bin 塞进全局 PATH！其 link.exe（coreutils）会遮蔽
-          # MSVC 的 link.exe 导致链接失败，make 也会顶掉 choco make 改变子 shell 行为。
-          # 只把文档工具做成包装脚本放进独立目录，仅 prepend 该目录。
-          DOCBIN="/c/doctools/bin"
-          mkdir -p "$DOCBIN"
-          MSYS_PERL="/c/msys64/usr/bin/perl.exe"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/makeinfo "$@"\n' "$MSYS_PERL" > "$DOCBIN/makeinfo"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/texi2any "$@"\n' "$MSYS_PERL" > "$DOCBIN/texi2any"
-          printf '#!/bin/sh\nexec %s /c/msys64/usr/bin/core_perl/pod2man "$@"\n' "$MSYS_PERL" > "$DOCBIN/pod2man"
-          chmod +x "$DOCBIN"/*
-          # 仅 prepend 包装目录（无 link.exe / make 冲突）；makeinfo 由 MSYS2 perl
-          # 直接解释，其 @INC 内置 MSYS2 模块路径，无需 MSYS2 bin 进 PATH
-          echo 'C:\doctools\bin' >> "${GITHUB_PATH}"
-          export PATH="$DOCBIN:${PATH}"
-          # 验证
-          # 注意：pod2man（podlators）官方只支持 -h/--help，没有 --version 选项，
-          # 用 --version 会报 "Unknown option: version" 并在 set -e -o pipefail 下失败。
-          command -v makeinfo >/dev/null || { echo "错误：makeinfo 不可用"; exit 1; }
-          makeinfo --version 2>&1 | head -n1
-          command -v pod2man >/dev/null || { echo "错误：pod2man 不可用"; exit 1; }
-          pod2man --help 2>&1 | head -n1
-          command -v perl >/dev/null || { echo "错误：perl 不可用"; exit 1; }
-          perl -v 2>&1 | sed -n '2p'
-
       - name: 导出 VMAF meson 日志
         if: failure()
         shell: bash
@@ -1010,7 +978,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --enable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1043,8 +1011,6 @@ jobs:
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
-          $docDir = "$env:USERPROFILE\ffmpeg-install\share\doc\ffmpeg"
-          if (Test-Path $docDir) { Copy-Item $docDir dist\doc -Recurse -Force }
           Compress-Archive -Path dist\* -DestinationPath ${{ matrix.artifact }} -Force
 
       - uses: actions/upload-artifact@v7
@@ -1055,13 +1021,14 @@ jobs:
 
   macos-arm:
     name: macOS ARM（VideoToolbox）
+    if: github.event.schedule != '0 14 * * *'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget texinfo lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -1152,7 +1119,7 @@ jobs:
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
             --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \
-            --enable-hwaccel=av1_videotoolbox --enable-doc
+            --enable-hwaccel=av1_videotoolbox --disable-doc
           make -j"$(sysctl -n hw.logicalcpu)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -1187,7 +1154,6 @@ jobs:
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          [ -d "${HOME}/ffmpeg-install/share/doc/ffmpeg" ] && cp -r "${HOME}/ffmpeg-install/share/doc/ffmpeg" dist/doc || true
           cd dist && tar -cJf ../ffmpeg-macos-arm.tar.xz .
 
       - uses: actions/upload-artifact@v7
