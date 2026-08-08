@@ -951,16 +951,14 @@ jobs:
               lib -nologo "-out:${P_MIXED}/lib/pthread_shim.lib" "${P_MIXED}/lib/pthread_shim.obj" && \
               echo "pthread_shim.lib created" || { echo "::error::failed to create pthread_shim.lib"; exit 1; }
           fi
-          CUDA_FLAGS=""
+          # CUDA/AMF/VPL 的 --enable-* 只在 matrix.configure_extra，这里只准备路径与头文件
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
             export CUDA_PATH="/c/cuda"
             export CUDACXX="/c/cuda/bin/nvcc"
             export PATH="/c/cuda/bin:${PATH}"
-            CUDA_FLAGS="--enable-cuda-nvcc --enable-cuvid --enable-nvenc"
             CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
           fi
-          AMF_FLAGS=""
           if [ "${{ matrix.amf }}" = "true" ]; then
             AMF_DIR="/tmp/AMF"
             [ ! -d "$AMF_DIR" ] && git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git "$AMF_DIR"
@@ -970,11 +968,6 @@ jobs:
               cp -r "$AMF_INCLUDE_DIR/core" "$AMF_INCLUDE_DIR/components" "$AMF_INCLUDE_DIR/AMF/"
             fi
             AMF_INCLUDE="$(cygpath -m "$AMF_INCLUDE_DIR")"
-            AMF_FLAGS="--enable-amf"
-          fi
-          VPL_FLAGS=""
-          if [ "${{ matrix.vpl }}" = "true" ]; then
-            VPL_FLAGS="--enable-libvpl"
           fi
           # 交叉 ARM64：摘掉 x64 nasm；装 gas-preprocessor（armasm64 编 NEON 汇编需要）
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ] || [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm" ]; then
