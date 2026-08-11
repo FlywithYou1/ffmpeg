@@ -10,6 +10,35 @@ src = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/ffmpeg-src")
 configure = src / "configure"
 s = configure.read_text(encoding="utf-8")
 s = s.replace(r'gsub(/\\/, "/")', r'gsub(/\\\\/, "/")')
+
+# 1b. configure: 清理 FFmpeg master a72b9465 (2026-08-06) 遗留的 heredoc 死代码
+#    上游把 probe_libc() 里 MSVC 分支的 heredoc 探针改写成 test_cpp_condition 时，
+#    漏删了原 heredoc 的正文和结尾 EOF，导致 configure 出现：
+#      #ifdef WINAPI_FAMILY
+#      #include <winapifamily.h>
+#      #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#      #error not desktop
+#      #endif
+#      #endif
+#      EOF
+#    裸 EOF 被 bash 当作命令执行，报 "./configure: line N: EOF: command not found"。
+#    这里删除该残留块（含其后的裸 EOF 行）。
+dead = """        test_${pfx}cpp_condition windows.h "!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601" &&
+            add_${pfx}cppflags -D_WIN32_WINNT=0x0601
+#ifdef WINAPI_FAMILY
+#include <winapifamily.h>
+#if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#error not desktop
+#endif
+#endif
+EOF
+"""
+if dead in s:
+    s = s.replace(dead, "")
+    print("Removed orphaned heredoc tail in configure (a72b9465 leftover)")
+else:
+    print("WARN: configure heredoc-tail block not found; skip")
+
 configure.write_text(s, encoding="utf-8")
 
 # 2. ffbuild/library.mak: lib.exe 响应文件路径修复
