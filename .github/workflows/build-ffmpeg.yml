@@ -365,11 +365,10 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
 
-      - name: 配置 MSVC（VS 2026）
+      - name: 配置 MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: ${{ matrix.msvc_arch }}
-          vsversion: "18.0"
 
       - name: 安装构建工具
         shell: pwsh
