@@ -66,7 +66,7 @@ cc /tmp/pl_test.c $(pkg-config --static --cflags --libs libplacebo) -o /tmp/pl_t
   --extra-libs="-lpthread -lm -ldl -lstdc++" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-  --enable-cuvid --enable-nvenc --enable-libnpp \
+  --enable-cuvid --enable-nvenc \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
@@ -81,6 +81,8 @@ echo "--- NVENC ---"
 "$P/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
 echo "--- VMAF ---"
 "$P/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+echo "--- FRUC-Vulkan (NVIDIA 光流插帧) ---"
+"$P/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i fruc_vulkan || echo "(none)"
 
 echo "[5/5] 输出"
 mkdir -p "$ORIG_DIR/output"

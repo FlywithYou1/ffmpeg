@@ -496,10 +496,10 @@ sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleav
   --pkg-config-flags="--static" \
   --extra-cflags="-I${P_MIXED}/include -I${CUDA_HOME_MIXED}/include ${VCPKG_CFLAGS} -DLIBTWOLAME_STATIC" \
   --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
-  --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib nppc.lib nppicc.lib nppig.lib nppidei.lib npps.lib" \
+  --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-  --enable-cuvid --enable-nvenc --enable-libnpp \
+  --enable-cuvid --enable-nvenc \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl \
@@ -521,6 +521,8 @@ echo "--- NVENC ---"
 "$P/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || echo "(none)"
 echo "--- VMAF ---"
 "$P/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "(none)"
+echo "--- FRUC-Vulkan (NVIDIA 光流插帧) ---"
+"$P/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i fruc_vulkan || echo "(none)"
 
 echo "[5/5] 输出"
 mkdir -p "$ORIG_DIR/output"

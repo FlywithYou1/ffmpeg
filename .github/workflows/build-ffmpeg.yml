@@ -278,6 +278,10 @@ jobs:
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -encoders 2>&1 | ${{ matrix.verify_grep }} || echo "（无）"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
+          echo "--- FRUC-Vulkan (NVIDIA 光流插帧) ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -filters 2>&1 | grep -i fruc_vulkan || echo "（无）"
+          echo "--- Vulkan 编解码器 ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -codecs 2>&1 | grep -iE '_vulkan' || echo "（无）"
 
       - name: 打包
         run: |
@@ -969,6 +973,15 @@ jobs:
               || gas-preprocessor.pl -arch aarch64 -as-type armasm -- armasm64.exe -h \
               || { echo "::error::gas-preprocessor + armasm64 smoke test failed"; exit 1; }
           fi
+          # NVIDIA 光流插帧滤镜 fruc_vulkan 依赖 SPIR-V 编译器（glslc），
+          # vcpkg 的 shaderc port 把 glslc.exe 放在 tools/shaderc/ 下，需显式加入 PATH，
+          # 否则 configure 的 spirv_compiler 检测失败导致 fruc_vulkan 被禁用。
+          if [ -d "${VCPKG_INSTALLED}/tools/shaderc" ]; then
+            GLSLC_DIR="$(cygpath -m "${VCPKG_INSTALLED}/tools/shaderc")"
+            export PATH="${GLSLC_DIR}:${PATH}"
+            echo "glslc dir: ${GLSLC_DIR}"
+          fi
+          command -v glslc >/dev/null 2>&1 && echo "glslc: $(which glslc)" || echo "::warning::glslc not found in PATH"
           ./configure --toolchain=msvc --prefix="$P" \
             --pkg-config="$PKG_CONFIG" \
             --pkg-config-flags="--static" \
@@ -1003,6 +1016,10 @@ jobs:
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'nvenc|amf|qsv|libmp3lame|libfdk_aac' | head -10 || echo "（无）"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
+          echo "--- FRUC-Vulkan (NVIDIA 光流插帧) ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i fruc_vulkan || echo "（无）"
+          echo "--- Vulkan 编解码器 ---"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -codecs 2>&1 | grep -iE '_vulkan' || echo "（无）"
 
       - name: 打包
         shell: pwsh
