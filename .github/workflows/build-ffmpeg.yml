@@ -1044,7 +1044,14 @@ jobs:
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget lame sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
+          if brew info fdk-aac >/dev/null 2>&1; then
+            brew install fdk-aac
+            echo "ENABLE_FDK_AAC=1" >> "${GITHUB_ENV}"
+          else
+            echo "::warning::Homebrew formula fdk-aac unavailable on this runner; building without libfdk-aac"
+            echo "ENABLE_FDK_AAC=0" >> "${GITHUB_ENV}"
+          fi
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -1080,7 +1087,16 @@ jobs:
           echo "SDKROOT=${SDKROOT}"
           P="${HOME}/ffmpeg-install"
           LAME_PREFIX="$(brew --prefix lame)"
-          FDK_PREFIX="$(brew --prefix fdk-aac)"
+          FDK_PREFIX=""
+          FDK_CFLAGS=""
+          FDK_LDFLAGS=""
+          FDK_ENABLE=""
+          if [ "${ENABLE_FDK_AAC:-0}" = "1" ]; then
+            FDK_PREFIX="$(brew --prefix fdk-aac)"
+            FDK_CFLAGS="-I${FDK_PREFIX}/include"
+            FDK_LDFLAGS="-L${FDK_PREFIX}/lib"
+            FDK_ENABLE="--enable-libfdk-aac"
+          fi
           # Homebrew 的 lame 不带 .pc 文件，手动生成 libmp3lame.pc
           LAME_INCLUDE=$(ls -d "${LAME_PREFIX}/include"/*/ 2>/dev/null | head -1 || echo "${LAME_PREFIX}/include")
           {
@@ -1095,8 +1111,10 @@ jobs:
             echo 'Libs: -L${libdir} -lmp3lame'
             echo 'Cflags: -I${includedir}'
           } > "${P}/lib/pkgconfig/libmp3lame.pc"
-          # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
-          [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+          if [ -n "${FDK_PREFIX}" ]; then
+            # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
+            [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
+          fi
           BREW_PREFIX="$(brew --prefix)"
           MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
           if [ -d "${MVK_PREFIX}/libexec/include" ]; then
@@ -1115,10 +1133,16 @@ jobs:
               sed 's/-lstdc++/-lc++/g' "$pc" > "${P}/lib/pkgconfig/$base"
             done
           done
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          PKG_CONFIG_PATHS="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig"
+          [ -n "${FDK_PREFIX}" ] && PKG_CONFIG_PATHS="${PKG_CONFIG_PATHS}:${FDK_PREFIX}/lib/pkgconfig"
+          export PKG_CONFIG_PATH="${PKG_CONFIG_PATHS}:${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           pkg-config --exists libmp3lame && echo "pkg-config libmp3lame: OK ($(pkg-config --modversion libmp3lame))" || echo "pkg-config libmp3lame: FAIL"
-          pkg-config --exists libfdk-aac  && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))"   || echo "pkg-config libfdk-aac: FAIL"
+          if [ -n "${FDK_PREFIX}" ]; then
+            pkg-config --exists libfdk-aac && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))" || echo "pkg-config libfdk-aac: FAIL"
+          else
+            echo "pkg-config libfdk-aac: SKIP (formula unavailable)"
+          fi
           cd /tmp && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
           # macOS 使用 libc++，configure 里 libsnappy 的 -lstdc++ 会导致检测失败
@@ -1126,11 +1150,11 @@ jobs:
           rm -f configure.bak
           ./configure --prefix="$P" \
             --cc="$CC" --cxx="$CXX" \
-            --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
-            --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
+            --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include ${FDK_CFLAGS} ${MVK_CFLAGS}" \
+            --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib ${FDK_LDFLAGS} ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame ${FDK_ENABLE} --enable-opencl --enable-vulkan \
             --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
@@ -1249,7 +1273,7 @@ jobs:
             |---|---|---|---|
             | `ffmpeg-macos-arm.tar.xz` | Apple | VideoToolbox | ✅ CPU |
 
-            > 所有构建均包含： libmp3lame + libfdk-aac + SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
+            > 所有构建均包含： libmp3lame + SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy（`libfdk-aac` 在可用平台启用；macOS ARM 在 Homebrew 缺失该 formula 时会跳过）
             > Windows 构建使用 MSVC 2026 编译，需要 VC++ 可再发行组件。
           files: release-assets/*
           draft: false
