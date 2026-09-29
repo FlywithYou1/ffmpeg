@@ -38,22 +38,34 @@ __clean_path() {
 __clean_path
 
 CUDA_HOME="${CUDA_HOME:-}"
+HAVE_CUDA=0
 if [ -z "${CUDA_HOME}" ]; then
   for d in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA"/v*; do
     d2="$(cygpath -u "$d" 2>/dev/null || echo "$d")"
-    if [ -d "${d2}/bin" ] && [ -f "${d2}/bin/nvcc.exe" ]; then CUDA_HOME="${d2}"; break; fi
+    if [ -d "${d2}/bin" ] && [ -f "${d2}/bin/nvcc.exe" ]; then CUDA_HOME="${d2}"; HAVE_CUDA=1; break; fi
   done
+else
+  HAVE_CUDA=1
 fi
-[ -z "${CUDA_HOME}" ] && { echo "错误：未找到 CUDA"; exit 1; }
+if [ "${HAVE_CUDA}" != "1" ] && command -v nvcc >/dev/null 2>&1; then
+  NVCCBIN="$(dirname "$(which nvcc)")"
+  CUDA_HOME="$(dirname "${NVCCBIN}")"
+  HAVE_CUDA=1
+fi
 
 echo "=========================================="
 echo "FFmpeg NVIDIA NVENC/CUDA (Windows MSVC)"
-echo "PREFIX: $P  THREADS: $THREADS  CUDA: $CUDA_HOME"
+echo "PREFIX: $P  THREADS: $THREADS  CUDA: ${CUDA_HOME:-UNAVAILABLE}"
 echo "Compiler: $(cl.exe 2>&1 | head -n1 || echo MSVC)"
 echo "=========================================="
 
-export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
-export PATH="${CUDA_HOME}/bin:${P}/bin:${PATH}"
+if [ "${HAVE_CUDA}" = "1" ]; then
+  export CUDA_PATH="${CUDA_HOME}" CUDACXX="${CUDA_HOME}/bin/nvcc"
+  export PATH="${CUDA_HOME}/bin:${P}/bin:${PATH}"
+else
+  echo "警告：未找到 CUDA，将跳过 --enable-cuda-nvcc/--enable-cuvid，仅保留 NVENC。"
+  export PATH="${P}/bin:${PATH}"
+fi
 
 # Resolve default vcpkg root before pkg-config detection uses it.
 VCPKG_INSTALLED="${VCPKG_INSTALLED:-}"
@@ -72,29 +84,38 @@ export PKG_CONFIG="${PKG_CONFIG:-/usr/bin/pkg-config}"
 
 # Convert common paths to mixed (C:/...) form to avoid shell quoting issues with spaces.
 P_MIXED="$(cygpath -m "$P" 2>/dev/null || echo "$P")"
-CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+CUDA_HOME_MIXED=""
+if [ "${HAVE_CUDA}" = "1" ]; then
+  CUDA_HOME_MIXED="$(cygpath -m "$CUDA_HOME" 2>/dev/null || echo "$CUDA_HOME")"
+fi
 # CUDA default install path contains spaces which break FFmpeg's configure/unquoted
 # $CFLAGS/$LDFLAGS. Use a junction to a space-free path for compiler flags.
-if command -v cmd.exe >/dev/null 2>&1; then
+if [ "${HAVE_CUDA}" = "1" ] && command -v cmd.exe >/dev/null 2>&1; then
   rm -rf /c/cuda
   cmd //c "mklink /J C:\\cuda \"$(cygpath -w "$CUDA_HOME")\"" >/dev/null 2>&1 || true
   [ -d "/c/cuda" ] && CUDA_HOME_MIXED="C:/cuda"
 fi
 
 # Verify nvcc is reachable before FFmpeg configure (--enable-cuda-nvcc needs it).
-if ! command -v nvcc >/dev/null 2>&1; then
-  echo "错误：nvcc 不在 PATH 中 (CUDA_HOME=${CUDA_HOME})"
-  echo "PATH=${PATH}"
-  exit 1
+if [ "${HAVE_CUDA}" = "1" ]; then
+  if ! command -v nvcc >/dev/null 2>&1; then
+    echo "警告：nvcc 不在 PATH 中，降级为 NVENC-only (CUDA_HOME=${CUDA_HOME})"
+    HAVE_CUDA=0
+  fi
 fi
-echo "nvcc: $(which nvcc)"
-nvcc --version
+if [ "${HAVE_CUDA}" = "1" ]; then
+  echo "nvcc: $(which nvcc)"
+  nvcc --version
+fi
 VCPKG_INSTALLED_MIXED=""
 if [ -n "${VCPKG_INSTALLED:-}" ]; then
   VCPKG_INSTALLED_MIXED="$(cygpath -m "$VCPKG_INSTALLED" 2>/dev/null || echo "$VCPKG_INSTALLED" | tr '/\\' '/' 2>/dev/null | sed -e 's#^/c/#C:/#' -e 's#^/d/#D:/#')"
 fi
 
-CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
+CL=""
+if [ "${HAVE_CUDA}" = "1" ]; then
+  CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
+fi
 
 # Ensure vcpkg dependencies are discoverable by pkg-config.
 # vcpkg ports do not always ship pkg-config files, so create the ones ffmpeg expects.
@@ -340,9 +361,12 @@ for path in ("src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/log.c", "src/f
         "#endif\n"
     )
 '
-# nvcc (CUDA .cu) compiles as C++ and does not support C11 designated initializers
-# before C++20. Rewrite the one struct in integer_adm.h to positional initialization.
-python3 -c '
+VMAF_ENABLE_CUDA=false
+if [ "${HAVE_CUDA}" = "1" ]; then
+  VMAF_ENABLE_CUDA=true
+  # nvcc (CUDA .cu) compiles as C++ and does not support C11 designated initializers
+  # before C++20. Rewrite the one struct in integer_adm.h to positional initialization.
+  python3 -c '
 import pathlib
 p = pathlib.Path("src/feature/integer_adm.h")
 if p.exists():
@@ -358,9 +382,11 @@ if p.exists():
         "    {0.944, 0.521, 0.404, {1.868, 1.0, 0.516, 1.0}}};")
     p.write_text(s, encoding="utf-8")
 '
-# nvcc fatbin uses a hard-coded custom_target command; inject extra include dirs
-# so CUDA .cu files can find ffnvcodec headers (from nv-codec-headers) and pthread.h.
-python3 -c "
+fi
+if [ "${HAVE_CUDA}" = "1" ]; then
+  # nvcc fatbin uses a hard-coded custom_target command; inject extra include dirs
+  # so CUDA .cu files can find ffnvcodec headers (from nv-codec-headers) and pthread.h.
+  python3 -c "
 import pathlib
 mb = pathlib.Path('src/meson.build')
 s = mb.read_text(encoding='utf-8')
@@ -369,9 +395,14 @@ s = s.replace(
     \"'-I', '../src/' + cuda_dir,\\n                '-I', '${P_MIXED}/include',\\n                '-I', '${VCPKG_INSTALLED_MIXED}/include',\")
 mb.write_text(s, encoding='utf-8')
 "
+fi
 # nvcc host compiler (cl) also consults INCLUDE on Windows
-export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED}/include;${INCLUDE:-}"
-export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
+export INCLUDE="${P_MIXED}/include;${VCPKG_INSTALLED_MIXED}/include;${CUDA_HOME_MIXED:+${CUDA_HOME_MIXED}/include;}${INCLUDE:-}"
+if [ "${HAVE_CUDA}" = "1" ]; then
+  export C_INCLUDE_PATH="${P}/include:${CUDA_HOME}/include:${C_INCLUDE_PATH:-}"
+else
+  export C_INCLUDE_PATH="${P}/include:${C_INCLUDE_PATH:-}"
+fi
 # Ensure MSVC link.exe before Git's link.EXE for meson
 CLDIR=$(dirname "$(which cl.exe 2>/dev/null)" 2>/dev/null || true)
 [ -n "$CLDIR" ] && export PATH="${CLDIR}:${PATH}"
@@ -420,12 +451,12 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
   else
     echo "使用 VS Clang (MSVC target) 编译 VMAF（nasm 缺失，禁用 asm 优化）"
   fi
-  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" ${CUDA_HOME_MIXED:+"-I${CUDA_HOME_MIXED}/include"} "--target=x86_64-pc-windows-msvc" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_CPP_ARGS=$(__meson_array "--target=x86_64-pc-windows-msvc" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   CC="${CLANG_BIN}/clang.exe" CXX="${CLANG_BIN}/clang++.exe" \
   PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-  meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=${VMAF_ENABLE_CUDA} -Denable_asm=${VMAF_ENABLE_ASM} -Db_vscrt=mt -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
     -Dcpp_args="$VMAF_CPP_ARGS" \
@@ -433,10 +464,10 @@ if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ]; then
     -Dcpp_link_args="$VMAF_LINK_ARGS"
 else
   echo "警告：未找到 VS Clang，VMAF 回退到 MSVC 并禁用 asm 优化"
-  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" "-I${CUDA_HOME_MIXED}/include" "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
+  VMAF_C_ARGS=$(__meson_array "-I${P_MIXED}/include" ${CUDA_HOME_MIXED:+"-I${CUDA_HOME_MIXED}/include"} "-D_USE_MATH_DEFINES" ${PTHREAD_CFLAGS:+"$PTHREAD_CFLAGS"})
   VMAF_LINK_ARGS=$(__meson_array ${PTHREAD_LDFLAGS:+"$PTHREAD_LDFLAGS"})
   PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
-  meson setup build --buildtype release --prefix="$P" -Denable_cuda=true -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
+  meson setup build --buildtype release --prefix="$P" -Denable_cuda=${VMAF_ENABLE_CUDA} -Denable_asm=false -Db_vscrt=mt -Ddefault_library=static \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false -Dcpp_std=c++17 \
     -Dc_args="$VMAF_C_ARGS" \
     -Dc_link_args="$VMAF_LINK_ARGS"
@@ -488,18 +519,21 @@ python3 -c 'import pathlib; p=pathlib.Path("ffbuild/library.mak"); s=p.read_text
 
 VCPKG_CFLAGS=""; VCPKG_LDFLAGS=""
 [ -n "${VCPKG_INSTALLED}" ] && VCPKG_CFLAGS="-I${VCPKG_INSTALLED}/include" && VCPKG_LDFLAGS="-LIBPATH:${VCPKG_INSTALLED}/lib"
+CUDA_CONFIG_FLAGS="--enable-cuda-nvcc --enable-cuvid"
+if [ "${HAVE_CUDA}" != "1" ]; then
+  CUDA_CONFIG_FLAGS=""
+fi
 # libtwolame 静态库需要定义 LIBTWOLAME_STATIC，否则头文件会使用 __declspec(dllimport)
 sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
 sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
 
 ./configure --toolchain=msvc --prefix="$P" \
   --pkg-config-flags="--static" \
-  --extra-cflags="-I${P_MIXED}/include -I${CUDA_HOME_MIXED}/include ${VCPKG_CFLAGS} -DLIBTWOLAME_STATIC" \
-  --extra-ldflags="-LIBPATH:${P_MIXED}/lib -LIBPATH:${CL} ${VCPKG_LDFLAGS}" \
+  --extra-cflags="-I${P_MIXED}/include ${CUDA_HOME_MIXED:+-I${CUDA_HOME_MIXED}/include} ${VCPKG_CFLAGS} -DLIBTWOLAME_STATIC" \
+  --extra-ldflags="-LIBPATH:${P_MIXED}/lib ${CL:+-LIBPATH:${CL}} ${VCPKG_LDFLAGS}" \
   --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
   --enable-gpl --enable-version3 --enable-nonfree \
-  --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc \
-  --enable-cuvid --enable-nvenc \
+  --enable-libvmaf --enable-ffnvcodec ${CUDA_CONFIG_FLAGS} --enable-nvenc \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl \
