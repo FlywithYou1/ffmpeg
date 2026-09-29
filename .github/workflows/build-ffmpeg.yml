@@ -603,16 +603,12 @@ jobs:
             Write-Host "nvcc already exists in PATH, skip CUDA install."
             exit 0
           }
-          $ok = $false
-          for ($i = 1; $i -le 2; $i++) {
-            Write-Host "CUDA install attempt $i/2"
+          for ($i = 1; $i -le 3; $i++) {
+            Write-Host "CUDA install attempt $i/3"
             winget install --id Nvidia.CUDA -e --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
-            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if ($LASTEXITCODE -eq 0) { break }
             Write-Host "::warning::winget CUDA install failed (attempt $i, exit=$LASTEXITCODE)"
             Start-Sleep -Seconds 10
-          }
-          if (-not $ok) {
-            Write-Host "::warning::CUDA toolkit install failed; workflow will continue and fall back to NVENC-only if CUDA is unavailable."
           }
           exit 0
 
@@ -628,23 +624,14 @@ jobs:
           done
           [ -z "${CUDA_BASE}" ] && NVCCBIN="$(dirname "$(which nvcc 2>/dev/null || true)" 2>/dev/null || true)" && \
             [ -n "${NVCCBIN}" ] && CUDA_BASE="$(dirname "${NVCCBIN}")"
-          if [ -z "${CUDA_BASE}" ]; then
-            echo "::warning::未找到 CUDA，将跳过 cuda-nvcc/cuvid，仅保留 NVENC"
-            echo "HAS_CUDA=0" >> "${GITHUB_ENV}"
-          else
-            echo "HAS_CUDA=1" >> "${GITHUB_ENV}"
-            echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
-            "${CUDA_BASE}/bin/nvcc.exe" --version
-          fi
+          [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
+          echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
+          "${CUDA_BASE}/bin/nvcc.exe" --version
 
       - name: 创建 CUDA junction
         if: matrix.cuda
         shell: pwsh
         run: |
-          if ($env:HAS_CUDA -ne "1") {
-            Write-Host "Skip CUDA junction (HAS_CUDA=$env:HAS_CUDA)"
-            exit 0
-          }
           $cuda = $env:CUDA_HOME
           if (-not $cuda) { Write-Error "CUDA_HOME is not set"; exit 1 }
           if ($cuda -match '^/([a-zA-Z])/(.*)$') {
@@ -747,7 +734,7 @@ jobs:
                   s = s.replace("#ifdef _MSC_VER\n", "#if defined(_MSC_VER) && !defined(__clang__)\n")
                   p.write_text(s, encoding="utf-8")
           PYEOF4
-          if [ "${HAS_CUDA:-0}" = "1" ]; then
+          if [ "${{ matrix.cuda }}" = "true" ]; then
           python3 << 'PYEOF5'
           import pathlib, re
           p = pathlib.Path("src/feature/integer_adm.h")
@@ -782,9 +769,7 @@ jobs:
           # Clang-cl 和 MSVC 分别通过不同变量找头文件
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
           export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
-          VMAF_ENABLE_CUDA=false
-          if [ "${HAS_CUDA:-0}" = "1" ]; then
-          VMAF_ENABLE_CUDA=true
+          if [ "${{ matrix.cuda }}" = "true" ]; then
           P_MIXED="$P_MIXED" VCPKG_INSTALLED="$VCPKG_INSTALLED" python3 << 'PYEOF6'
           import pathlib, os
           p_mixed = os.environ['P_MIXED']
@@ -836,7 +821,7 @@ jobs:
           mkdir -p "$P_MIXED/include" && echo $'#ifndef GETOPT_SHIM_H\n#define GETOPT_SHIM_H\n#ifdef __cplusplus\nextern "C" {\n#endif\nstruct option { const char *name; int has_arg; int *flag; int val; };\n#define no_argument 0\n#define required_argument 1\n#define optional_argument 2\nstatic char *optarg = 0;\nstatic int optind = 1;\nstatic inline int getopt_long(int argc, char * const argv[], const char *optstring, const struct option *longopts, int *longindex){(void)argc;(void)argv;(void)optstring;(void)longopts;(void)longindex;return -1;}\n#ifdef __cplusplus\n}\n#endif\n#endif' > "$P_MIXED/include/getopt.h"
           PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;${PKG_CONFIG_PATH:-}" \
             meson setup build --buildtype release --prefix="$P" \
-              -Denable_cuda=${VMAF_ENABLE_CUDA} -Denable_asm=$VMAF_ENABLE_ASM \
+              -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
               -Denable_tests=false -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
           # Only build libvmaf.a static library (FFmpeg only needs the lib, not the vmaf CLI tool).
           # The CLI tool depends on pthread_create etc. which our inline shim can't satisfy at link time.
@@ -951,18 +936,12 @@ jobs:
               echo "pthread_shim.lib created" || { echo "::error::failed to create pthread_shim.lib"; exit 1; }
           fi
           # CUDA/AMF/VPL 的 --enable-* 只在 matrix.configure_extra，这里只准备路径与头文件
-          if [ "${HAS_CUDA:-0}" = "1" ]; then
+          if [ "${{ matrix.cuda }}" = "true" ]; then
             export CUDA_HOME="/c/cuda"
             export CUDA_PATH="/c/cuda"
             export CUDACXX="/c/cuda/bin/nvcc"
             export PATH="/c/cuda/bin:${PATH}"
             CL="${CUDA_HOME_MIXED}/lib/x64"; [ ! -d "/c/cuda/lib/x64" ] && CL="${CUDA_HOME_MIXED}/lib"
-          fi
-          CONFIGURE_EXTRA="${{ matrix.configure_extra }}"
-          if [ "${HAS_CUDA:-0}" != "1" ]; then
-            CONFIGURE_EXTRA="${CONFIGURE_EXTRA//--enable-cuda-nvcc/}"
-            CONFIGURE_EXTRA="${CONFIGURE_EXTRA//--enable-cuvid/}"
-            echo "::warning::CUDA toolkit unavailable, configure flags downgraded to NVENC-only."
           fi
           if [ "${{ matrix.amf }}" = "true" ]; then
             AMF_DIR="/tmp/AMF"
@@ -1023,7 +1002,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib ${CL:+-LIBPATH:$CL} -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
-            ${CONFIGURE_EXTRA} --enable-opencl --enable-vulkan \
+            ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
