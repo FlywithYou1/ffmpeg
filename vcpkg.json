@@ -1,7 +1,7 @@
 {
   "name": "ffmpeg-build",
   "version": "1.0.0",
-  "builtin-baseline": "001713e802f5cf619a64461b918161be6a0634f0",
+  "builtin-baseline": "2cfff9c458d9dcf642e9fa09ba624f9931bb5358",
   "dependencies": [
     "pkgconf",
     "mp3lame",
