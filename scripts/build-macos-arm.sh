@@ -23,7 +23,7 @@ for pkg in molten-vk shaderc; do
 done
 
 # 确保软件编解码器依赖存在
-for pkg in lame fdk-aac x264 x265 libvpx opus libvorbis libtheora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy sdl2 svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband vidstab; do
+for pkg in x264 x265 libvpx opus libvorbis libtheora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy sdl2 svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband vidstab; do
   brew list "$pkg" &>/dev/null || brew install "$pkg"
 done
 
@@ -45,26 +45,6 @@ ninja -vC build && ninja -C build install
 
 # ---- FFmpeg ----
 echo "[2/4] FFmpeg"
-# Homebrew 的 lame 不带 .pc 文件，手动生成 libmp3lame.pc
-LAME_PREFIX="$(brew --prefix lame)"
-FDK_PREFIX="$(brew --prefix fdk-aac)"
-LAME_INCLUDE=$(ls -d "${LAME_PREFIX}/include"/*/ 2>/dev/null | head -1 || echo "${LAME_PREFIX}/include")
-LAME_LIB="${LAME_PREFIX}/lib"
-cat > "${P}/lib/pkgconfig/libmp3lame.pc" <<LAMEPC
-prefix=${LAME_PREFIX}
-exec_prefix=\${prefix}
-libdir=${LAME_LIB}
-includedir=${LAME_INCLUDE}
-
-Name: libmp3lame
-Description: LAME MP3 encoder library
-Version: 3.100
-Libs: -L\${libdir} -lmp3lame
-Cflags: -I\${includedir}
-LAMEPC
-# fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
-[ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && \
-  ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
 BREW_PREFIX="$(brew --prefix)"
 MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
 if [ -d "${MVK_PREFIX}/libexec/include" ]; then
@@ -83,7 +63,7 @@ for pc_dir in "${BREW_PREFIX}/lib/pkgconfig" /opt/homebrew/opt/*/lib/pkgconfig; 
     sed 's/-lstdc++/-lc++/g' "$pc" > "${P}/lib/pkgconfig/$base"
   done
 done
-export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 cd /tmp && rm -rf ffmpeg-src
 git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-src
 cd ffmpeg-src
@@ -91,15 +71,15 @@ cd ffmpeg-src
 sed -i.bak 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
 rm -f configure.bak
 ./configure --prefix="$P" \
-  --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
-  --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
+  --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include ${MVK_CFLAGS}" \
+  --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib ${MVK_LDFLAGS}" \
   --extra-libs="-lpthread -lm" \
   --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
-  --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
+  --enable-sdl2 \
   --enable-videotoolbox --enable-audiotoolbox \
   --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
   --enable-hwaccel=vp9_videotoolbox --enable-hwaccel=prores_videotoolbox \

@@ -48,11 +48,32 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 |---|---|---|---|
 | `ffmpeg-macos-arm.tar.xz` | Apple Silicon | VideoToolbox | ✅ CPU |
 
+### 整合版 + AV2（独立 CI 构建项）
+
+保留原有 NVIDIA、AMD、Intel 和不带 AV2 的整合版，不创建 Git 分支。
+
+| Artifact | 平台 | 硬件加速 |
+|---|---|---|
+| `ffmpeg-linux-x86-all-av2.tar.xz` | Linux x86_64 | NVENC/CUDA + QSV + VAAPI |
+| `ffmpeg-windows-x86-all-av2.zip` | Windows x86_64 | NVENC/CUDA + QSV + AMF |
+| `ffmpeg-windows-arm64-av2.zip` | Windows ARM64 | D3D11VA / DXVA2 / MF |
+| `ffmpeg-macos-arm-av2.tar.xz` | macOS ARM64 | VideoToolbox |
+
+这些产物额外包含 [AVM 1.0.0](https://github.com/AOMediaCodec/avm/tree/v1.0.0) 的 `avmenc`、`avmdec` 和许可证。AV2 使用独立工具编解码，**不是 FFmpeg 原生 AV2 支持**；原有 libaom 的 AV1 支持保留。Windows ARM64 的 AVM 使用通用 C 实现，避免不兼容的汇编工具链。
+
+CI 会用 FFmpeg 生成测试帧，经过 AV2 编码、解码后重新读取，失败则不发布产物。AVM 的构建和验证仅在 GitHub Actions runner 执行。
+
+```bash
+ffmpeg -i input.mp4 -pix_fmt yuv420p -f yuv4mpegpipe input.y4m
+avmenc --codec=av2 --ivf --cpu-used=6 --end-usage=q --cq-level=45 -o output.ivf input.y4m
+avmdec --codec=av2 -o decoded.y4m output.ivf
+```
+
 ---
 
 ## 🔧 功能特性
 
-- **软件编解码器**: libmp3lame (MP3), libfdk-aac (AAC), libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl）
+- **软件编解码器**: libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl）
 - **硬件加速**: NVENC/NVDEC, Intel QSV, AMD AMF/VAAPI, VideoToolbox, D3D11VA/D3D12VA/DXVA2
 - **CUDA 处理**: libnpp (NVIDIA Performance Primitives)
 - **VMAF**: Netflix 视频质量评分（CPU 或 CUDA 加速）
@@ -66,9 +87,9 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 
 - [Visual Studio 2026](https://visualstudio.microsoft.com/) (Windows MSVC)
 - [Git for Windows](https://git-scm.com/) (提供 Bash 环境)
-- [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理；x64 建议安装 `pkgconf fdk-aac sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc`)
+- [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理；x64 建议安装 `pkgconf sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc`)
 - [NASM](https://www.nasm.us/) (x86/x64 汇编优化)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Windows CI 自动安装最新版)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Linux/Windows CI 使用 [mjun0812/setup-cuda](https://github.com/mjun0812/setup-cuda)，每次构建自动安装 NVIDIA 最新稳定版；网络安装失败时自动改用本地安装器，仅在 GitHub Actions runner 执行)
 - [Meson](https://mesonbuild.com/) + [Ninja](https://ninja-build.org/) (VMAF 构建)
 
 ### Windows (VS 2026 Developer Command Prompt + Git Bash)
@@ -99,7 +120,7 @@ bash scripts/build-windows-arm64.sh
 sudo apt-get update
 sudo apt-get install -y build-essential yasm nasm pkg-config meson ninja-build \
   cmake git wget curl ca-certificates python3 xxd \
-  libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+  libsdl2-dev \
   libva-dev libdrm-dev libvpl-dev \
   libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
   libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
@@ -140,7 +161,7 @@ bash ffmpeg-archlinux-nvidia.sh
 
 ## 📁 项目结构
 
-```
+```text
 ├── .github/workflows/build-ffmpeg.yml   # CI/CD 工作流 (12 jobs)
 ├── scripts/
 │   ├── build-windows-intel-qsv.sh       # Windows Intel QSV

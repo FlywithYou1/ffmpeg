@@ -79,41 +79,6 @@ if [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/lib/pkgconfig" ]; the
 
   mkdir -p "${VCPKG_INSTALLED}/lib/pkgconfig"
 
-  # mp3lame 的 static triplet 在 MSVC 下缺少 mpglib 内部符号，改用 dynamic triplet 的 import lib + DLL
-  VCPKG_INSTALLED_DYNAMIC="${VCPKG_INSTALLED/%static/dynamic}"
-  if [ -d "${VCPKG_INSTALLED_DYNAMIC}/lib" ]; then
-    cp "${VCPKG_INSTALLED_DYNAMIC}/lib/libmp3lame.lib" "${VCPKG_INSTALLED}/lib/libmp3lame.lib" 2>/dev/null || true
-    cp "${VCPKG_INSTALLED_DYNAMIC}/lib/mp3lame.lib" "${VCPKG_INSTALLED}/lib/mp3lame.lib" 2>/dev/null || true
-    mkdir -p "${VCPKG_INSTALLED}/bin"
-    cp "${VCPKG_INSTALLED_DYNAMIC}/bin/"*.dll "${VCPKG_INSTALLED}/bin/" 2>/dev/null || true
-  fi
-
-  lame_lib="$(find_import_lib libmp3lame mp3lame)" || { echo "错误：未找到 mp3lame import library"; exit 1; }
-  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libmp3lame.pc" <<EOF
-prefix=${VCPKG_INSTALLED_MIXED}
-exec_prefix=\${prefix}
-libdir=\${prefix}/lib
-includedir=\${prefix}/include
-
-Name: libmp3lame
-Description: LAME MP3 encoder library
-Version: 3.100
-Libs: ${lame_lib}
-EOF
-
-  fdk_lib="$(find_import_lib fdk-aac libfdk-aac fdk-aac-2)" || { echo "错误：未找到 fdk-aac import library"; exit 1; }
-  cat > "${VCPKG_INSTALLED}/lib/pkgconfig/libfdk-aac.pc" <<EOF
-prefix=${VCPKG_INSTALLED_MIXED}
-exec_prefix=\${prefix}
-libdir=\${prefix}/lib
-includedir=\${prefix}/include
-
-Name: libfdk-aac
-Description: Fraunhofer FDK AAC codec library
-Version: 2.0.2
-Libs: ${fdk_lib}
-EOF
-
   # SDL2 (ffplay 需要)
   if [ ! -f "${VCPKG_INSTALLED}/lib/pkgconfig/sdl2.pc" ]; then
     sdl2_lib="$(find_import_lib SDL2)" || { echo "错误：未找到 SDL2 import library"; exit 1; }
@@ -131,19 +96,6 @@ Libs: ${sdl2main_lib:+$sdl2main_lib }$sdl2_lib
 Cflags: -I\${includedir} -I\${includedir}/SDL2
 EOF
   fi
-
-  # 创建库名别名，避免 ffmpeg fallback 找不到文件
-  ensure_lib_alias() {
-    local actual="$1" alias="$2"
-    if [ -f "${VCPKG_INSTALLED}/lib/${actual}" ] && [ ! -f "${VCPKG_INSTALLED}/lib/${alias}" ]; then
-      cp "${VCPKG_INSTALLED}/lib/${actual}" "${VCPKG_INSTALLED}/lib/${alias}"
-      echo "  alias: ${alias} -> ${actual}"
-    fi
-  }
-  ensure_lib_alias "${lame_lib}" "mp3lame.lib"
-  ensure_lib_alias "${lame_lib}" "libmp3lame.lib"
-  ensure_lib_alias "${fdk_lib}" "fdk-aac.lib"
-  ensure_lib_alias "${fdk_lib}" "libfdk-aac.lib"
 
   # 为 FFmpeg 的 --enable-libxxx 选项提供 pkg-config 回退（vcpkg 并不总是自带 .pc）
   write_pc() {
@@ -438,14 +390,14 @@ sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleav
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl \
-  --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 \
+  --enable-sdl2 \
   --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
 make -j"$THREADS" && make install
 
 # ---- 复制 DLL ----
 echo "[3/4] DLL"
 [ -n "${VCPKG_INSTALLED}" ] && [ -d "${VCPKG_INSTALLED}/bin" ] && \
-  for dll in libmp3lame.dll fdk-aac-2.dll SDL2.dll zlib1.dll; do
+  for dll in SDL2.dll zlib1.dll; do
     [ -f "${VCPKG_INSTALLED}/bin/$dll" ] && cp "${VCPKG_INSTALLED}/bin/$dll" "$P/bin/" && echo "  $dll"
   done
 

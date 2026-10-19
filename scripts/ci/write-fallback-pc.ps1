@@ -144,48 +144,6 @@ if (-not $svtLibName) {
     }
 }
 
-# libmp3lame
-$mp3lameLib = Find-ImportLib @('libmp3lame-static','libmp3lame','mp3lame','lame','libmp3lame-0')
-# vcpkg mp3lame also builds mpglib (internal decoder); named "mpghip" by upstream, needed at link time
-$mpglib = Find-ImportLib @('libmpghip-static','mpghip','mpglib','mpglib-static')
-$lameLibs = 'lame.lib'
-if ($mpglib) { $lameLibs = "$lameLibs mpglib.lib" }
-if (-not $mp3lameLib) {
-    Write-Host "::warning::mp3lame import library not found under $inst\lib"
-} else {
-Write-Utf8 "$pcDir/libmp3lame.pc" @(
-    "prefix=$instMixed",
-    'exec_prefix=${prefix}',
-    'libdir=${prefix}/lib',
-    'includedir=${prefix}/include',
-    '',
-    'Name: libmp3lame',
-    'Description: LAME MP3 encoder library',
-    "Version: $(Get-PortVersion 'mp3lame')",
-    "Libs: $lameLibs"
-)
-Write-Host "已创建 libmp3lame.pc -> $lameLibs (alias for $mp3lameLib)"
-}
-
-# libfdk-aac
-$fdkLib = Find-ImportLib @('fdk-aac','libfdk-aac','fdk-aac-2','fdk-aac-2-static')
-if (-not $fdkLib) {
-    Write-Host "::warning::fdk-aac import library not found under $inst\lib"
-} else {
-Write-Utf8 "$pcDir/libfdk-aac.pc" @(
-    "prefix=$instMixed",
-    'exec_prefix=${prefix}',
-    'libdir=${prefix}/lib',
-    'includedir=${prefix}/include',
-    '',
-    'Name: libfdk-aac',
-    'Description: Fraunhofer FDK AAC codec library',
-    "Version: $(Get-PortVersion 'fdk-aac')",
-    "Libs: $fdkLib"
-)
-Write-Host "已创建 libfdk-aac.pc -> $fdkLib"
-}
-
 # sdl2（仅在缺失时创建回退）
 if (-not (Test-Path "$pcDir/sdl2.pc")) {
     $sdl2Lib = Find-ImportLib @('SDL2','SDL2-static','SDL2_arm64')
@@ -324,14 +282,6 @@ function Copy-LibAlias($actual, $alias) {
         Write-Output "Created alias $alias -> $actual"
     }
 }
-Copy-LibAlias $mp3lameLib "libmp3lame.lib"
-Copy-LibAlias $mp3lameLib "mp3lame.lib"
-# Use a digit-free alias: mslink appends digits from lib name to the check function (e.g. 3lame → p3lame)
-Copy-LibAlias $mp3lameLib "lame.lib"
-# mpglib (internal MP3 decoder in libmp3lame)
-if ($mpglib) { Copy-LibAlias $mpglib "mpglib.lib" }
-Copy-LibAlias $fdkLib "fdk-aac.lib"
-Copy-LibAlias $fdkLib "libfdk-aac.lib"
 if ($libx264Lib) { Copy-LibAlias $libx264Lib "libx264.lib"; Copy-LibAlias $libx264Lib "x264.lib" }
 if ($libx265Lib) { Copy-LibAlias $libx265Lib "libx265.lib"; Copy-LibAlias $libx265Lib "x265.lib" }
 if ($libvpxLib) { Copy-LibAlias $libvpxLib "libvpx.lib"; Copy-LibAlias $libvpxLib "vpx.lib" }
@@ -370,10 +320,6 @@ Write-Output "已安装的导入库："
 Get-ChildItem "$inst\lib\*.lib" | Select-Object -ExpandProperty Name
 Write-Output "已生成的 .pc 文件："
 Get-ChildItem "$pcDir\*.pc" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
-Write-Output "libmp3lame.pc:"
-Get-Content "$pcDir/libmp3lame.pc"
-Write-Output "libfdk-aac.pc:"
-Get-Content "$pcDir/libfdk-aac.pc"
 Write-Output "aom.pc status:"
 if (Test-Path "$pcDir\aom.pc") {
     Get-Content "$pcDir\aom.pc"

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[ "${GITHUB_ACTIONS:-}" = "true" ] || { echo "This script builds AVM on GitHub Actions only."; exit 1; }
+: "${RUNNER_TEMP:?}" "${GITHUB_ENV:?}"
+ROOT="${RUNNER_TEMP}/avm"
+P="${RUNNER_TEMP}/avm-install"
+# AVM AV2 1.0.0, independent of the existing libaom AV1 dependency.
+AVM_REF=966a7d7cd6fcf60360caf5dc413b2aeeb65e144d
+git clone --no-checkout https://github.com/AOMediaCodec/avm.git "$ROOT"
+git -C "$ROOT" checkout --detach "$AVM_REF"
+args=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+      -DENABLE_APPS=ON -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=ON -DENABLE_DOCS=OFF
+      -DCONFIG_AV2_ENCODER=1 -DCONFIG_AV2_DECODER=1 -DCONFIG_WEBM_IO=0 -DCONFIG_LIBYUV=0
+      -DCMAKE_INSTALL_PREFIX="$P" -DCMAKE_INSTALL_LIBDIR=lib)
+if [ "${RUNNER_OS}" = "macOS" ]; then
+  args+=(-DCMAKE_OSX_ARCHITECTURES=arm64 "-DCMAKE_OSX_SYSROOT=$(xcrun --sdk macosx --show-sdk-path)")
+  THREADS="$(sysctl -n hw.logicalcpu)"
+else
+  args+=(-DENABLE_NASM=ON)
+  THREADS="$(nproc)"
+fi
+cmake -S "$ROOT" -B "$ROOT/build" "${args[@]}"
+cmake --build "$ROOT/build" --parallel "$THREADS" --target avmenc avmdec
+cmake --install "$ROOT/build"
+# v1.0.0 install rules may omit the apps; stage them directly from the build tree.
+mkdir -p "$P/bin"
+for tool in avmenc avmdec; do
+  [ -x "$P/bin/$tool" ] && continue
+  src="$(find "$ROOT/build" -type f -name "$tool" -perm -u+x | head -n1)"
+  [ -n "$src" ] || { echo "错误：未找到 $tool"; exit 1; }
+  cp "$src" "$P/bin/$tool"
+done
+mkdir -p "$P/licenses/avm"
+cp "$ROOT/LICENSE" "$ROOT/PATENTS" "$P/licenses/avm/"
+[ "${RUNNER_OS}" != "macOS" ] || for bin in avmenc avmdec; do codesign --force --sign - "$P/bin/$bin"; done
+"$P/bin/avmenc" --help > /dev/null
+"$P/bin/avmdec" --help > /dev/null
+echo "AVM_PREFIX=$P" >> "$GITHUB_ENV"

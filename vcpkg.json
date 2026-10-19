@@ -4,8 +4,6 @@
   "builtin-baseline": "bf19794383e8fb95eba5aa553235bc8ec2271688",
   "dependencies": [
     "pkgconf",
-    "mp3lame",
-    "fdk-aac",
     "sdl2",
     "libiconv",
     "zlib",

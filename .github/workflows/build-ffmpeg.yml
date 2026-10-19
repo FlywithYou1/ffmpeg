@@ -13,6 +13,7 @@ on:
     paths:
       - '.github/workflows/build-ffmpeg.yml'
       - 'scripts/**'
+      - 'vcpkg.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -167,6 +168,16 @@ jobs:
             configure_extra: --enable-libvmaf --enable-vaapi
             verify_grep: "grep '_vaapi' | head -10"
             artifact: ffmpeg-linux-arm.tar.xz
+          - id: x86-all-av2
+            name: "Linux x86 整合版 + AV2（NVIDIA + Intel + AMD）"
+            runner: ubuntu-26.04
+            extra_packages: libva-dev libvpl-dev libdrm-dev
+            cuda: true
+            vmaf_cuda: true
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
+            verify_grep: "grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc|_qsv|_vaapi' | head -10"
+            artifact: ffmpeg-linux-x86-all-av2.tar.xz
+            av2: true
     steps:
       - uses: actions/checkout@v7
 
@@ -176,7 +187,7 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             build-essential yasm nasm pkg-config meson ninja-build \
             cmake git wget curl ca-certificates gnupg python3 xxd \
-            libmp3lame-dev libfdk-aac-dev libsdl2-dev \
+            libsdl2-dev \
             ${{ matrix.extra_packages }} \
             libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
             libtheora-dev libaom-dev libwebp-dev libass-dev libfreetype6-dev \
@@ -188,32 +199,19 @@ jobs:
             sudo apt-get upgrade -y -qq
             bash scripts/ci/linux-pc-fallbacks.sh /usr
 
-      - name: 安装 CUDA 工具包
+      - name: 安装最新 CUDA 工具包
+        id: cuda
         if: matrix.cuda
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y wget
-          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64/cuda-keyring_1.1-1_all.deb
-          sudo dpkg -i cuda-keyring_1.1-1_all.deb
-          sudo apt-get update -qq
-          sudo apt-get install -y cuda-toolkit-13-3
-          sudo apt-get update -qq
-          sudo apt-get upgrade -y -qq
-          CUDA_VER_DIR=$(ls -d /usr/local/cuda-13.* 2>/dev/null | sort -V | tail -1)
-          if [ -n "${CUDA_VER_DIR}" ]; then
-            sudo ln -sf "${CUDA_VER_DIR}" /usr/local/cuda 2>/dev/null || true
-            echo "CUDA linked: ${CUDA_VER_DIR}"
-          else
-            sudo ln -sf /usr/local/cuda-13.3 /usr/local/cuda 2>/dev/null || true
-          fi
+        uses: mjun0812/setup-cuda@v1
+        with:
+          version: 'latest'
+          method: 'auto'
 
       - name: 检测 CUDA
         if: matrix.cuda
         run: |
-          CUDA_BASE=""
-          for d in /usr/local/cuda-* /usr/local/cuda; do
-            if [ -d "$d/bin" ] && [ -x "$d/bin/nvcc" ]; then CUDA_BASE="$d"; break; fi
-          done
+          CUDA_BASE="${CUDA_HOME:-${CUDA_PATH:-}}"
+          [ -x "${CUDA_BASE}/bin/nvcc" ] || { echo "::error::Action 未提供有效 CUDA 路径"; exit 1; }
           [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc" --version
@@ -244,6 +242,11 @@ jobs:
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
+      - name: 编译 AVM AV2 工具
+        if: matrix.av2
+        shell: bash
+        run: bash scripts/ci/build-avm.sh
+
       - name: 编译 FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
@@ -260,7 +263,7 @@ jobs:
             --extra-libs="-lpthread -lm -ldl" \
             --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -283,9 +286,18 @@ jobs:
           echo "--- Vulkan 编解码器 ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg" -hide_banner -codecs 2>&1 | grep -iE '_vulkan' || echo "（无）"
 
+      - name: 验证 AV2 编解码往返
+        if: matrix.av2
+        shell: bash
+        run: bash scripts/ci/verify-avm.sh "$HOME/ffmpeg-install/bin/ffmpeg"
+
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
+          if [ "${{ matrix.av2 }}" = "true" ]; then
+            cp "${AVM_PREFIX}/bin/"{avmenc,avmdec} dist/
+            cp -R "${AVM_PREFIX}/licenses" dist/
+          fi
           cd dist && tar -cJf ../${{ matrix.artifact }} .
 
       - uses: actions/upload-artifact@v7
@@ -363,6 +375,29 @@ jobs:
             vpl: true
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
             artifact: ffmpeg-windows-x86-all.zip
+          - id: x86-all-av2
+            name: "Windows x86 整合版 + AV2（NVIDIA + Intel + AMD）"
+            runner: windows-2025-vs2026
+            msvc_arch: amd64
+            triplet: x64-windows-static
+            cuda: true
+            amf: true
+            vpl: true
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
+            artifact: ffmpeg-windows-x86-all-av2.zip
+            av2: true
+          - id: arm64-av2
+            name: "Windows ARM64 整合版 + AV2（Snapdragon）"
+            runner: windows-11-vs2026-arm
+            msvc_arch: amd64_arm64
+            triplet: arm64-windows-static
+            cuda: false
+            amf: false
+            vpl: false
+            # 交叉编译必须 --arch=arm64，否则当成 x86（_tzcnt / x86asm LNK1112）
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon
+            artifact: ffmpeg-windows-arm64-av2.zip
+            av2: true
     steps:
       - name: 禁用 Git CRLF 自动转换
         shell: bash
@@ -584,8 +619,6 @@ jobs:
           find "${VCPKG_INSTALLED}/lib/pkgconfig" -name '*.pc' -print0 2>/dev/null | xargs -0 -I{} sh -c 'echo "== {} =="; cat "{}"' || true
           echo "--- pkg-config checks ---"
           if [ -n "${PKG_CONFIG:-}" ] && [ -x "$PKG_CONFIG" ]; then
-            $PKG_CONFIG --exists libmp3lame && echo "libmp3lame OK: version=$($PKG_CONFIG --modversion libmp3lame) libs=$($PKG_CONFIG --libs libmp3lame) cflags=$($PKG_CONFIG --cflags libmp3lame)" || echo "未找到 libmp3lame"
-            $PKG_CONFIG --exists libfdk-aac && echo "libfdk-aac OK: version=$($PKG_CONFIG --modversion libfdk-aac) libs=$($PKG_CONFIG --libs libfdk-aac) cflags=$($PKG_CONFIG --cflags libfdk-aac)" || echo "未找到 libfdk-aac"
             $PKG_CONFIG --exists sdl2 && echo "sdl2 OK: version=$($PKG_CONFIG --modversion sdl2) libs=$($PKG_CONFIG --libs sdl2) cflags=$($PKG_CONFIG --cflags sdl2)" || echo "未找到 sdl2"
             $PKG_CONFIG --exists vpl && echo "vpl OK: version=$($PKG_CONFIG --modversion vpl) libs=$($PKG_CONFIG --libs vpl) cflags=$($PKG_CONFIG --cflags vpl)" || echo "未找到 vpl"
             $PKG_CONFIG --exists zimg && echo "zimg OK: version=$($PKG_CONFIG --modversion zimg) libs=$($PKG_CONFIG --libs zimg) cflags=$($PKG_CONFIG --cflags zimg)" || echo "未找到 zimg"
@@ -594,23 +627,21 @@ jobs:
             echo "pkg-config 未找到，跳过检查"
           fi
 
-      - name: 安装 CUDA 工具包
+      - name: 安装最新 CUDA 工具包
+        id: cuda
         if: matrix.cuda
-        shell: pwsh
-        run: winget install --id Nvidia.CUDA -e --accept-source-agreements --accept-package-agreements --silent
+        uses: mjun0812/setup-cuda@v1
+        with:
+          version: 'latest'
+          method: 'auto'
 
       - name: 检测 CUDA
         if: matrix.cuda
         shell: bash
         run: |
-          CUDA_BASE=""
-          for base in "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA" "/c/Program Files/NVIDIA/CUDA"; do
-            for d in "$base"/v* "$base"/v*.*; do
-              if [ -d "$d/bin" ] && [ -x "$d/bin/nvcc.exe" ]; then CUDA_BASE="$d"; break 2; fi
-            done
-          done
-          [ -z "${CUDA_BASE}" ] && NVCCBIN="$(dirname "$(which nvcc 2>/dev/null || true)" 2>/dev/null || true)" && \
-            [ -n "${NVCCBIN}" ] && CUDA_BASE="$(dirname "${NVCCBIN}")"
+          CUDA_BASE="${CUDA_HOME:-${CUDA_PATH:-}}"
+          CUDA_BASE="$(cygpath -u "$CUDA_BASE")"
+          [ -x "${CUDA_BASE}/bin/nvcc.exe" ] || { echo "::error::Action 未提供有效 CUDA 路径"; exit 1; }
           [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc.exe" --version
@@ -711,7 +742,6 @@ jobs:
           p.write_text(s, encoding="utf-8")
           PYEOF3
           fi
-          sed -i '1i typedef unsigned short mode_t;' src/feature/mkdirp.h
           python3 << 'PYEOF4'
           import pathlib
           for path in ("src/log.c", "src/feature/cuda/integer_adm_cuda.c"):
@@ -745,7 +775,7 @@ jobs:
           # PThreads4W 真实 pthread.h 依赖 _ptw32.h 等内部文件，无法单独使用 — 直接用 Windows SRWLOCK shim
           # mkdirp.c 引用 POSIX unistd.h，Windows 没有 — 同时生成 shim
           # unistd 假头仅给 VMAF。勿 #define mkdir：VMAF mkdirp.c 是单参，FFmpeg 是双参；编 FFmpeg 前会 rm 本文件
-          mkdir -p "$P_MIXED/include" && echo $'#ifndef UNISTD_SHIM_H\n#define UNISTD_SHIM_H\ntypedef unsigned short mode_t;\n#include <io.h>\n#include <direct.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n#include <windows.h>\n#ifndef isatty\n#define isatty _isatty\n#endif\n#ifndef fileno\n#define fileno _fileno\n#endif\n/* mkdir：交给 direct.h 的单参声明，供 VMAF mkdirp.c */\nstatic __inline unsigned int sleep(unsigned int sec){ Sleep(sec * 1000u); return 0; }\nstatic __inline void usleep(unsigned int usec){ Sleep((usec + 999u) / 1000u); }\n#endif' > "$P_MIXED/include/unistd.h"
+          mkdir -p "$P_MIXED/include" && echo $'#ifndef UNISTD_SHIM_H\n#define UNISTD_SHIM_H\n#include <io.h>\n#include <direct.h>\n#include <sys/stat.h>\n#include <stdlib.h>\n#include <windows.h>\n#ifndef isatty\n#define isatty _isatty\n#endif\n#ifndef fileno\n#define fileno _fileno\n#endif\n/* mkdir：交给 direct.h 的单参声明，供 VMAF mkdirp.c */\nstatic __inline unsigned int sleep(unsigned int sec){ Sleep(sec * 1000u); return 0; }\nstatic __inline void usleep(unsigned int usec){ Sleep((usec + 999u) / 1000u); }\n#endif' > "$P_MIXED/include/unistd.h"
           mkdir -p "$P_MIXED/include" && echo $'#ifndef PTHREAD_SHIM_H\n#define PTHREAD_SHIM_H\n#include <windows.h>\n#include <stdint.h>\n#ifdef __cplusplus\nextern "C" {\n#endif\ntypedef struct { SRWLOCK lock; int init; } pthread_mutex_t;\ntypedef struct { CONDITION_VARIABLE cv; int init; } pthread_cond_t;\ntypedef HANDLE pthread_t;\ntypedef struct { int init; int pshared; void *ptr; } pthread_mutexattr_t;\ntypedef struct { int init; int pshared; } pthread_condattr_t;\n#define PTHREAD_MUTEX_INITIALIZER { {0},0 }\n#define PTHREAD_COND_INITIALIZER   { {0},0 }\nstatic inline int pthread_mutex_init(pthread_mutex_t*m,const pthread_mutexattr_t*a){(void)a;InitializeSRWLock(&m->lock);m->init=1;return 0;}\nstatic inline int pthread_mutex_destroy(pthread_mutex_t*m){(void)m;m->init=0;return 0;}\nstatic inline int pthread_mutex_lock(pthread_mutex_t*m){AcquireSRWLockExclusive(&m->lock);return 0;}\nstatic inline int pthread_mutex_unlock(pthread_mutex_t*m){ReleaseSRWLockExclusive(&m->lock);return 0;}\nstatic inline int pthread_cond_init(pthread_cond_t*c,const pthread_condattr_t*a){(void)a;InitializeConditionVariable(&c->cv);c->init=1;return 0;}\nstatic inline int pthread_cond_destroy(pthread_cond_t*c){(void)c;c->init=0;return 0;}\nstatic inline int pthread_cond_wait(pthread_cond_t*c,pthread_mutex_t*m){return SleepConditionVariableSRW(&c->cv,&m->lock,INFINITE,0)?0:-1;}\nstatic inline int pthread_cond_signal(pthread_cond_t*c){WakeConditionVariable(&c->cv);return 0;}\nstatic inline int pthread_cond_broadcast(pthread_cond_t*c){WakeAllConditionVariable(&c->cv);return 0;}\nstatic inline int pthread_create(pthread_t*t,const void*a,void*(*f)(void*),void*arg){(void)a;*t=CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)f,arg,0,NULL);return*t?0:-1;}\nstatic inline int pthread_join(pthread_t t,void**ret){WaitForSingleObject(t,INFINITE);if(ret)GetExitCodeThread(t,(LPDWORD)ret);CloseHandle(t);return 0;}\nstatic inline void pthread_exit(void*ret){ExitThread((DWORD)(uintptr_t)ret);}\nstatic inline int pthread_detach(pthread_t t){(void)t;return 0;}\n#ifdef __cplusplus\n}\n#endif\n#endif' > "$P_MIXED/include/pthread.h"
           # 如果 GITHUB_ENV 未传递 VCPKG_INSTALLED，直接用 find 探测
           if [ -z "${VCPKG_INSTALLED:-}" ]; then
@@ -755,7 +785,7 @@ jobs:
           fi
           # Clang-cl 和 MSVC 分别通过不同变量找头文件
           VCPKG_INC="${VCPKG_INSTALLED:+${VCPKG_INSTALLED}/include;}"
-          export INCLUDE="${VCPKG_INC}${P_MIXED}/include;${INCLUDE:-}"
+          export INCLUDE="${P_MIXED}/include;${VCPKG_INC}${INCLUDE:-}"
           if [ "${{ matrix.cuda }}" = "true" ]; then
           P_MIXED="$P_MIXED" VCPKG_INSTALLED="$VCPKG_INSTALLED" python3 << 'PYEOF6'
           import pathlib, os
@@ -782,7 +812,7 @@ jobs:
             VMAF_ENABLE_ASM=true
           elif [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ] && command -v nasm >/dev/null 2>&1; then
             export CC="${CLANG_BIN}/clang.exe"
-            export CXX="${CLANG_BIN}/clang.exe"
+            export CXX="${CLANG_BIN}/clang++.exe"
             VMAF_ENABLE_ASM=true
           else
             VMAF_ENABLE_ASM=false
@@ -792,12 +822,15 @@ jobs:
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
           VMAF_C_ARGS="-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS"
           # pthread shim MUST come before vcpkg include (vcpkg has its own pthread.h that needs pthreads.lib)
-          [ -n "${VCPKG_INSTALLED:-}" ] && VMAF_C_ARGS="-I${P_MIXED}/include -I${VCPKG_INSTALLED}/include ${VMAF_C_ARGS}"
-          # MSVC cl.exe 需要 /experimental:c11atomics 启用 C11 <stdatomic.h>；Clang 不认识此标志
+          VMAF_C_ARGS="-I${P_MIXED}/include ${VCPKG_INSTALLED:+-I${VCPKG_INSTALLED}/include }${VMAF_C_ARGS}"
+          VMAF_CPP_ARGS="${VMAF_C_ARGS}"
+          # C11 atomics is a C-only MSVC flag, not a C++ compiler flag.
           if [ "${CC}" != "${CLANG_BIN}/clang.exe" ]; then
             VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
+            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
+          else
+            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} -std=c++14"
           fi
-          VMAF_CPP_ARGS="${VMAF_C_ARGS} -std=c++14"
           VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}")
           echo "--- VMAF meson ---"
           echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  VMAF_MESON_ARGS=${VMAF_MESON_ARGS[*]}"
@@ -810,9 +843,11 @@ jobs:
             meson setup build --buildtype release --prefix="$P" \
               -Denable_cuda=${{ matrix.cuda }} -Denable_asm=$VMAF_ENABLE_ASM \
               -Denable_tests=false -Db_vscrt=mt -Ddefault_library=static "${VMAF_MESON_ARGS[@]}"
-          # Only build libvmaf.a static library (FFmpeg only needs the lib, not the vmaf CLI tool).
-          # The CLI tool depends on pthread_create etc. which our inline shim can't satisfy at link time.
-          ninja -vC build src/libvmaf.a 2>&1 | tee /tmp/ninja-vmaf.log || {
+          # Meson names the MSVC library .lib and the Clang library .a.
+          vmaf_target=$(ninja -C build -t targets all | awk '/^src\/(libvmaf\.a|vmaf\.lib|libvmaf\.lib):/ && !found { sub(/:.*/, ""); print; found=1 }')
+          [ -n "$vmaf_target" ] || { echo "::error::未找到 VMAF 静态库构建目标"; exit 1; }
+          set -o pipefail
+          ninja -vC build "$vmaf_target" 2>&1 | tee /tmp/ninja-vmaf.log || {
             echo "::error::ninja 编译 VMAF 失败，详见下方 /tmp/ninja-vmaf.log"
             exit 1
           }
@@ -883,6 +918,11 @@ jobs:
             cat /tmp/ninja-vmaf.log
           fi
 
+      - name: 编译 AVM AV2 工具
+        if: matrix.av2
+        shell: pwsh
+        run: ./scripts/ci/build-avm-windows.ps1
+
       - name: 编译 FFmpeg
         shell: bash
         run: |
@@ -909,8 +949,6 @@ jobs:
           sed -i 's/require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++/require libsnappy snappy-c.h snappy_compress -lsnappy/' configure
           sed -i 's/require libtwolame twolame.h twolame_init -ltwolame/require libtwolame twolame.h twolame_init -ltwolame -DLIBTWOLAME_STATIC/' configure
           sed -i 's/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame/check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame -DLIBTWOLAME_STATIC/' configure
-          # Use digit-free lame.lib alias + mpglib (mslink appends digits to check function)
-          sed -i '/libmp3lame/s/ -lmp3lame/ lame.lib mpglib.lib/' configure
           # MSVC has no libm; math functions are in ucrt.lib (linked by default)
           # Remove standalone -lm from configure checks (space-delimited, NOT -lmfplat/-lmfuuid etc.)
           sed -i 's/ -lm / /g; s/ -lm$//' configure
@@ -990,7 +1028,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-libmp3lame --enable-libfdk-aac --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log
@@ -999,10 +1037,6 @@ jobs:
         run: |
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== pkg-config libmp3lame ==="
-          ${PKG_CONFIG:-true} --debug libmp3lame 2>&1 | head -40 || true
-          echo "=== pkg-config libfdk-aac ==="
-          ${PKG_CONFIG:-true} --debug libfdk-aac 2>&1 | head -40 || true
           echo "=== pkg-config vpl ==="
           ${PKG_CONFIG:-true} --debug vpl 2>&1 | head -40 || true
 
@@ -1013,7 +1047,7 @@ jobs:
           echo "--- HW Accel ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -hwaccels 2>&1 || echo "（无）"
           echo "--- Encoders ---"
-          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'nvenc|amf|qsv|libmp3lame|libfdk_aac' | head -10 || echo "（无）"
+          "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -encoders 2>&1 | grep -iE 'nvenc|amf|qsv|_mf' | head -10 || echo "（无）"
           echo "--- VMAF ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
           echo "--- FRUC-Vulkan (NVIDIA 光流插帧) ---"
@@ -1021,12 +1055,21 @@ jobs:
           echo "--- Vulkan 编解码器 ---"
           "${HOME}/ffmpeg-install/bin/ffmpeg.exe" -hide_banner -codecs 2>&1 | grep -iE '_vulkan' || echo "（无）"
 
+      - name: 验证 AV2 编解码往返
+        if: matrix.av2
+        shell: pwsh
+        run: ./scripts/ci/verify-avm.ps1 -Ffmpeg "$env:USERPROFILE\ffmpeg-install\bin\ffmpeg.exe"
+
       - name: 打包
         shell: pwsh
         run: |
           $b = "$env:USERPROFILE\ffmpeg-install\bin"
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item "$b\ffmpeg.exe","$b\ffprobe.exe","$b\ffplay.exe" dist\ -ErrorAction SilentlyContinue
+          if ('${{ matrix.av2 }}' -eq 'true') {
+            Copy-Item "$env:AVM_PREFIX\bin\avmenc.exe", "$env:AVM_PREFIX\bin\avmdec.exe" dist\
+            Copy-Item "$env:AVM_PREFIX\licenses" dist\ -Recurse
+          }
           Compress-Archive -Path dist\* -DestinationPath ${{ matrix.artifact }} -Force
 
       - uses: actions/upload-artifact@v7
@@ -1036,15 +1079,25 @@ jobs:
           retention-days: 30
 
   macos-arm:
-    name: macOS ARM（VideoToolbox）
+    name: ${{ matrix.name }}
     if: github.event.schedule != '0 14 * * *'
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS ARM（VideoToolbox）
+            av2: false
+            artifact: ffmpeg-macos-arm.tar.xz
+          - name: macOS ARM 整合版 + AV2（VideoToolbox）
+            av2: true
+            artifact: ffmpeg-macos-arm-av2.tar.xz
     steps:
       - uses: actions/checkout@v7
 
       - name: 安装依赖
         run: |
-          brew install yasm nasm pkg-config meson ninja cmake wget lame fdk-aac sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
+          brew install yasm nasm pkg-config meson ninja cmake wget sdl2 x264 x265 libvpx opus libvorbis theora aom webp libass freetype fontconfig zimg libsoxr openjpeg snappy molten-vk shaderc svt-av1 dav1d kvazaar openh264 xvid twolame speex codec2 jpeg-xl libopenmpt libbs2b aribb24 libplacebo rubberband libvidstab
 
       - name: 编译 VMAF（CPU）
         run: |
@@ -1067,6 +1120,11 @@ jobs:
           ninja -vC build && ninja -C build install
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"
 
+      - name: 编译 AVM AV2 工具
+        if: matrix.av2
+        shell: bash
+        run: bash scripts/ci/build-avm.sh
+
       - name: 编译 FFmpeg
         run: |
           export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
@@ -1079,24 +1137,6 @@ jobs:
           echo "Apple Clang: $(clang --version | head -1)"
           echo "SDKROOT=${SDKROOT}"
           P="${HOME}/ffmpeg-install"
-          LAME_PREFIX="$(brew --prefix lame)"
-          FDK_PREFIX="$(brew --prefix fdk-aac)"
-          # Homebrew 的 lame 不带 .pc 文件，手动生成 libmp3lame.pc
-          LAME_INCLUDE=$(ls -d "${LAME_PREFIX}/include"/*/ 2>/dev/null | head -1 || echo "${LAME_PREFIX}/include")
-          {
-            echo "prefix=${LAME_PREFIX}"
-            echo 'exec_prefix=${prefix}'
-            echo "libdir=${LAME_PREFIX}/lib"
-            echo "includedir=${LAME_INCLUDE}"
-            echo ""
-            echo "Name: libmp3lame"
-            echo "Description: LAME MP3 encoder library"
-            echo "Version: 3.100"
-            echo 'Libs: -L${libdir} -lmp3lame'
-            echo 'Cflags: -I${includedir}'
-          } > "${P}/lib/pkgconfig/libmp3lame.pc"
-          # fdk-aac 有 .pc 但 ffmpeg 需要 libfdk-aac 名
-          [ -f "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" ] && ln -sf "${FDK_PREFIX}/lib/pkgconfig/fdk-aac.pc" "${P}/lib/pkgconfig/libfdk-aac.pc"
           BREW_PREFIX="$(brew --prefix)"
           MVK_PREFIX="$(brew --prefix molten-vk 2>/dev/null || true)"
           if [ -d "${MVK_PREFIX}/libexec/include" ]; then
@@ -1115,10 +1155,8 @@ jobs:
               sed 's/-lstdc++/-lc++/g' "$pc" > "${P}/lib/pkgconfig/$base"
             done
           done
-          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${LAME_PREFIX}/lib/pkgconfig:${FDK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="${P}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
-          pkg-config --exists libmp3lame && echo "pkg-config libmp3lame: OK ($(pkg-config --modversion libmp3lame))" || echo "pkg-config libmp3lame: FAIL"
-          pkg-config --exists libfdk-aac  && echo "pkg-config libfdk-aac: OK ($(pkg-config --modversion libfdk-aac))"   || echo "pkg-config libfdk-aac: FAIL"
           cd /tmp && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
           # macOS 使用 libc++，configure 里 libsnappy 的 -lstdc++ 会导致检测失败
@@ -1126,11 +1164,11 @@ jobs:
           rm -f configure.bak
           ./configure --prefix="$P" \
             --cc="$CC" --cxx="$CXX" \
-            --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include -I${LAME_PREFIX}/include -I${FDK_PREFIX}/include ${MVK_CFLAGS}" \
-            --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib -L${LAME_PREFIX}/lib -L${FDK_PREFIX}/lib ${MVK_LDFLAGS}" \
+            --extra-cflags="-isysroot ${SDKROOT} -I$P/include -I${BREW_PREFIX}/include ${MVK_CFLAGS}" \
+            --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
             --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
-            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libmp3lame --enable-libfdk-aac --enable-opencl --enable-vulkan \
+            --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-opencl --enable-vulkan \
             --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
             --enable-hwaccel=h264_videotoolbox --enable-hwaccel=hevc_videotoolbox \
@@ -1143,8 +1181,6 @@ jobs:
         run: |
           echo "=== ffbuild/config.log ==="
           cat /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(config.log not found)"
-          echo "=== ffbuild/config.log (LAME section) ==="
-          grep -A20 'libmp3lame' /tmp/ffmpeg-src/ffbuild/config.log 2>/dev/null || echo "(no libmp3lame section)"
 
       - name: 裁剪、签名与验证
         run: |
@@ -1167,15 +1203,24 @@ jobs:
           echo "--- VMAF ---"
           "${FF}" -hide_banner -filters 2>&1 | grep -i vmaf || echo "（无）"
 
+      - name: 验证 AV2 编解码往返
+        if: matrix.av2
+        shell: bash
+        run: bash scripts/ci/verify-avm.sh "$HOME/ffmpeg-install/bin/ffmpeg"
+
       - name: 打包
         run: |
           mkdir -p dist && cp "${HOME}/ffmpeg-install/bin/"{ffmpeg,ffprobe,ffplay} dist/
-          cd dist && tar -cJf ../ffmpeg-macos-arm.tar.xz .
+          if [ "${{ matrix.av2 }}" = "true" ]; then
+            cp "${AVM_PREFIX}/bin/"{avmenc,avmdec} dist/
+            cp -R "${AVM_PREFIX}/licenses" dist/
+          fi
+          cd dist && tar -cJf ../${{ matrix.artifact }} .
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ffmpeg-macos-arm
-          path: ffmpeg-macos-arm.tar.xz
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
           retention-days: 30
 
   # ============================================================
@@ -1249,7 +1294,18 @@ jobs:
             |---|---|---|---|
             | `ffmpeg-macos-arm.tar.xz` | Apple | VideoToolbox | ✅ CPU |
 
-            > 所有构建均包含： libmp3lame + libfdk-aac + SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
+            ### AV2 工具整合版（保留上述原有构建）
+
+            | 产物 | 硬件加速 | AV2 |
+            |---|---|---|
+            | `ffmpeg-linux-x86-all-av2.tar.xz` | NVENC/CUDA + QSV + VAAPI | avmenc / avmdec |
+            | `ffmpeg-windows-x86-all-av2.zip` | NVENC/CUDA + QSV + AMF | avmenc / avmdec |
+            | `ffmpeg-windows-arm64-av2.zip` | D3D11VA / DXVA2 / MF | avmenc / avmdec |
+            | `ffmpeg-macos-arm-av2.tar.xz` | VideoToolbox | avmenc / avmdec |
+
+            AV2 由 AVM 1.0.0 的独立工具提供，不是 FFmpeg 原生编解码器；原有 libaom AV1 保留。
+
+            > 所有构建均包含： SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
             > Windows 构建使用 MSVC 2026 编译，需要 VC++ 可再发行组件。
           files: release-assets/*
           draft: false

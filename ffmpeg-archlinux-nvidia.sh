@@ -58,8 +58,6 @@ sudo pacman -S --needed --noconfirm \
   ca-certificates-utils \
   gnupg \
   lsb-release \
-  lame \
-  libfdk-aac \
   x264 \
   x265 \
   libvpx \
@@ -209,8 +207,6 @@ RANLIB="${RANLIB_BIN}" \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \
   --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libwavpack --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
-  --enable-libmp3lame \
-  --enable-libfdk-aac \
   --enable-sdl2
 
 echo "[7/12] 校验 configure 输出..."
@@ -252,12 +248,10 @@ echo "[10/12] 编码器能力检查..."
 /usr/local/bin/ffmpeg -hide_banner -encoders | grep -E 'av1_nvenc|hevc_nvenc|h264_nvenc' || true
 
 echo "[11/12] 音频编码器检查..."
-/usr/local/bin/ffmpeg -hide_banner -encoders | grep -E 'libmp3lame|libfdk_aac' || true
 
 echo "[12/12] 完成"
 echo "=========================================="
 echo "完成：安装到 /usr/local，VMAF + FFmpeg 均为 gcc 编译"
-echo "新增: MP3 (libmp3lame) + AAC (libfdk-aac) 编码支持"
 echo "=========================================="
 
 # 返回脚本执行前的目录
