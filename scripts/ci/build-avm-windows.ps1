@@ -45,9 +45,12 @@ if ($isArm64) {
         '-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_SYSTEM_PROCESSOR=ARM64',
         '-DAVM_TARGET_CPU=arm64', '-DENABLE_NEON=ON', '-DENABLE_NASM=OFF')
 } else {
-    $env:CC = 'cl.exe'
-    $env:CXX = 'cl.exe'
-    $cmakeArgs += @('-DCMAKE_C_COMPILER=cl.exe', '-DCMAKE_CXX_COMPILER=cl.exe',
+    if (-not $env:CLANG_BIN) { throw 'VS Clang is required for AVM x64' }
+    $clangCl = Join-Path $env:CLANG_BIN 'clang-cl.exe'
+    if (-not (Test-Path $clangCl)) { throw "clang-cl.exe not found under $env:CLANG_BIN" }
+    $env:CC = $clangCl
+    $env:CXX = $clangCl
+    $cmakeArgs += @("-DCMAKE_C_COMPILER=$clangCl", "-DCMAKE_CXX_COMPILER=$clangCl",
         '-DAVM_TARGET_CPU=x86_64', '-DENABLE_NASM=ON')
 }
 & cmake -S $source -B $build @cmakeArgs
