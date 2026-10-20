@@ -827,7 +827,7 @@ jobs:
             # VMAF 的 ARM64 NEON 是 C intrinsics；MSVC 版本使用上面的兼容初始化
             # 不需要 NASM（NASM 是 x86-only，ARM64 分支不使用它）
             VMAF_ENABLE_ASM=false
-          el          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang-cl.exe" ] && command -v nasm >/dev/null 2>&1; then
+          elif [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang-cl.exe" ] && command -v nasm >/dev/null 2>&1; then
             export CC="${CLANG_BIN}/clang-cl.exe"
             export CXX="${CLANG_BIN}/clang-cl.exe"
             VMAF_ENABLE_ASM=true
