@@ -691,7 +691,7 @@ jobs:
           for name in ("src/libvmaf.c", "src/predict.c"):
               p = pathlib.Path(name)
               s = p.read_text(encoding="utf-8")
-              s = s.replace("#ifdef HAVE_ALLOCA_H\\n#include <alloca.h>\\n#endif", "#if defined(HAVE_ALLOCA_H) && HAVE_ALLOCA_H\\n#include <alloca.h>\\n#endif")
+              s = s.replace("#ifdef HAVE_ALLOCA_H", "#if defined(HAVE_ALLOCA_H) && HAVE_ALLOCA_H")
               p.write_text(s, encoding="utf-8")
           '
           # MSVC does not allow pointer arithmetic on void*; integer_vif.c init() has data+=N
@@ -856,10 +856,12 @@ jobs:
           VMAF_C_ARGS="-I${P_MIXED}/include ${VCPKG_INSTALLED:+-I${VCPKG_INSTALLED}/include }${VMAF_C_ARGS}"
           VMAF_CPP_ARGS="${VMAF_C_ARGS}"
           # C11 atomics is a C-only MSVC flag, not a C++ compiler flag.
-          if [ -z "${CLANG_BIN:-}" ] || [ "${CC}" != "${CLANG_BIN}/clang-cl.exe" ]; then
+          if [ -n "${CLANG_BIN:-}" ] && [ "${CC}" = "${CLANG_BIN}/clang-cl.exe" ]; then
+            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /clang:-std=c++14"
+          else
             VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
+            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
           fi
-          # Let Meson select the compiler-specific C++14 flag for clang-cl or MSVC.
           VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}" -Dcpp_std=c++14)
           echo "--- VMAF meson ---"
           echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  VMAF_MESON_ARGS=${VMAF_MESON_ARGS[*]}"
