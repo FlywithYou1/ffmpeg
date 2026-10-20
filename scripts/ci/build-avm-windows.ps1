@@ -20,8 +20,8 @@ $cmakeArgs = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS
     '-DENABLE_APPS=ON', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=ON', '-DENABLE_DOCS=OFF',
     '-DCONFIG_WEBM_IO=0', '-DCONFIG_LIBYUV=0', '-DCONFIG_ML_PART_SPLIT=0', '-DCONFIG_TENSORFLOW_LITE=0')
 if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64') {
-    # AVM's Windows ARM assembly path expects GNU tools, not MSVC armasm64.
-    $cmakeArgs += @('-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_SYSTEM_PROCESSOR=ARM64', '-DAVM_TARGET_CPU=generic')
+    # AVM 1.0.0 x86 RTCD detection is unsafe for MSVC ARM64; use the generic C kernels.
+    $cmakeArgs += @('-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_SYSTEM_PROCESSOR=ARM64', '-DAVM_TARGET_CPU=generic', '-DENABLE_NASM=OFF')
 } else {
     $cmakeArgs += @('-DAVM_TARGET_CPU=x86_64', '-DENABLE_NASM=ON')
 }
