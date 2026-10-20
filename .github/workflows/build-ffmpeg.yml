@@ -685,6 +685,15 @@ jobs:
           cd /tmp && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf && rm -rf build
           sed -i 's/^#ifdef _MSC_VER$/#if defined(_MSC_VER) \&\& !defined(__clang__)/' src/feature/integer_vif.h
+          # VMAF gates alloca.h on HAVE_ALLOCA_H; treat a defined zero as disabled.
+          python3 -c '
+          import pathlib
+          for name in ("src/libvmaf.c", "src/predict.c"):
+              p = pathlib.Path(name)
+              s = p.read_text(encoding="utf-8")
+              s = s.replace("#ifdef HAVE_ALLOCA_H\\n#include <alloca.h>\\n#endif", "#if defined(HAVE_ALLOCA_H) && HAVE_ALLOCA_H\\n#include <alloca.h>\\n#endif")
+              p.write_text(s, encoding="utf-8")
+          '
           # MSVC does not allow pointer arithmetic on void*; integer_vif.c init() has data+=N
           python3 << 'PYEOF1'
           import pathlib, re
@@ -847,13 +856,11 @@ jobs:
           VMAF_C_ARGS="-I${P_MIXED}/include ${VCPKG_INSTALLED:+-I${VCPKG_INSTALLED}/include }${VMAF_C_ARGS}"
           VMAF_CPP_ARGS="${VMAF_C_ARGS}"
           # C11 atomics is a C-only MSVC flag, not a C++ compiler flag.
-          if [ -n "${CLANG_BIN:-}" ] && [ "${CC}" = "${CLANG_BIN}/clang-cl.exe" ]; then
-            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
-          else
+          if [ -z "${CLANG_BIN:-}" ] || [ "${CC}" != "${CLANG_BIN}/clang-cl.exe" ]; then
             VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
-            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
           fi
-          VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}")
+          # Let Meson select the compiler-specific C++14 flag for clang-cl or MSVC.
+          VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}" -Dcpp_std=c++14)
           echo "--- VMAF meson ---"
           echo "VCPKG_INSTALLED=${VCPKG_INSTALLED:-未设置}  VMAF_MESON_ARGS=${VMAF_MESON_ARGS[*]}"
           echo "CC=${CC:-cl.exe 默认}  VMAF_ENABLE_ASM=${VMAF_ENABLE_ASM}"
