@@ -59,9 +59,9 @@ Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**�
 | `ffmpeg-windows-arm64-av2.zip` | Windows ARM64 | D3D11VA / DXVA2 / MF |
 | `ffmpeg-macos-arm-av2.tar.xz` | macOS ARM64 | VideoToolbox |
 
-这些产物额外包含 [AVM 1.0.0](https://github.com/AOMediaCodec/avm/tree/v1.0.0) 的 `avmenc`、`avmdec` 和许可证。AV2 使用独立工具编解码，**不是 FFmpeg 原生 AV2 支持**；原有 libaom 的 AV1 支持保留。Windows ARM64 的 AVM 使用通用 C 实现，避免不兼容的汇编工具链。
+这些产物额外包含 [AOMediaCodec/avm `av2-enc` 分支](https://github.com/AOMediaCodec/avm/tree/av2-enc) 的 `avmenc`、`avmdec` 和许可证，CI 固定到已审阅的分支提交 `224c347d185d85c906df1e69e65bf569fd7e2c23`。该分支提供 AArch64 专用 NEON、CRC、DotProd、I8MM 和 SVE/SVE2 优化；Linux/macOS ARM64 构建显式启用基础 NEON，并让 AVM 根据编译器能力检测高级 flavor。恢复了 AVM 内置 libyuv、WebM I/O 和 Lanczos resampling。AV2 使用独立工具编解码，**不是 FFmpeg 原生 AV2 支持**；原有 libaom 的 AV1 支持保留。Windows ARM64 暂用通用 C 内核，因为 AVM 文档未声明 MSVC ARM64 SIMD 支持。
 
-CI 会用 FFmpeg 生成测试帧，经过 AV2 编码、解码后重新读取，失败则不发布产物。AVM 的构建和验证仅在 GitHub Actions runner 执行。
+依赖 TensorFlow Lite 的 DIP/ML pruning 保持关闭，以免 XNNPACK ARM kernels 在 Windows ARM64 链接失败；其他基础 AV2 编码/解码路径保持启用。CI 会用 FFmpeg 生成测试帧，经过 AV2 编码、解码后重新读取，失败则不发布产物。AVM 的构建和验证仅在 GitHub Actions runner 执行。
 
 ```bash
 ffmpeg -i input.mp4 -pix_fmt yuv420p -f yuv4mpegpipe input.y4m

@@ -6,7 +6,7 @@ if (-not $env:GITHUB_ACTIONS -or -not $env:RUNNER_TEMP -or -not $env:GITHUB_ENV)
 $source = Join-Path $env:RUNNER_TEMP 'avm'
 $build = Join-Path $source 'build'
 $prefix = Join-Path $env:RUNNER_TEMP 'avm-install'
-$ref = '966a7d7cd6fcf60360caf5dc413b2aeeb65e144d' # AV2 1.0.0
+$ref = '224c347d185d85c906df1e69e65bf569fd7e2c23' # reviewed av2-enc branch tip
 & git clone --no-checkout https://github.com/AOMediaCodec/avm.git $source
 if ($LASTEXITCODE -ne 0) { throw 'AVM clone failed' }
 & git -C $source checkout --detach $ref
@@ -18,9 +18,10 @@ $cmakeArgs = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW',
     '-DCONFIG_AV2_ENCODER=1', '-DCONFIG_AV2_DECODER=1',
     '-DENABLE_APPS=ON', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=ON', '-DENABLE_DOCS=OFF',
-    '-DCONFIG_WEBM_IO=0', '-DCONFIG_LIBYUV=0', '-DCONFIG_DIP_EXT_PRUNING=0', '-DCONFIG_ML_PART_SPLIT=0', '-DCONFIG_TENSORFLOW_LITE=0')
+    '-DCONFIG_WEBM_IO=1', '-DCONFIG_LIBYUV=1', '-DCONFIG_LANCZOS_RESAMPLE=1',
+    '-DCONFIG_DIP_EXT_PRUNING=0', '-DCONFIG_ML_PART_SPLIT=0', '-DCONFIG_TENSORFLOW_LITE=0')
 if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64') {
-    # AVM 1.0.0 x86 RTCD detection is unsafe for MSVC ARM64; use the generic C kernels.
+    # Keep Windows ARM64 on generic C kernels; AVM's MSVC ARM64 SIMD path is unsupported.
     $cmakeArgs += @('-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_SYSTEM_PROCESSOR=ARM64', '-DAVM_TARGET_CPU=generic', '-DENABLE_NASM=OFF')
 } else {
     $cmakeArgs += @('-DAVM_TARGET_CPU=x86_64', '-DENABLE_NASM=ON')
