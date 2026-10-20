@@ -751,6 +751,23 @@ jobs:
                   s = s.replace("#ifdef _MSC_VER\n", "#if defined(_MSC_VER) && !defined(__clang__)\n")
                   p.write_text(s, encoding="utf-8")
           PYEOF4
+          if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ] || [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm" ]; then
+          python3 << 'PYEOF_ARM64_NEON'
+          import pathlib
+          p = pathlib.Path("src/feature/arm64/adm_neon.c")
+          if p.exists():
+              s = p.read_text(encoding="utf-8")
+              s = s.replace(
+                  "const int32x4_t lanes = { 0, 1, 2, 3 };",
+                  "const int32_t lane_values[4] = {0, 1, 2, 3};\n    const int32x4_t lanes = vld1q_s32(lane_values);"
+              )
+              s = s.replace(
+                  "const float32x4_t result = {\n        (float)vgetq_lane_s64(lo, 0), (float)vgetq_lane_s64(lo, 1),\n        (float)vgetq_lane_s64(hi, 0), (float)vgetq_lane_s64(hi, 1)\n    };",
+                  "const float result_values[4] = {\n        (float)vgetq_lane_s64(lo, 0), (float)vgetq_lane_s64(lo, 1),\n        (float)vgetq_lane_s64(hi, 0), (float)vgetq_lane_s64(hi, 1)\n    };\n    const float32x4_t result = vld1q_f32(result_values);"
+              )
+              p.write_text(s, encoding="utf-8")
+          PYEOF_ARM64_NEON
+          fi
           if [ "${{ matrix.cuda }}" = "true" ]; then
           python3 << 'PYEOF5'
           import pathlib, re
@@ -807,12 +824,12 @@ jobs:
           TGT_ARCH="${VSCMD_ARG_TGT_ARCH:-}"
           if [ "$TGT_ARCH" = "arm64" ] || [ "$TGT_ARCH" = "arm" ]; then
             # ARM64：不覆盖 CC/CXX（x64 Clang 与 arm64 MSVC 库架构冲突）
-            # VMAF 的 ARM64 NEON 是 C intrinsics（arm_neon.h），MSVC cl.exe 可直接编译
+            # VMAF 的 ARM64 NEON 是 C intrinsics；MSVC 版本使用上面的兼容初始化
             # 不需要 NASM（NASM 是 x86-only，ARM64 分支不使用它）
-            VMAF_ENABLE_ASM=true
-          elif [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang.exe" ] && command -v nasm >/dev/null 2>&1; then
-            export CC="${CLANG_BIN}/clang.exe"
-            export CXX="${CLANG_BIN}/clang++.exe"
+            VMAF_ENABLE_ASM=false
+          el          if [ -n "${CLANG_BIN:-}" ] && [ -f "${CLANG_BIN}/clang-cl.exe" ] && command -v nasm >/dev/null 2>&1; then
+            export CC="${CLANG_BIN}/clang-cl.exe"
+            export CXX="${CLANG_BIN}/clang-cl.exe"
             VMAF_ENABLE_ASM=true
           else
             VMAF_ENABLE_ASM=false
@@ -820,16 +837,21 @@ jobs:
           fi
           # Clang（非 clang-cl 模式）不读取 INCLUDE 环境变量，必须通过 -Dc_args 传入头文件路径
           # pthread.h 已生成在 $P_MIXED/include 下（在 -I 路径中），VMAF 编译时能找到
-          VMAF_C_ARGS="-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS"
+          VMAF_C_ARGS="-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -DHAVE_ALLOCA_H=0 -DHAVE_STRSEP=0"
+          # Meson checks POSIX headers/functions that MSVC never has; mark these
+          # unavailable so VMAF uses its MSVC alternatives instead of stopping configure.
+          if [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm64" ] || [ "${VSCMD_ARG_TGT_ARCH:-}" = "arm" ]; then
+            VMAF_C_ARGS="${VMAF_C_ARGS} -DHAVE_FEATURES_H=0 -DHAVE_LOCALTIME_R=0 -DHAVE_LOCALTIME_S=1"
+          fi
           # pthread shim MUST come before vcpkg include (vcpkg has its own pthread.h that needs pthreads.lib)
           VMAF_C_ARGS="-I${P_MIXED}/include ${VCPKG_INSTALLED:+-I${VCPKG_INSTALLED}/include }${VMAF_C_ARGS}"
           VMAF_CPP_ARGS="${VMAF_C_ARGS}"
           # C11 atomics is a C-only MSVC flag, not a C++ compiler flag.
-          if [ "${CC}" != "${CLANG_BIN}/clang.exe" ]; then
-            VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
+          if [ -n "${CLANG_BIN:-}" ] && [ "${CC}" = "${CLANG_BIN}/clang-cl.exe" ]; then
             VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
           else
-            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} -std=c++14"
+            VMAF_C_ARGS="${VMAF_C_ARGS} /experimental:c11atomics"
+            VMAF_CPP_ARGS="${VMAF_CPP_ARGS} /std:c++14"
           fi
           VMAF_MESON_ARGS=("-Dc_args=${VMAF_C_ARGS}" "-Dcpp_args=${VMAF_CPP_ARGS}")
           echo "--- VMAF meson ---"
@@ -1028,7 +1050,7 @@ jobs:
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --enable-gpl --enable-version3 --enable-nonfree \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
-            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
+            --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
 
       - name: 失败时导出 ffbuild/config.log

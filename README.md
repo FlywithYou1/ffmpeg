@@ -10,7 +10,7 @@
 
 从 [Releases](https://github.com/FlywithYou1/ffmpeg/releases) 下载，每个压缩包包含 `ffmpeg.exe` + `ffprobe.exe` + `ffplay.exe`。
 
-Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**无需额外 DLL**。
+Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**无需额外 DLL**。AV2 整合构建通过 GitHub Actions 自动安装 CUDA 最新稳定版。
 
 ### Linux (x86_64)
 

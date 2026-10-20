@@ -282,6 +282,10 @@ function Copy-LibAlias($actual, $alias) {
         Write-Output "Created alias $alias -> $actual"
     }
 }
+# Current vcpkg libjxl.pc uses -ljxl-static, while MSVC provides jxl.lib.
+# Supply the expected archive name while preserving vcpkg's dependency metadata.
+$jxlLib = Find-ImportLib @('jxl')
+if ($jxlLib -and $jxlLib -ne 'jxl-static.lib') { Copy-LibAlias $jxlLib 'jxl-static.lib' }
 if ($libx264Lib) { Copy-LibAlias $libx264Lib "libx264.lib"; Copy-LibAlias $libx264Lib "x264.lib" }
 if ($libx265Lib) { Copy-LibAlias $libx265Lib "libx265.lib"; Copy-LibAlias $libx265Lib "x265.lib" }
 if ($libvpxLib) { Copy-LibAlias $libvpxLib "libvpx.lib"; Copy-LibAlias $libvpxLib "vpx.lib" }

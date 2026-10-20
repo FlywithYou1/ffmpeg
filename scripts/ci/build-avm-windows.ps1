@@ -11,10 +11,14 @@ $ref = '966a7d7cd6fcf60360caf5dc413b2aeeb65e144d' # AV2 1.0.0
 if ($LASTEXITCODE -ne 0) { throw 'AVM clone failed' }
 & git -C $source checkout --detach $ref
 if ($LASTEXITCODE -ne 0) { throw 'AVM checkout failed' }
+$env:CC = 'cl.exe'
+$env:CXX = 'cl.exe'
 $cmakeArgs = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF',
-    '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DCONFIG_AV2_ENCODER=1', '-DCONFIG_AV2_DECODER=1',
+    '-DCMAKE_C_COMPILER=cl.exe', '-DCMAKE_CXX_COMPILER=cl.exe',
+    '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW',
+    '-DCONFIG_AV2_ENCODER=1', '-DCONFIG_AV2_DECODER=1',
     '-DENABLE_APPS=ON', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=ON', '-DENABLE_DOCS=OFF',
-    '-DCONFIG_WEBM_IO=0', '-DCONFIG_LIBYUV=0')
+    '-DCONFIG_WEBM_IO=0', '-DCONFIG_LIBYUV=0', '-DCONFIG_ML_PART_SPLIT=0', '-DCONFIG_TENSORFLOW_LITE=0')
 if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64') {
     # AVM's Windows ARM assembly path expects GNU tools, not MSVC armasm64.
     $cmakeArgs += @('-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_SYSTEM_PROCESSOR=ARM64', '-DAVM_TARGET_CPU=generic')
@@ -25,7 +29,8 @@ if ($env:VSCMD_ARG_TGT_ARCH -eq 'arm64') {
 if ($LASTEXITCODE -ne 0) { throw 'AVM configuration failed' }
 & cmake --build $build --parallel $env:NUMBER_OF_PROCESSORS --target avmenc avmdec
 if ($LASTEXITCODE -ne 0) { throw 'AVM build failed' }
-# Upstream intentionally omits MSVC install rules.
+# AVM intentionally omits pkg-config/install rules under MSVC.
+# Stage the two application binaries directly from the build tree.
 New-Item -ItemType Directory -Path "$prefix\bin", "$prefix\licenses\avm" -Force | Out-Null
 foreach ($tool in @('avmenc', 'avmdec')) {
     $exe = Get-ChildItem -LiteralPath $build -Recurse -Filter "$tool.exe" -File |
