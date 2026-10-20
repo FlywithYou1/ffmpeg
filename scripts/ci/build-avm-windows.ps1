@@ -27,6 +27,17 @@ if ($isArm64) {
     }
     $env:CC = $clangCl
     $env:CXX = $clangCl
+    # Windows ARM64 guarantees baseline NEON; retain AVM_SIMD_CAPS and its mask
+    # without executing the ARM32-only __emit probe in the MSVC detection path.
+    $cpuDetectPath = Join-Path $source 'avm_ports\arm_cpudetect.c'
+    $cpuDetect = Get-Content -LiteralPath $cpuDetectPath -Raw
+    $cpuDetectGuard = '#if !CONFIG_RUNTIME_CPU_DETECT || defined(__APPLE__)'
+    if ([regex]::Matches($cpuDetect, [regex]::Escape($cpuDetectGuard)).Count -ne 1) {
+        throw 'AVM CPU detection guard changed; review the Windows ARM64 patch'
+    }
+    $cpuDetect = $cpuDetect.Replace($cpuDetectGuard,
+        "$cpuDetectGuard || (defined(_WIN32) && defined(_M_ARM64))")
+    [IO.File]::WriteAllText($cpuDetectPath, $cpuDetect, [Text.UTF8Encoding]::new($false))
     # Use Clang's NEON vector support with the MSVC ABI and ARM64 SDK libraries.
     $cmakeArgs += @("-DCMAKE_C_COMPILER=$clangCl", "-DCMAKE_CXX_COMPILER=$clangCl",
         '-DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc', '-DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc',
