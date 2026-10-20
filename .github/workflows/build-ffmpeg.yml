@@ -688,7 +688,7 @@ jobs:
           # VMAF gates alloca.h on HAVE_ALLOCA_H; treat a defined zero as disabled.
           python3 -c '
           import pathlib
-          for name in ("src/libvmaf.c", "src/predict.c"):
+          for name in ("src/libvmaf.c", "src/predict.c", "src/read_json_model.c"):
               p = pathlib.Path(name)
               s = p.read_text(encoding="utf-8")
               s = s.replace("#ifdef HAVE_ALLOCA_H", "#if defined(HAVE_ALLOCA_H) && HAVE_ALLOCA_H")
