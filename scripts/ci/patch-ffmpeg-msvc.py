@@ -4,7 +4,9 @@ import pathlib
 import re
 import sys
 
-src = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/ffmpeg-src")
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: patch-ffmpeg-msvc.py SOURCE_DIR")
+src = pathlib.Path(sys.argv[1]).resolve()
 
 # 1. configure: gsub 路径分隔符修复
 configure = src / "configure"
@@ -39,6 +41,21 @@ if dead in s:
 else:
     print("WARN: configure heredoc-tail block not found; skip")
 
+# MSVC's runtime provides libm; preserve unrelated -lmfplat/-lmfuuid flags.
+s = re.sub(r"(?<!\S)-lm(?=\s|$)", "", s)
+# Snappy exposes its stable C API; the C++ header probe is not MSVC-compatible.
+s = s.replace(
+    'require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++',
+    'require libsnappy snappy-c.h snappy_compress -lsnappy',
+)
+s = re.sub(
+    r'(require(?:_cpp)? libsnappy) (?:snappy\.h|snappy-c\.h) "?snappy::(?:MaxCompressedLength|RawCompress)"? -lsnappy',
+    'require libsnappy snappy-c.h snappy_compress -lsnappy', s,
+)
+s = re.sub(
+    r'((?:require|check_lib) libtwolame twolame\.h \S+ -ltwolame)(?! -DLIBTWOLAME_STATIC)',
+    r'\1 -DLIBTWOLAME_STATIC', s,
+)
 configure.write_text(s, encoding="utf-8")
 
 # 2. ffbuild/library.mak: lib.exe 响应文件路径修复

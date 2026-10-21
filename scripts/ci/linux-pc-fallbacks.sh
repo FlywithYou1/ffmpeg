@@ -1,37 +1,43 @@
 #!/usr/bin/env bash
-# 为 Linux 构建生成缺失的 pkg-config 回退文件。
-# 用法: bash scripts/ci/linux-pc-fallbacks.sh <install_prefix>
-set -euo pipefail
-
+# Create private overrides; never modify distribution-owned pkg-config files.
+set -Eeuo pipefail
 P="${1:?Usage: $0 <install_prefix>}"
+case "$P" in /|/usr|/usr/local) echo "Use a private install prefix" >&2; exit 1 ;; esac
 mkdir -p "$P/lib/pkgconfig"
+REAL_PKG_CONFIG="${FFMPEG_PKG_CONFIG:-pkg-config}"
+MULTIARCH="${MULTIARCH:-$("${CC:-cc}" -print-multiarch)}"
+[ -n "$MULTIARCH" ] || { echo "Unable to determine target multiarch" >&2; exit 1; }
+export PKG_CONFIG_PATH="$P/lib/pkgconfig:/usr/lib/$MULTIARCH/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
 
-# libopenjp2.pc — 在自定义安装目录强制覆盖不带 -DOPJ_STATIC。
-# 不在系统目录（/usr）操作，避免权限问题。
-if [ "$P" != "/usr" ] && [ "$P" != "/usr/local" ]; then
-    OPENJP2_INCLUDE=$(ls -d /usr/include/openjpeg-* 2>/dev/null | head -1 || echo /usr/include)
-    printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=%s\nName: libopenjp2\nDescription: OpenJPEG JPEG 2000 library\nVersion: 2.5.0\nLibs: -L${libdir} -lopenjp2\nCflags: -I${includedir}\n' "$OPENJP2_INCLUDE" > "$P/lib/pkgconfig/libopenjp2.pc"
-    echo "Created libopenjp2.pc (without -DOPJ_STATIC)"
+port_version() {
+  dpkg-query -W -f='${Version}' "$1" | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/'
+}
+
+for spec in 'libopenjp2:libopenjp2-7-dev:openjp2' 'x265:libx265-dev:x265'; do
+  IFS=: read -r pc_name package library <<< "$spec"
+  if "$REAL_PKG_CONFIG" --exists "$pc_name"; then
+    continue
+  fi
+  version="$(port_version "$package")"
+  include=/usr/include
+  if [ "$pc_name" = libopenjp2 ]; then
+    for candidate in /usr/include/openjpeg-*; do
+      [ -d "$candidate" ] && { include="$candidate"; break; }
+    done
+  fi
+  printf 'prefix=/usr\nlibdir=/usr/lib/%s\nincludedir=%s\nName: %s\nDescription: %s library\nVersion: %s\nLibs: -L${libdir} -l%s\nCflags: -I${includedir}\n' \
+    "$MULTIARCH" "$include" "$pc_name" "$library" "$version" "$library" > "$P/lib/pkgconfig/$pc_name.pc"
+  if [ "$pc_name" = x265 ]; then
+    printf 'Libs.private: -lstdc++ -lm -lgcc -lpthread\n' >> "$P/lib/pkgconfig/$pc_name.pc"
+  fi
+ done
+
+kvazaar_dir="$("$REAL_PKG_CONFIG" --variable=pcfiledir kvazaar)"
+[ -f "$kvazaar_dir/kvazaar.pc" ] || { echo "Missing kvazaar.pc" >&2; exit 1; }
+kvazaar_ver="$(port_version libkvazaar-dev)"
+sed -E "s/^Version:.*/Version: $kvazaar_ver/" "$kvazaar_dir/kvazaar.pc" > "$P/lib/pkgconfig/kvazaar.pc.tmp"
+mv "$P/lib/pkgconfig/kvazaar.pc.tmp" "$P/lib/pkgconfig/kvazaar.pc"
+if [ -n "${GITHUB_ENV:-}" ]; then
+  printf 'PKG_CONFIG_PATH=%s\n' "$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 fi
-
-# x265.pc — 某些发行版不附带
-if ! pkg-config --exists x265 2>/dev/null; then
-    printf 'prefix=/usr\nexec_prefix=${prefix}\nlibdir=/usr/lib/x86_64-linux-gnu\nincludedir=/usr/include\nName: x265\nDescription: H.265/HEVC encoder\nVersion: 1.0.0\nLibs: -L${libdir} -lx265\nLibs.private: -lstdc++ -lm -lgcc -lpthread\nCflags: -I${includedir}\n' > "$P/lib/pkgconfig/x265.pc"
-    echo "Created x265.pc"
-fi
-
-# kvazaar.pc — Ubuntu 26.04 版本占位符修复
-kvazaar_ver=$(dpkg-query -W -f='${Version}' libkvazaar-dev 2>/dev/null | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')
-for pc in $(find /usr/lib /usr/local/lib -name kvazaar.pc 2>/dev/null); do
-    echo "Found kvazaar.pc: $pc"
-    pc_dir=$(dirname "$pc")
-    if [[ ":${PKG_CONFIG_PATH:-}:" != *":$pc_dir:"* ]]; then
-        export PKG_CONFIG_PATH="${pc_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-    fi
-    if [ -n "$kvazaar_ver" ]; then
-        sudo sed -i -E "s/^Version:.*/Version: $kvazaar_ver/" "$pc"
-        echo "Patched $pc -> Version: $kvazaar_ver"
-    fi
-done
-echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-}" | tee -a "${GITHUB_ENV:-/dev/null}"
-pkg-config --modversion kvazaar || true
+"$REAL_PKG_CONFIG" --modversion libopenjp2 x265 kvazaar

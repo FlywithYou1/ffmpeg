@@ -2,15 +2,15 @@
 
 [![Build FFmpeg Multi-Vendor](https://github.com/FlywithYou1/ffmpeg/actions/workflows/build-ffmpeg.yml/badge.svg)](https://github.com/FlywithYou1/ffmpeg/actions/workflows/build-ffmpeg.yml)
 
-**FFmpeg 静态构建**，支持多种 GPU 硬件加速（NVENC、QSV、AMF、VAAPI、VideoToolbox）和 VMAF 质量评分。
+**FFmpeg 多平台构建**，支持多种 GPU 硬件加速（NVENC、QSV、AMF、VAAPI、VideoToolbox）和 VMAF 质量评分。
 
 ---
 
 ## 📦 预构建二进制
 
-从 [Releases](https://github.com/FlywithYou1/ffmpeg/releases) 下载，每个压缩包包含 `ffmpeg.exe` + `ffprobe.exe` + `ffplay.exe`。
+从 [Releases](https://github.com/FlywithYou1/ffmpeg/releases) 下载，每个压缩包包含 `ffmpeg` + `ffprobe` + `ffplay`（Windows 为 `.exe`），以及许可证和依赖清单。
 
-Windows 构建使用 **/MT 静态运行时** 并静态链接 vcpkg 依赖，**无需额外 DLL**。AV2 整合构建通过 GitHub Actions 自动安装 CUDA 最新稳定版。
+Windows 使用 **/MT 静态运行时** 和 vcpkg 静态依赖；显卡驱动、系统组件仍须由操作系统提供。Linux 优先链接可用的静态库，未能静态链接的非系统共享库随包携带；macOS 携带非系统 dylib，并修正相对加载路径、重新签名。请保留整个解压目录（包括 `lib/`），不要只复制可执行文件。Linux 仍要求兼容的 glibc，GPU 驱动不随包分发。
 
 ### Linux (x86_64)
 
@@ -77,7 +77,7 @@ avmdec --codec=av2 -o decoded.y4m output.ivf
 
 - **软件编解码器**: libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl）
 - **硬件加速**: NVENC/NVDEC, Intel QSV, AMD AMF/VAAPI, VideoToolbox, D3D11VA/D3D12VA/DXVA2
-- **CUDA 处理**: libnpp (NVIDIA Performance Primitives)
+- **CUDA 处理**: 公开发布版由 Clang/LLVM 编译 PTX（不启用非自由的 `cuda-nvcc` / `libnpp`），NVENC/NVDEC 和 VMAF-CUDA 保留；本地构建可用 `BUILD_POLICY=local` 启用 `cuda-nvcc`（产物不可再分发）
 - **VMAF**: Netflix 视频质量评分（CPU 或 CUDA 加速）
 - **容器格式**: MP4, MKV, MOV, AVI, TS, FLV, WebM, OGG 等
 
@@ -89,12 +89,27 @@ avmdec --codec=av2 -o decoded.y4m output.ivf
 
 - [Visual Studio 2026](https://visualstudio.microsoft.com/) (Windows MSVC)
 - [Git for Windows](https://git-scm.com/) (提供 Bash 环境)
-- [vcpkg](https://github.com/microsoft/vcpkg) (Windows 依赖管理；x64 建议安装 `pkgconf sdl2 libiconv zlib pthreads x264 x265 libvpx opus libvorbis libtheora aom libwebp libass freetype fontconfig soxr openjpeg snappy opencl vulkan-headers svt-av1 dav1d openh264 libtwolame speex libjxl shaderc`)
+- [vcpkg](https://github.com/microsoft/vcpkg)（Windows 使用本仓库 `vcpkg.json` 锁定依赖；包括 libjxl、x64 的 libvpl。zimg 通过共享脚本从源码编译）
 - [NASM](https://www.nasm.us/) (x86/x64 汇编优化)
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Linux/Windows CI 使用 [mjun0812/setup-cuda](https://github.com/mjun0812/setup-cuda)，每次构建自动安装 NVIDIA 最新稳定版；网络安装失败时自动改用本地安装器，仅在 GitHub Actions runner 执行)
 - [Meson](https://mesonbuild.com/) + [Ninja](https://ninja-build.org/) (VMAF 构建)
+- Python 3、CMake；NVIDIA FFmpeg 需要具备 NVPTX 后端的 Clang（Windows 可使用 VS LLVM，Linux 安装 `clang`）
 
 ### Windows (VS 2026 Developer Command Prompt + Git Bash)
+
+先在仓库根目录用锁定的清单安装静态 triplet（脚本不会自动安装或切换 vcpkg 版本）：
+
+```powershell
+$baseline = (Get-Content .\vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+git -C C:\vcpkg fetch origin $baseline
+# 使用独立的 vcpkg clone；不要切换正在供其他项目使用的工作树
+git -C C:\vcpkg checkout --detach $baseline
+C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+C:\vcpkg\vcpkg.exe install --triplet x64-windows-static --x-manifest-root=.
+# ARM64 改用 --triplet arm64-windows-static
+```
+
+默认检测仓库的 `vcpkg_installed/<triplet>` 或 `VCPKG_ROOT/installed/<triplet>`；也可显式设置 `VCPKG_INSTALLED`。编译器目标与 triplet 必须一致。请使用无空格的 `TMPDIR`；含空格的工具/依赖路径通过构建私有 junction 处理，不覆盖全局 `C:\cuda`。
 
 ```bash
 # 1. 打开 "x64 Native Tools Command Prompt for VS 2026"
@@ -110,7 +125,8 @@ bash scripts/build-windows-nvidia.sh
 # AMD AMF
 bash scripts/build-windows-amd-amf.sh
 
-# Snapdragon ARM64
+# Snapdragon ARM64：另开 ARM64 Developer Command Prompt，执行
+# vcvarsall.bat amd64_arm64，然后再启动 Git Bash
 bash scripts/build-windows-arm64.sh
 ```
 
@@ -121,7 +137,7 @@ bash scripts/build-windows-arm64.sh
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential yasm nasm pkg-config meson ninja-build \
-  cmake git wget curl ca-certificates python3 xxd \
+  cmake git wget curl ca-certificates python3 xxd clang patchelf \
   libsdl2-dev \
   libva-dev libdrm-dev libvpl-dev \
   libx264-dev libx265-dev libvpx-dev libopus-dev libvorbis-dev \
@@ -147,13 +163,21 @@ bash scripts/build-linux-amd.sh
 bash scripts/build-linux-arm.sh
 ```
 
-输出在 `output/` 目录。
+输出在 `output/` 目录（本地 `BUILD_POLICY=local` 的 NVIDIA 构建输出到 `output-local-only/`）。安装缓存默认使用 `~/ffmpeg-install`；可设置 `INSTALL_PREFIX`、`THREADS`。脚本只接受空目录或本仓库标记过的安装目录，不会递归删除安装目录或系统文件。旧版留下的非空目录请保留，改用新的 `INSTALL_PREFIX`。临时源码使用唯一目录，退出自动清理；同一安装目录禁止并行构建。
 
-### Linux (Ubuntu 26.04)
+### macOS (Apple Silicon)
 
-通过 GitHub Actions CI 自动构建，详见 [workflow](.github/workflows/build-ffmpeg.yml)。
+安装 Homebrew 后执行：
+
+```bash
+bash scripts/build-macos-arm.sh
+```
+
+通过 GitHub Actions CI 自动构建，详见 [workflow](.github/workflows/build-ffmpeg.yml)。基础版和 AV2 整合版复用同一次 FFmpeg 编译，保留全部既有产物名称。
 
 ### Arch Linux (NVIDIA)
+
+先自行完成系统更新并安装构建工具、CUDA、Clang、patchelf 和相应编解码依赖。脚本不再执行 `pacman -Syu`、全局安装或删除 `/usr/local`；使用同一套用户目录构建和打包流程。只用 `bash` 执行，不要 `source`。
 
 ```bash
 bash ffmpeg-archlinux-nvidia.sh
@@ -164,7 +188,7 @@ bash ffmpeg-archlinux-nvidia.sh
 ## 📁 项目结构
 
 ```text
-├── .github/workflows/build-ffmpeg.yml   # CI/CD 工作流 (12 jobs)
+├── .github/workflows/build-ffmpeg.yml   # CI/CD 工作流与多平台矩阵
 ├── scripts/
 │   ├── build-windows-intel-qsv.sh       # Windows Intel QSV
 │   ├── build-windows-nvidia.sh          # Windows NVIDIA NVENC/CUDA
@@ -174,7 +198,12 @@ bash ffmpeg-archlinux-nvidia.sh
 │   ├── build-linux-intel-qsv.sh         # Linux Intel QSV + VAAPI
 │   ├── build-linux-amd.sh               # Linux AMD VAAPI
 │   ├── build-linux-arm.sh               # Linux ARM64 VAAPI / CPU
-│   └── build-macos-arm.sh               # macOS Apple Silicon
+│   ├── build-macos-arm.sh               # macOS Apple Silicon
+│   ├── build-env.sh                     # 安装目录归属、并发锁、临时目录
+│   ├── build-linux-common.sh            # Linux/Arch 公共构建
+│   ├── build-windows-common.sh          # Windows 公共构建
+│   ├── ci/                             # 链接、源码修补、源码收集、运行时打包和验证
+│   └── tests/                          # Python unittest 回归测试
 └── ffmpeg-archlinux-nvidia.sh           # Arch Linux NVIDIA NVENC/CUDA
 ```
 
@@ -205,12 +234,39 @@ ARM64 构建使用 [gas-preprocessor](https://github.com/FFmpeg/gas-preprocessor
 
 ### Windows pkg-config 路径分隔符
 
-在 Windows MSVC 环境下，vcpkg 提供的 `pkgconf` 是原生 Windows 二进制，期望 `;` 作为 `PKG_CONFIG_PATH` 分隔符（而非 Unix 的 `:`）。同时，Meson (Python) 构建 VMAF 时仍期望 `:` 分隔符。
+在 Windows MSVC 环境下，vcpkg 的原生 `pkgconf` 使用 `;` 分隔 `PKG_CONFIG_PATH`。本项目在调用 Meson 和 FFmpeg 时都使用与所选原生工具相匹配的 Windows 路径，不依赖 Unix 的 `:` 分隔方式。
 
-因此本项目的构建脚本采取双轨策略：
-- **Meson 构建步骤**：`PKG_CONFIG_PATH` 使用 `:` 分隔
-- **FFmpeg configure / pkgconf**：`PKG_CONFIG_PATH` 使用 `;` 分隔
+### 验证
+
+```bash
+python scripts/ci/check-syntax.py
+python -m unittest discover -s scripts/tests -p 'test_*.py'
+```
+
+可选：手动复核依赖源码收集（需要 `apt-get source` / `brew` / `vcpkg` 权限）
+
+```bash
+python scripts/ci/collect-dependency-sources.py --platform linux \
+  --output /tmp/dependency-sources --source-dir <ffmpeg 源码目录> --install-root <安装前缀>
+```
+
+CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL 编解码往返及平台声明的编码器；AV2 另做编码/解码往返。仅检查编码器注册，不要求构建机器有可用显卡。
 
 ### 许可
 
-FFmpeg 依据 LGPL/GPL 许可。启用 `--enable-gpl --enable-version3 --enable-nonfree` 后，生成的二进制受 GPL v3 约束。
+公开发布构建使用 `--enable-gpl --enable-version3`，不使用 `--enable-nonfree`。后者会使 FFmpeg 标记产物为 **nonfree and unredistributable**，不能把它当作普通 GPL v3 二进制发布。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
+
+**本地构建与公开发布是两套配置**：
+
+| | 本地（`BUILD_POLICY=local`，默认） | 公开 Release（`BUILD_POLICY=release`） |
+|---|---|---|
+| NVIDIA CUDA | `--enable-nonfree` + `cuda-nvcc` | CUDA LLVM（Clang 编译 PTX） |
+| NVENC / NVDEC / VMAF-CUDA | 有 | 有 |
+| 可再分发 | **否**，仅自用 | 是 |
+| 产物目录 | `output-local-only/` | `output/` |
+
+启用 `nonfree` 的产物**不能公开分发**，只能自用。`scripts/ci/package-runtime.py --local-only` 会拒绝为非 nonfree 构建打此类包，`verify-runtime.py --local-only` 只接受标记为 `local-only-unredistributable` 的包。
+
+**对应源码**：每个公开包都包含 `scripts/ci/collect-dependency-sources.py` 收集并校验的完整依赖源码（apt 的 deb-src 源码包、Homebrew formula 源码、vcpkg port 与下载的源码包），以及修改后的 FFmpeg / VMAF / AVM 源码和本仓库构建脚本。清单记录在 `runtime-manifest.json`（`corresponding_source.status` 为 `complete`）和 `metadata/dependency-source-inventory.json`。CI 在移动后的发布目录用 `verify-runtime.py --require-complete-source` 复核；任何依赖缺失都会使构建失败，从而阻止发布不完整的包。
+
+压缩包还应保留 FFmpeg、AVM 及随附第三方依赖的许可证、实际版本和对应源码信息。再分发者仍需满足 GPL v3 的完整对应源码及第三方许可要求。系统框架和 GPU 驱动不随包分发。参见 [FFmpeg 许可说明](https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md)。
