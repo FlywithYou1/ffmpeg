@@ -13,24 +13,32 @@ port_version() {
   dpkg-query -W -f='${Version}' "$1" | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/'
 }
 
-for spec in 'libopenjp2:libopenjp2-7-dev:openjp2' 'x265:libx265-dev:x265'; do
+for spec in 'x265:libx265-dev:x265'; do
   IFS=: read -r pc_name package library <<< "$spec"
   if "$REAL_PKG_CONFIG" --exists "$pc_name"; then
     continue
   fi
   version="$(port_version "$package")"
-  include=/usr/include
-  if [ "$pc_name" = libopenjp2 ]; then
-    for candidate in /usr/include/openjpeg-*; do
-      [ -d "$candidate" ] && { include="$candidate"; break; }
-    done
-  fi
-  printf 'prefix=/usr\nlibdir=/usr/lib/%s\nincludedir=%s\nName: %s\nDescription: %s library\nVersion: %s\nLibs: -L${libdir} -l%s\nCflags: -I${includedir}\n' \
-    "$MULTIARCH" "$include" "$pc_name" "$library" "$version" "$library" > "$P/lib/pkgconfig/$pc_name.pc"
-  if [ "$pc_name" = x265 ]; then
-    printf 'Libs.private: -lstdc++ -lm -lgcc -lpthread\n' >> "$P/lib/pkgconfig/$pc_name.pc"
-  fi
- done
+  printf 'prefix=/usr\nlibdir=/usr/lib/%s\nincludedir=/usr/include\nName: %s\nDescription: %s library\nVersion: %s\nLibs: -L${libdir} -l%s\nCflags: -I${includedir}\n' \
+    "$MULTIARCH" "$pc_name" "$library" "$version" "$library" > "$P/lib/pkgconfig/$pc_name.pc"
+  printf 'Libs.private: -lstdc++ -lm -lgcc -lpthread\n' >> "$P/lib/pkgconfig/$pc_name.pc"
+done
+
+# Debian/Ubuntu put -DOPJ_STATIC in libopenjp2's public Cflags. It makes the API
+# hidden, so FFmpeg's shared-library probe fails with
+# "hidden symbol `opj_version' isn't defined". Overlay a copy without that define.
+if "$REAL_PKG_CONFIG" --exists libopenjp2; then
+  openjp2_version="$("$REAL_PKG_CONFIG" --modversion libopenjp2)"
+  openjp2_cflags="$("$REAL_PKG_CONFIG" --cflags libopenjp2 | sed -E 's/(^| )-DOPJ_STATIC( |$)/ /g; s/  +/ /g; s/^ //; s/ $//')"
+else
+  openjp2_version="$(port_version libopenjp2-7-dev)"
+  openjp2_cflags=""
+  for candidate in /usr/include/openjpeg-*; do
+    [ -d "$candidate" ] && { openjp2_cflags="-I$candidate"; break; }
+  done
+fi
+printf 'prefix=/usr\nlibdir=/usr/lib/%s\nincludedir=/usr/include\nName: libopenjp2\nDescription: JPEG 2000 library (OpenJPEG)\nVersion: %s\nLibs: -L${libdir} -lopenjp2\nLibs.private: -lm\nCflags: %s\n' \
+  "$MULTIARCH" "$openjp2_version" "$openjp2_cflags" > "$P/lib/pkgconfig/libopenjp2.pc"
 
 kvazaar_dir="$("$REAL_PKG_CONFIG" --variable=pcfiledir kvazaar)"
 [ -f "$kvazaar_dir/kvazaar.pc" ] || { echo "Missing kvazaar.pc" >&2; exit 1; }
