@@ -398,6 +398,7 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
         omissions.append("vcpkg --only-downloads failed: " + result.stdout.strip()[:400])
     sha = vcpkg_git_sha(vcpkg_root)
     ports_root = Path(vcpkg_root) / "ports"
+    missing_archives = []
     for package in packages:
         name = package["Package"]
         version = package.get("Version", "unknown")
@@ -422,10 +423,14 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
             files.append(shutil.copy2(archive, target))
         if not matched and port_fetches_source(port):
             omissions.append(f"vcpkg {name}: no downloaded source archive")
+            missing_archives.append(name)
         record = {"id": f"vcpkg:{name}@{version}", "manager": "vcpkg", "package": name,
                   "version": version, "modules": [], "vcpkg_sha": sha, "files": {}}
         record_files(record, output, files)
         records.append(record)
+    if missing_archives:
+        omissions.append("vcpkg downloaded no archive for " + ", ".join(sorted(missing_archives))
+                         + "; last output: " + result.stdout.strip()[-600:])
     return records, omissions
 
 
