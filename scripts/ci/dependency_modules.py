@@ -45,12 +45,17 @@ FEATURE_MODULES = {
     "libx264": ("x264",),
     "libx265": ("x265",),
     "libxml2": ("libxml-2.0",),
-    "libxvid": ("xvidcore",),
+    "libxvid": (),
     "libzimg": ("zimg",),
 }
 
 # Compression and windowing libraries linked without a dedicated --enable flag.
 BASE_MODULES = ("zlib", "liblzma", "bzip2", "sdl2", "iconv")
+
+# libxvid is mapped to no module on purpose: FFmpeg links it with a plain
+# -lxvidcore and distributions ship no xvidcore.pc, so there is nothing for the
+# collector or the packager to query. It is covered by the bundled library
+# attribution instead.
 
 
 def features_from_buildconf(text):
