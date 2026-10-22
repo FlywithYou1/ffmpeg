@@ -242,6 +242,9 @@ jobs:
           make -j"$(nproc)" PREFIX="$P" && make PREFIX="$P" install
           mkdir -p "$P/share/nv-codec-headers"
           cp include/ffnvcodec/nvEncodeAPI.h "$P/share/nv-codec-headers/copyright"
+          # VMAF 的 nvcc fatbin 目标写死了 -I，只认 nvcc 默认搜索路径，
+          # 因此同时装到 /usr/local 供 CUDA 编解码头文件被找到。
+          sudo make PREFIX=/usr/local install
 
       - name: 编译 VMAF
         run: |
