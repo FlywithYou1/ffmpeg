@@ -10,7 +10,7 @@ import re
 # FFmpeg --enable-<feature> -> pkg-config module names that satisfy it.
 FEATURE_MODULES = {
     "libaom": ("aom",),
-    "libaribb24": ("libaribb24",),
+    "libaribb24": ("aribb24",),
     "libass": ("libass",),
     "libbluray": ("libbluray",),
     "libbs2b": ("libbs2b",),
@@ -29,12 +29,13 @@ FEATURE_MODULES = {
     "libopenmpt": ("libopenmpt",),
     "libopus": ("opus",),
     "libplacebo": ("libplacebo",),
-    "librubberband": ("librubberband",),
+    "librubberband": ("rubberband",),
     "libsnappy": ("snappy",),
     "libsoxr": ("soxr",),
     "libspeex": ("speex",),
+    "libtheora": ("theora",),
     "libsvtav1": ("SvtAv1Enc",),
-    "libtwolame": ("libtwolame",),
+    "libtwolame": ("twolame",),
     "libvidstab": ("vidstab",),
     "libvmaf": ("libvmaf",),
     "libvorbis": ("vorbis", "vorbisenc"),
@@ -44,7 +45,7 @@ FEATURE_MODULES = {
     "libx264": ("x264",),
     "libx265": ("x265",),
     "libxml2": ("libxml-2.0",),
-    "libxvid": ("xvid",),
+    "libxvid": ("xvidcore",),
     "libzimg": ("zimg",),
 }
 

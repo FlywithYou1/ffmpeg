@@ -227,7 +227,7 @@ class Packager:
                                       "source_urls": urls, "license": entry.get("licenseConcluded", entry.get("licenseDeclared", "NOASSERTION")),
                                       "patches": "SPDX/port metadata identifies inputs; full matching port sources and patches require review.",
                                       "corresponding_source": "not-included"}
-        if not any(key.startswith("vcpkg:") for key in self.packages):
+        if self.platform == "windows" and not any(key.startswith("vcpkg:") for key in self.packages):
             self.gaps.append(f"License root {Path(root).name}: package version/source attribution absent unless supplied by source archive.")
 
     def required_inputs(self):
@@ -442,6 +442,13 @@ class Packager:
                 self.dependencies.append({"from": target.name, "name": name, "disposition": disposition})
 
     def dpkg_attribution(self, path):
+        try:
+            if Path(path).resolve().is_relative_to(self.bin_dir.parent.resolve()):
+                # Installed by this build (VMAF, AVM, ...); the matching source
+                # arrives through --dependency-source, so dpkg has no owner.
+                return
+        except (OSError, ValueError):
+            pass
         if not shutil.which("dpkg-query"):
             self.gaps.append(f"No dpkg attribution for {path}")
             return
