@@ -270,13 +270,12 @@ jobs:
         shell: bash
         run: bash scripts/ci/build-avm.sh
 
-      - name: 准备静态 pkg-config 链接
-        run: bash scripts/ci/prepare-linux-link.sh "$HOME/ffmpeg-install" "$RUNNER_TEMP/linux-link"
+      - name: 准备 pkg-config 覆盖
+        run: bash scripts/ci/prepare-linux-pkgconfig.sh "$HOME/ffmpeg-install"
 
       - name: 编译 FFmpeg
         run: |
           P="${HOME}/ffmpeg-install"
-          PKG_CONFIG_WRAPPER="$RUNNER_TEMP/linux-link/pkg-config-static"
           CUDA_ARGS=()
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export PATH="${CUDA_HOME}/bin:${PATH}"
@@ -284,12 +283,12 @@ jobs:
           fi
           cd "$CI_BUILD_ROOT" && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
-          ./configure --prefix="$P" --pkg-config="$PKG_CONFIG_WRAPPER" --pkg-config-flags="--static" \
+          ./configure --prefix="$P" --pkg-config-flags="--static" \
             --disable-shared --enable-static \
             --extra-cflags="-I$P/include ${CUDA_HOME:+-I${CUDA_HOME}/include}" \
-            --extra-ldflags="-L$P/lib -L$RUNNER_TEMP/linux-link/static-libs" \
+            --extra-ldflags="-L$P/lib" \
             --extra-libs="-lpthread -lm -ldl" \
-            --enable-gpl --enable-version3 --enable-lto "${CUDA_ARGS[@]}" \
+            --enable-gpl --enable-version3 --enable-nonfree --enable-lto "${CUDA_ARGS[@]}" \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab --enable-sdl2 --disable-doc
           make -j"$(nproc)" && make install
@@ -881,7 +880,7 @@ jobs:
             --extra-ldflags="-LIBPATH:$P_MIXED/lib ${CL:+-LIBPATH:$CL} -LIBPATH:${VCPKG_INSTALLED}/lib" \
             --extra-libs="advapi32.lib ole32.lib ws2_32.lib user32.lib bcrypt.lib cfgmgr32.lib gdi32.lib shell32.lib libcpmt.lib" \
             --disable-shared --enable-static \
-            --enable-gpl --enable-version3 "${CUDA_ARGS[@]}" \
+            --enable-gpl --enable-version3 --enable-nonfree "${CUDA_ARGS[@]}" \
             ${{ matrix.configure_extra }} --enable-opencl --enable-vulkan \
             --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-libdav1d --enable-libopenh264 --enable-libtwolame --enable-libspeex --enable-libjxl --enable-sdl2 --enable-d3d11va --enable-d3d12va --enable-dxva2 --enable-mediafoundation --disable-doc
           make -j"$(nproc)" && make install
@@ -1075,7 +1074,7 @@ jobs:
             --extra-ldflags="-isysroot ${SDKROOT} -L$P/lib -L${BREW_PREFIX}/lib ${MVK_LDFLAGS}" \
             --extra-libs="-lpthread -lm" \
             --disable-shared --enable-static \
-            --enable-gpl --enable-version3 --enable-lto \
+            --enable-gpl --enable-version3 --enable-nonfree --enable-lto \
             --enable-libvmaf --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy --enable-opencl --enable-vulkan \
             --enable-libsvtav1 --enable-libdav1d --enable-libkvazaar --enable-libopenh264 --enable-libxvid --enable-libtwolame --enable-libspeex --enable-libcodec2 --enable-libjxl --enable-libopenmpt --enable-libbs2b --enable-libaribb24 --enable-libplacebo --enable-librubberband --enable-libvidstab \
             --enable-sdl2 --enable-videotoolbox --enable-audiotoolbox \
@@ -1237,7 +1236,7 @@ jobs:
             AV2 由 AVM 1.0.0 的独立工具提供，不是 FFmpeg 原生编解码器；原有 libaom AV1 保留。
 
             > 所有构建均包含： SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
-            > 所有构建启用 libjxl / JPEG XL 与 libvmaf，FFmpeg 按 GPLv3 分发，不启用 nonfree。
+            > 所有构建启用 libjxl / JPEG XL 与 libvmaf，并带 `--enable-nonfree`（FFmpeg 会标记为 nonfree and unredistributable）。
             > Linux 优先链接静态依赖；不可避免的非系统共享库随包分发。macOS 随包提供非系统 dylib，并重写加载路径及 ad-hoc 签名。
             > Windows 使用 MSVC /MT 与静态 vcpkg 依赖；硬件加速仍需要兼容的厂商驱动。
             > 每个包带 FFmpeg 许可证、实际构建源码/修改、配置及依赖版权信息，并嵌入自动收集和校验的对应版本依赖源码。

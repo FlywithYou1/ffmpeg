@@ -5,7 +5,7 @@ build_linux() {
   source "$(dirname "${BASH_SOURCE[0]}")/build-env.sh"
   init_build_env "$0"
   local vendor="$1" configure_extra=() verify_extra=() extra_cflags="" extra_ldflags=""
-  local policy="${BUILD_POLICY:-local}" license_flags=(--disable-nonfree) package_flags=()
+  local policy="${BUILD_POLICY:-local}" license_flags=(--enable-nonfree) package_flags=()
   local output_dir=output
   case "$policy" in
     local|release) ;;
@@ -74,16 +74,8 @@ build_linux() {
     *) echo "Unknown Linux vendor: $vendor" >&2; return 1 ;;
   esac
   if [ "${FFMPEG_ARCH_BUILD:-0}" != 1 ]; then
-    bash "$REPO_ROOT/scripts/ci/prepare-linux-link.sh" "$P" "$BUILD_ROOT/linux-link"
+    bash "$REPO_ROOT/scripts/ci/prepare-linux-pkgconfig.sh" "$P"
     export PKG_CONFIG_PATH="$P/lib/pkgconfig:/usr/lib/$("${CC:-cc}" -print-multiarch)/pkgconfig:${PKG_CONFIG_PATH:-}"
-  else
-    mkdir -p "$BUILD_ROOT/linux-link/static-libs"
-    for archive in /usr/lib/*.a; do
-      [ -f "$archive" ] || continue
-      name="$(basename "$archive")"
-      case "$name" in libc.a|libm.a|libm-*.a|libdl.a|libpthread.a|librt.a|libcuda.a|libnvidia-*.a) continue ;; esac
-      ln -sf "$archive" "$BUILD_ROOT/linux-link/static-libs/$name"
-    done
   fi
   if [ "${FFMPEG_ARCH_BUILD:-0}" = 1 ]; then
     configure_extra+=(--enable-libwavpack)
@@ -103,12 +95,10 @@ build_linux() {
   fi
   git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git "$BUILD_ROOT/ffmpeg-src"
   cd "$BUILD_ROOT/ffmpeg-src"
-  printf '#!/usr/bin/env bash\nexec python3 "%s/scripts/ci/prefer-static-pkg-config.py" "$@"\n' "$REPO_ROOT" > "$BUILD_ROOT/pkg-config-static"
-  chmod +x "$BUILD_ROOT/pkg-config-static"
   ./configure --prefix="$P" --disable-shared --enable-static --cc="${CC:-cc}" --cxx="${CXX:-c++}" \
-    --pkg-config="$BUILD_ROOT/pkg-config-static" --pkg-config-flags=--static \
+    --pkg-config-flags=--static \
     --extra-cflags="-I$P/include $extra_cflags" \
-    --extra-ldflags="-L$P/lib -L$BUILD_ROOT/linux-link/static-libs $extra_ldflags" --extra-libs="-lpthread -lm -ldl -lstdc++" \
+    --extra-ldflags="-L$P/lib $extra_ldflags" --extra-libs="-lpthread -lm -ldl -lstdc++" \
     --enable-gpl --enable-version3 "${license_flags[@]}" --enable-libvmaf "${configure_extra[@]}" \
     --enable-opencl --enable-vulkan \
     --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora \

@@ -379,7 +379,7 @@ windows_build() {
   WINDOWS_FLAVOR="$1"
   WINDOWS_POLICY="${BUILD_POLICY:-local}"
   case "$WINDOWS_POLICY" in local|release) ;; *) windows_die "BUILD_POLICY 必须为 local 或 release" ;; esac
-  WINDOWS_LICENSE_FLAGS=(--disable-nonfree)
+  WINDOWS_LICENSE_FLAGS=(--enable-nonfree)
   WINDOWS_PACKAGE_FLAGS=()
   WINDOWS_ARCH=x64
   WINDOWS_FFMPEG_ARCH=x86_64

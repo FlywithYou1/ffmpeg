@@ -80,7 +80,7 @@ rm -f configure.bak
   --extra-cflags="-I${P}/include -I${BREW_PREFIX}/include ${MVK_CFLAGS}" \
   --extra-ldflags="-L${P}/lib -L${BREW_PREFIX}/lib ${MVK_LDFLAGS}" \
   --extra-libs="-lpthread -lm" \
-  --enable-gpl --enable-version3 \
+  --enable-gpl --enable-version3 --enable-nonfree \
   --enable-libvmaf \
   --enable-opencl --enable-vulkan \
   --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg --enable-libsoxr --enable-libopenjpeg --enable-libsnappy \

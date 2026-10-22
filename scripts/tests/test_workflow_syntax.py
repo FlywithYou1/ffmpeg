@@ -49,10 +49,12 @@ class WorkflowSyntaxTests(unittest.TestCase):
         self.assertNotIn('if: false', text)
         for platform in ('linux', 'windows', 'macos'):
             self.assertIn(f'collect-dependency-sources.py --platform {platform}', text)
-        self.assertNotIn('--enable-nonfree', text)
         self.assertNotIn('sudo apt-get upgrade', text)
         self.assertNotIn('- id: x86-all-av2', text)
         self.assertNotIn('- id: arm64-av2', text)
+        for job, following in (('linux', 'windows'), ('windows', 'macos-arm'), ('macos-arm', 'release')):
+            section = text.split(f'\n  {job}:\n', 1)[1].split(f'\n  {following}:\n', 1)[0]
+            self.assertIn('--enable-nonfree', section)
         windows = text.split('  windows:', 1)[1].split('  macos-arm:', 1)[0]
         self.assertIn('--enable-libjxl', windows)
         self.assertIn('--enable-cuda-llvm', windows)

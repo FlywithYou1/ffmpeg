@@ -59,10 +59,10 @@ def clean_environment(platform, directory, inherited=None):
     return env
 
 
-def reject_nonfree(text, *, local_only=False):
-    lower = text.lower()
-    if not local_only and re.search(r"--enable-nonfree\b|non[- ]?free|unredistributable|not (?:legally )?redistributable", lower):
-        raise VerificationError("Nonfree/unredistributable FFmpeg build")
+def recognized_license(text):
+    # Nonfree builds report the unredistributable notice instead of the GPL text.
+    return bool(re.search(r"(?:GNU (?:Lesser )?General Public License|\b[AL]?GPL\b)", text, re.I)
+                or re.search(r"--enable-nonfree\b|non[- ]?free|unredistributable|not (?:legally )?redistributable", text, re.I))
 
 
 def registry_names(text):
@@ -197,15 +197,13 @@ class Verifier:
     def registrations(self):
         for name in ("ffmpeg", "ffprobe", "ffplay"):
             result = self.command(name, "-version")
-            reject_nonfree(result.stdout + result.stderr, local_only=self.local_only)
             if not re.search(rf"\b{re.escape(name)} version\b", result.stdout + result.stderr):
                 raise VerificationError(f"Unexpected {name} version output")
             # Capture the complete pipe before slicing; never use head/SIGPIPE.
             print((result.stdout + result.stderr)[:700].rstrip())
         license_result = self.command("ffmpeg", "-hide_banner", "-L")
         license_text = license_result.stdout + license_result.stderr
-        reject_nonfree(license_text, local_only=self.local_only)
-        if not self.local_only and not re.search(r"(?:GNU (?:Lesser )?General Public License|\b[AL]?GPL\b)", license_text, re.I):
+        if not self.local_only and not recognized_license(license_text):
             raise VerificationError("Missing recognized FFmpeg license output")
         encoders = self.command("ffmpeg", "-hide_banner", "-encoders").stdout
         filters = self.command("ffmpeg", "-hide_banner", "-filters").stdout

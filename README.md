@@ -254,18 +254,18 @@ CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL �
 
 ### 许可
 
-公开发布构建使用 `--enable-gpl --enable-version3`，不使用 `--enable-nonfree`。后者会使 FFmpeg 标记产物为 **nonfree and unredistributable**，不能把它当作普通 GPL v3 二进制发布。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
+公开发布构建使用 `--enable-gpl --enable-version3 --enable-nonfree`。启用 `--enable-nonfree` 后 FFmpeg 会把自身标记为 **nonfree and unredistributable**（`ffmpeg -L` 输出 "This version of FFmpeg has nonfree parts compiled in"），因此这些产物**不能当作普通 GPL v3 二进制再分发**，仅限自行使用。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
 
-**本地构建与公开发布是两套配置**：
+**本地构建与公开发布共用 nonfree 配置**：
 
 | | 本地（`BUILD_POLICY=local`，默认） | 公开 Release（`BUILD_POLICY=release`） |
 |---|---|---|
 | NVIDIA CUDA | `--enable-nonfree` + `cuda-nvcc` | CUDA LLVM（Clang 编译 PTX） |
+| nonfree 标记 | 有 | 有 |
 | NVENC / NVDEC / VMAF-CUDA | 有 | 有 |
-| 可再分发 | **否**，仅自用 | 是 |
 | 产物目录 | `output-local-only/` | `output/` |
 
-启用 `nonfree` 的产物**不能公开分发**，只能自用。`scripts/ci/package-runtime.py --local-only` 会拒绝为非 nonfree 构建打此类包，`verify-runtime.py --local-only` 只接受标记为 `local-only-unredistributable` 的包。
+本地脚本（`scripts/build-*.sh`）与 CI 一致，固定启用 `--enable-nonfree`；`BUILD_POLICY` 只决定 CUDA 实现方式、产物目录，以及是否用 `--local-only` 标记清单。`package-runtime.py` 与 `verify-runtime.py` 接受 nonfree 产物，把 `ffmpeg -L` 的许可证输出记录进 `metadata/ffmpeg-license-output.txt`，不再以许可证为由中止打包。`--local-only` 仍要求构建必须是 nonfree，并把清单里的 `distribution` 标为 `local-only-unredistributable`。
 
 **对应源码**：每个公开包都包含 `scripts/ci/collect-dependency-sources.py` 收集并校验的完整依赖源码（apt 的 deb-src 源码包、Homebrew formula 源码、vcpkg port 与下载的源码包），以及修改后的 FFmpeg / VMAF / AVM 源码和本仓库构建脚本。清单记录在 `runtime-manifest.json`（`corresponding_source.status` 为 `complete`）和 `metadata/dependency-source-inventory.json`。CI 在移动后的发布目录用 `verify-runtime.py --require-complete-source` 复核；任何依赖缺失都会使构建失败，从而阻止发布不完整的包。
 

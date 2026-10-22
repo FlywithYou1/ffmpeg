@@ -83,7 +83,9 @@ foreach ($pcDirWin in @((Join-Path $inst 'lib\pkgconfig'), (Join-Path $inst 'sha
             [regex]::Replace($match.Value, '(?<!\S)-lm(?=\s|$)', '')
         })
         if ($pc.Name -eq 'SvtAv1Enc.pc') {
-            $patched = [regex]::Replace($patched, '(?m)^Cflags\.private:[^\r\n]*', {
+            # vcpkg ships -UEB_DLL in public Cflags; it reaches link.exe as
+            # /UEB_DLL, and FFmpeg treats the resulting LNK4044 as a failed check.
+            $patched = [regex]::Replace($patched, '(?m)^Cflags(?:\.private)?:[^\r\n]*', {
                 param($match)
                 [regex]::Replace($match.Value, '(?<!\S)-UEB_DLL(?=\s|$)', '')
             })

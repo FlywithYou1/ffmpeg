@@ -529,9 +529,17 @@ class LicenseSourceTests(ScratchTest):
             p.static_attribution()
         self.assertEqual({call.args[0] for call in attribution.call_args_list}, {pc, first, quoted, last})
 
-    def test_nonfree_configuration_rejected(self):
+    def test_nonfree_configuration_is_packaged(self):
+        p = self.packager("windows")
+        with mock.patch.object(package, "run", return_value=result("configuration: --enable-gpl --enable-nonfree\nThis version of FFmpeg has nonfree parts compiled in.")):
+            p.static_attribution()
+        self.assertIn("--enable-nonfree", p.configuration)
+
+    def test_local_only_packaging_requires_nonfree(self):
         p = self.packager()
-        with mock.patch.object(package, "run", return_value=result("configuration: --enable-gpl --enable-nonfree")), self.assertRaisesRegex(package.PackageError, "nonfree"):
+        p.local_only = True
+        with mock.patch.object(package, "run", return_value=result("configuration: --enable-gpl --enable-version3")), \
+             self.assertRaisesRegex(package.PackageError, "nonfree"):
             p.static_attribution()
 
 
@@ -567,10 +575,10 @@ class VerificationTests(ScratchTest):
             self.assertNotIn("vcpkg", env["PATH"])
             self.assertNotIn("FFREPORT", env)
 
-    def test_licenses_reject_nonfree_missing_output(self):
-        for text in ("--enable-nonfree", "nonfree and unredistributable", "not legally redistributable"):
-            with self.subTest(text=text), self.assertRaises(verify.VerificationError):
-                verify.reject_nonfree(text)
+    def test_licenses_accept_nonfree_but_require_output(self):
+        for text in ("--enable-nonfree", "nonfree and unredistributable", "not legally redistributable", "GNU General Public License version 3"):
+            with self.subTest(text=text):
+                self.assertTrue(verify.recognized_license(text))
         v = self.verifier()
         with mock.patch.object(v, "command", return_value=result("")), self.assertRaises(verify.VerificationError):
             v.registrations()

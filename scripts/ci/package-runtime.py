@@ -536,15 +536,12 @@ class Packager:
         features = sorted(set(re.findall(r"--enable-(lib[A-Za-z0-9_-]+)", configuration)))
         mapping = {"libjxl": "libjxl libjxl_threads", "libvmaf": "libvmaf", "libx264": "x264", "libx265": "x265", "libaom": "aom", "libdav1d": "dav1d", "libsvtav1": "SvtAv1Enc", "libopus": "opus", "libvorbis": "vorbis vorbisenc", "libass": "libass", "libfreetype": "freetype2", "libfontconfig": "fontconfig", "libharfbuzz": "harfbuzz", "libfribidi": "fribidi", "libzimg": "zimg", "libvpx": "vpx", "libwebp": "libwebp", "libopenjpeg": "libopenjp2", "libmp3lame": "lame", "libsoxr": "soxr", "libspeex": "speex", "libbluray": "libbluray", "libplacebo": "libplacebo", "libxml2": "libxml-2.0", "libvidstab": "vidstab"}
         nonfree = bool(re.search(r"--enable-nonfree\b|non[- ]?free|unredistributable|not (?:legally )?redistributable", configuration, re.I))
-        if nonfree and not self.local_only:
-            raise PackageError("FFmpeg is nonfree/unredistributable; refusing redistribution")
         if self.local_only and not nonfree:
             raise PackageError("Local-only packaging requires a nonfree FFmpeg build")
         license_result = run([str(self.stage / ("ffmpeg.exe" if self.platform == "windows" else "ffmpeg")), "-hide_banner", "-L"], env=clean_environment())
         license_output = license_result.stdout + license_result.stderr
-        if re.search(r"non[- ]?free|unredistributable|not (?:legally )?redistributable", license_output, re.I) and not self.local_only:
-            raise PackageError("FFmpeg license forbids redistribution")
-        if not self.local_only and not re.search(r"GNU (?:Lesser )?General Public License", license_output, re.I):
+        # A nonfree build prints the unredistributable notice in place of the GPL text.
+        if not self.local_only and not re.search(r"GNU (?:Lesser )?General Public License|non[- ]?free|unredistributable|not (?:legally )?redistributable", license_output, re.I):
             raise PackageError("FFmpeg license output could not be verified")
         self.copy_text("metadata/ffmpeg-license-output.txt", license_output)
         if self.platform == "windows":
