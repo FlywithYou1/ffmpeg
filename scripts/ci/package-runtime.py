@@ -780,11 +780,14 @@ class Packager:
             self.gaps.append("AVM corresponding source archive missing; pass --dependency-source AVM_SOURCE.")
 
     def package(self):
-        if self.complete_source_dir:
-            self.stage_complete_sources(self.complete_source_dir)
         inputs = self.required_inputs()
         self.output.parent.mkdir(parents=True, exist_ok=True)
-        self.stage.mkdir()
+        if self.complete_source_dir:
+            # Staging the dependency sources creates the stage tree via copy().
+            self.stage.mkdir(exist_ok=True)
+            self.stage_complete_sources(self.complete_source_dir)
+        else:
+            self.stage.mkdir()
         try:
             for source, name in inputs:
                 destination = self.copy(source, name)

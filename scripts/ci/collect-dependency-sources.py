@@ -406,7 +406,8 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
             files.extend(store_tree(output / "sources" / "vcpkg", port, destination / "port"))
         else:
             omissions.append(f"vcpkg {name}: no port directory")
-        matched = [a for root in (downloads, Path(vcpkg_root) / "downloads") if root.is_dir()
+        matched = [a for root in (downloads, Path(vcpkg_root) / "downloads", buildtrees.parent / "downloads")
+                   if root.is_dir()
                    for a in sorted(root.rglob("*"))
                    if a.is_file() and a.name.lower().startswith(name.lower())]
         for archive in matched:
