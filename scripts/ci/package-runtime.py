@@ -695,13 +695,19 @@ class Packager:
                 path = root / relative
                 if any(part in BUILD_DIRS for part in relative.parts) or path.suffix.lower() in BUILD_SUFFIXES or re.search(r"\.so\.\d", path.name):
                     continue
-                if path.is_symlink() or not under(path.resolve(), root) or any((root / parent).is_symlink() for parent in relative.parents if parent != Path(".")):
+                if any((root / parent).is_symlink() for parent in relative.parents if parent != Path(".")):
                     omitted.append(relative.as_posix())
                     continue
-                if not path.is_file():
+                # Archive symlinked files as regular files with their target's
+                # bytes, so the tree is complete without relying on link targets.
+                target = path.resolve() if path.is_symlink() else path
+                if not under(target, root):
+                    omitted.append(relative.as_posix())
+                    continue
+                if not target.is_file():
                     continue
                 # Archive working-tree bytes, including tracked local patches.
-                tar.add(path, arcname=label + "/" + relative.as_posix(), recursive=False)
+                tar.add(target, arcname=label + "/" + relative.as_posix(), recursive=False)
                 included += 1
         self.sources.append({"name": label, "archive": "sources/" + archive.name,
                              "patch_file": f"sources/{label}.patch" if sha else None,

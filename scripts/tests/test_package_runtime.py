@@ -457,6 +457,26 @@ class LicenseSourceTests(ScratchTest):
             self.assertEqual(tar.extractfile("dependency-sources/foo/foo-1.0.tar.xz").read(), archive.read_bytes())
             self.assertIn("dependency-sources/foo/distribution.patch", tar.getnames())
 
+    def test_symlinked_sources_are_archived_as_regular_files(self):
+        # zimg ships symlinks; omitting them made every package review-required.
+        p = self.packager()
+        tree = self.root / "zimg-src"
+        self.write(tree / "real" / "codec.c", b"int zimg_codec;")
+        try:
+            (tree / "link.c").symlink_to(Path("real") / "codec.c")
+            (tree / "escape.c").symlink_to(Path("..") / "outside.c")
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks unavailable (needs privilege on Windows)")
+        self.write(self.root / "outside.c", b"outside")
+        with mock.patch.object(package.shutil, "which", return_value=None):
+            p.archive_source(tree, "zimg-src")
+        with tarfile.open(p.stage / "sources" / "zimg-src.tar.gz") as tar:
+            names = tar.getnames()
+            self.assertIn("zimg-src/link.c", names)
+            self.assertEqual(tar.extractfile("zimg-src/link.c").read(), b"int zimg_codec;")
+        self.assertEqual(p.sources[0]["omitted_symlinks"], ["escape.c"])
+        self.assertTrue(any("symlinks omitted" in gap for gap in p.gaps))
+
     def test_dpkg_package_version_and_copyright(self):
         p = self.packager()
         original_is_file = package.Path.is_file
