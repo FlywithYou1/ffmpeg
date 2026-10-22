@@ -387,10 +387,18 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
     downloads.mkdir(parents=True, exist_ok=True)
     buildtrees = output / "work" / "vcpkg-buildtrees"
     buildtrees.mkdir(parents=True, exist_ok=True)
-    result = run([str(Path(vcpkg_root) / "vcpkg.exe"), "install", "--only-downloads",
-                  f"--x-downloads-root={downloads}", f"--x-buildtrees-root={buildtrees}",
-                  f"--triplet={triplet}", f"--x-manifest-root={manifest_root}"],
-                 cwd=manifest_root, check=False, timeout=5400)
+    # An already-installed tree makes vcpkg skip downloading sources, so point
+    # it at a scratch install root to force a full download plan.
+    scratch_install = output / "work" / "vcpkg-install-root"
+    scratch_install.mkdir(parents=True, exist_ok=True)
+    common = [str(Path(vcpkg_root) / "vcpkg.exe"), "install", "--only-downloads",
+              f"--x-downloads-root={downloads}", f"--x-buildtrees-root={buildtrees}",
+              f"--triplet={triplet}", f"--x-manifest-root={manifest_root}"]
+    result = None
+    for option in (f"--install-root={scratch_install}", f"--x-install-root={scratch_install}"):
+        result = run([*common, option], cwd=manifest_root, check=False, timeout=5400)
+        if result.returncode == 0:
+            break
     if result.returncode:
         omissions.append("vcpkg --only-downloads failed: " + result.stdout.strip()[:400])
     sha = vcpkg_git_sha(vcpkg_root)
