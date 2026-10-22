@@ -705,7 +705,8 @@ jobs:
           P_MIXED="$(cygpath -m "$P")"
           cd "$CI_BUILD_ROOT" && git clone --depth 1 https://github.com/Netflix/vmaf.git
           cd vmaf/libvmaf
-          COMPAT="${CI_BUILD_ROOT}/vmaf-compat"
+          COMPAT="$(cygpath -m "$CI_BUILD_ROOT")/vmaf-compat"
+          COMPAT_WIN="$(cygpath -w "$COMPAT")"
           ARCH="${VSCMD_ARG_TGT_ARCH:-x64}"
           PREPARE_ARGS=(--architecture "$ARCH")
           if [ "${{ matrix.cuda }}" = "true" ]; then
@@ -716,8 +717,10 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/scripts/ci/prepare-vmaf-windows.py" . "$COMPAT" "${PREPARE_ARGS[@]}"
           mkdir -p "$P/lib" "$P/lib/pkgconfig" "$P/include/libvmaf" "$P/share/libvmaf"
-          cl.exe -MT -nologo -c "-I$COMPAT" "-Fo$COMPAT/pthread_shim.obj" "$COMPAT/pthread_shim.c"
-          lib.exe -nologo "-out:$P_MIXED/lib/pthread_shim.lib" "$COMPAT/pthread_shim.obj"
+          # MSYS2 会把含 /a/_temp 形式的分片路径改写成 A:\...，cl.exe 因此无法打开 -Fo 输出；
+          # 这里统一用原生 Windows 路径并禁用参数转换。
+          MSYS2_ARG_CONV_EXCL='*' cl.exe -MT -nologo -c "-I$COMPAT_WIN" "-Fo$COMPAT_WIN\\pthread_shim.obj" "$COMPAT_WIN\\pthread_shim.c"
+          MSYS2_ARG_CONV_EXCL='*' lib.exe -nologo "-out:$P_MIXED/lib/pthread_shim.lib" "$COMPAT_WIN\\pthread_shim.obj"
           export INCLUDE="$COMPAT;$P_MIXED/include;$VCPKG_INSTALLED/include;${INCLUDE:-}"
           export PKG_CONFIG_PATH="$P_MIXED/lib/pkgconfig;$VCPKG_INSTALLED/lib/pkgconfig;${PKG_CONFIG_PATH:-}"
           export CC=cl.exe CXX=cl.exe
@@ -1011,6 +1014,14 @@ jobs:
           meson setup build --buildtype release --prefix="$P" --libdir=lib \
             -Ddefault_library=static -Denable_tools=false -Denable_docs=false -Denable_tests=false -Denable_cuda=false
           ninja -vC build && ninja -C build install
+          # 静态 libvmaf 内嵌 C++ 对象（libsvm），meson 生成的 .pc 不带 libc++，
+          # configure 的 vmaf_init 检测会因 std::__1::* 未定义而失败。
+          VMAF_VERSION=$(python3 -c "import json; print(json.load(open('build/meson-info/intro-projectinfo.json'))['version'])")
+          printf '%s\n' \
+            "prefix=$P" 'exec_prefix=${prefix}' 'libdir=${prefix}/lib' 'includedir=${prefix}/include' \
+            '' 'Name: libvmaf' 'Description: VMAF library' "Version: $VMAF_VERSION" \
+            'Libs: -L${libdir} -lvmaf -lc++' 'Libs.private: -lpthread -lm' \
+            'Cflags: -I${includedir} -I${includedir}/libvmaf' > "$P/lib/pkgconfig/libvmaf.pc"
           mkdir -p "$P/share/libvmaf"
           cp ../LICENSE "$P/share/libvmaf/copyright"
           echo "PKG_CONFIG_PATH=$P/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "${GITHUB_ENV}"

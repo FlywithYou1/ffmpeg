@@ -18,7 +18,15 @@ class StaticPkgConfigTests(unittest.TestCase):
             directory = Path(work)
             (directory / 'libvmaf.a').touch()
             flags = ['-L' + work, '-lvmaf', '-lmissing', '-pthread']
-            self.assertEqual(STATIC.prefer_archives(flags, []), ['-L' + work, str(directory / 'libvmaf.a'), '-lmissing', '-pthread'])
+            self.assertEqual(STATIC.prefer_archives(flags, []), ['-L' + work, '-l:libvmaf.a', '-lmissing', '-pthread'])
+
+    def test_emits_linker_token_that_stays_a_library(self):
+        # Absolute archive paths are not matched by FFmpeg's `filter '-l*|*.so'`,
+        # so they end up before the object file and the link fails.
+        with tempfile.TemporaryDirectory() as work:
+            directory = Path(work)
+            (directory / 'libaom.a').touch()
+            self.assertEqual(STATIC.prefer_archives(['-laom'], [work]), ['-L' + work, '-l:libaom.a'])
 
     def test_keeps_os_and_driver_libraries_dynamic(self):
         with tempfile.TemporaryDirectory() as work:
@@ -27,12 +35,20 @@ class StaticPkgConfigTests(unittest.TestCase):
             flags = ['-l' + name for name in ['c', 'm', 'dl', 'pthread', 'cuda', 'nvidia-encode']]
             self.assertEqual(STATIC.prefer_archives(flags, [work]), flags)
 
+    def test_keeps_cxx_and_compiler_runtime_dynamic(self):
+        with tempfile.TemporaryDirectory() as work:
+            names = ['stdc++', 'c++abi', 'gcc_s', 'atomic']
+            for name in names:
+                (Path(work) / ('lib' + name + '.a')).touch()
+            flags = ['-l' + name for name in names]
+            self.assertEqual(STATIC.prefer_archives(flags, [work]), flags)
+
     def test_search_directory_order(self):
         with tempfile.TemporaryDirectory() as work:
             a, b = Path(work) / 'a', Path(work) / 'b'
             a.mkdir(); b.mkdir()
             (a / 'libcodec.a').touch(); (b / 'libcodec.a').touch()
-            self.assertEqual(STATIC.prefer_archives(['-L' + str(a), '-lcodec'], [b])[-1], str(a / 'libcodec.a'))
+            self.assertEqual(STATIC.prefer_archives(['-L' + str(a), '-lcodec'], [b])[-1], '-l:libcodec.a')
 
 
 @unittest.skipUnless(shutil.which('bash'), 'Bash unavailable')
