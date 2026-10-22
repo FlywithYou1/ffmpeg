@@ -172,6 +172,23 @@ class CollectorTests(unittest.TestCase):
             collect.write_privileged(target, "Types: deb-src\n")
         self.assertEqual(runner.call_args.args[0][:2], ["sudo", "tee"])
 
+    def test_port_archive_keys_follow_the_upstream_repo(self):
+        # vcpkg names downloads after the upstream project, not the port name.
+        port = self.root / "ports" / "libogg"
+        port.mkdir(parents=True)
+        (port / "portfile.cmake").write_text(
+            "vcpkg_from_github(OUT_SOURCE_PATH SOURCE_PATH REPO xiph/ogg REF v1.3.5 SHA512 0)\n")
+        keys = collect.port_source_keys(port, "libogg")
+        self.assertIn("libogg", keys)
+        self.assertIn("ogg", keys)
+
+    def test_port_archive_keys_include_distfile_names(self):
+        port = self.root / "ports" / "sdl2"
+        port.mkdir(parents=True)
+        (port / "portfile.cmake").write_text(
+            'vcpkg_download_distfile(ARCHIVE URLS "https://example.org/SDL2-2.32.0.tar.gz" FILENAME "SDL2-2.32.0.tar.gz" SHA512 0)\n')
+        self.assertIn("sdl2-2.32.0", collect.port_source_keys(port, "sdl2"))
+
     def test_only_ports_that_download_sources_require_an_archive(self):
         helper = self.root / "ports" / "vcpkg-cmake"
         helper.mkdir(parents=True)

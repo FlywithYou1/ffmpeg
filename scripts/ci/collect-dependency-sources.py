@@ -370,6 +370,26 @@ def port_fetches_source(port):
         text, re.I))
 
 
+def port_source_keys(port, name):
+    """Names that vcpkg may use for a port's downloaded archive.
+
+    vcpkg names downloads after the upstream project, not the port: libogg
+    fetches ogg-1.3.5.tar.gz, fastfeat fetches the vmaf tree, and
+    vcpkg-tool-meson fetches meson-*.tar.gz.
+    """
+    keys = {name.lower()}
+    portfile = Path(port) / "portfile.cmake"
+    if portfile.is_file():
+        text = portfile.read_text(encoding="utf-8", errors="replace")
+        for _, repository in re.findall(r"REPO\s+([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)", text):
+            keys.add(repository.lower())
+        for url in re.findall(r'"(https?://[^"$]+)"', text):
+            base = re.sub(r"\.(?:tar\.(?:gz|xz|bz2)|tgz|zip)$", "", url.rstrip("/").split("/")[-1], flags=re.I)
+            if base:
+                keys.add(base.lower())
+    return {key for key in keys if len(key) >= 3}
+
+
 def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet):
     records = []
     omissions = []
@@ -413,10 +433,10 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
         roots = [root for root in (downloads, Path(vcpkg_root) / "downloads", buildtrees.parent / "downloads")
                  if root.is_dir()]
         available = [a for root in roots for a in sorted(root.rglob("*")) if a.is_file()]
-        matched = [a for a in available if a.name.lower().startswith(name.lower())]
+        keys = sorted(port_source_keys(port, name), key=len, reverse=True)
+        matched = [a for a in available if a.name.lower().startswith(keys[0])]
         if not matched:
-            # Some ports download archives that are not prefixed by the port name.
-            matched = [a for a in available if name.lower() in a.name.lower()]
+            matched = [a for a in available if any(key in a.name.lower() for key in keys)]
         for archive in matched:
             target = destination / "downloads" / archive.name
             target.parent.mkdir(parents=True, exist_ok=True)
