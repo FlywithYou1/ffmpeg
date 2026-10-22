@@ -48,6 +48,30 @@ class ModuleMappingTests(unittest.TestCase):
         text = "configuration: --enable-gpl --enable-libx264 --enable-libjxl --enable-version3"
         self.assertEqual(modules.features_from_buildconf(text), ["gpl", "libjxl", "libx264", "version3"])
 
+    def test_every_mapping_entry_is_a_tuple_of_module_names(self):
+        for feature, names in modules.FEATURE_MODULES.items():
+            with self.subTest(feature=feature):
+                self.assertIsInstance(names, tuple)
+                self.assertTrue(all(isinstance(name, str) and name for name in names))
+
+    def test_distro_module_names_are_mapped(self):
+        # Debian ships dav1d.pc and opus.pc, not libdav1d.pc/libopus.pc.
+        self.assertIn("dav1d", modules.required_modules(["libdav1d"]))
+        self.assertIn("opus", modules.required_modules(["libopus"]))
+        self.assertNotIn("libdav1d", modules.required_modules(["libdav1d"]))
+
+    def test_unmapped_non_library_switch_contributes_no_module(self):
+        self.assertEqual(modules.required_modules(["opencl", "vaapi"], exists=lambda name: False), [])
+
+    def test_transitive_modules_follow_requires_and_private(self):
+        requires = {"sdl2": ["vorbisfile >= 1.0"], "vorbisfile": ["ogg"], "ogg": ["libmpg123"]}
+
+        def query(option, module):
+            return requires.get(module, []) if option == "--print-requires" else []
+
+        self.assertEqual(modules.transitive_modules(["sdl2"], query),
+                         ["libmpg123", "ogg", "sdl2", "vorbisfile"])
+
     def test_collector_and_packager_use_the_same_module_set(self):
         # The packager maps the same feature names; a mismatch would hide gaps.
         for feature, expected in modules.FEATURE_MODULES.items():

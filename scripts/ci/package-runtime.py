@@ -24,6 +24,9 @@ import sys
 import tarfile
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dependency_modules import features_from_buildconf, required_modules  # noqa: E402
+
 
 class PackageError(RuntimeError):
     pass
@@ -533,8 +536,7 @@ class Packager:
         configuration = configuration_result.stdout + configuration_result.stderr
         self.configuration = configuration
         self.copy_text("metadata/ffmpeg-buildconf.txt", configuration)
-        features = sorted(set(re.findall(r"--enable-(lib[A-Za-z0-9_-]+)", configuration)))
-        mapping = {"libjxl": "libjxl libjxl_threads", "libvmaf": "libvmaf", "libx264": "x264", "libx265": "x265", "libaom": "aom", "libdav1d": "dav1d", "libsvtav1": "SvtAv1Enc", "libopus": "opus", "libvorbis": "vorbis vorbisenc", "libass": "libass", "libfreetype": "freetype2", "libfontconfig": "fontconfig", "libharfbuzz": "harfbuzz", "libfribidi": "fribidi", "libzimg": "zimg", "libvpx": "vpx", "libwebp": "libwebp", "libopenjpeg": "libopenjp2", "libmp3lame": "lame", "libsoxr": "soxr", "libspeex": "speex", "libbluray": "libbluray", "libplacebo": "libplacebo", "libxml2": "libxml-2.0", "libvidstab": "vidstab"}
+        features = features_from_buildconf(configuration)
         nonfree = bool(re.search(r"--enable-nonfree\b|non[- ]?free|unredistributable|not (?:legally )?redistributable", configuration, re.I))
         if self.local_only and not nonfree:
             raise PackageError("Local-only packaging requires a nonfree FFmpeg build")
@@ -550,14 +552,10 @@ class Packager:
         if not shutil.which("pkg-config"):
             self.gaps.append("pkg-config absent: static dependency package/source attribution is incomplete.")
             return
-        modules = set()
-        for feature in features:
-            modules.update(mapping.get(feature, feature).split())
-        # FFmpeg's optional/compression/SDL dependencies may not use enable-lib flags.
-        for module in ("zlib", "liblzma", "bzip2", "sdl2"):
-            if run(["pkg-config", "--exists", module], check=False).returncode == 0:
-                modules.add(module)
-        queue = sorted(modules)
+        modules = required_modules(
+            features,
+            exists=lambda name: run(["pkg-config", "--exists", name], check=False).returncode == 0)
+        queue = list(modules)
         seen = set()
         while queue:
             module = queue.pop(0)

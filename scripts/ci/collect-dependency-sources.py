@@ -26,7 +26,7 @@ import sys
 import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from dependency_modules import features_from_buildconf, required_modules  # noqa: E402
+from dependency_modules import features_from_buildconf, required_modules, transitive_modules  # noqa: E402
 
 INVENTORY = "source-inventory.json"
 SCHEMA = 1
@@ -86,18 +86,9 @@ def build_configuration(ffmpeg_binary, source_dir):
 
 def collect_required(pkg_config, modules):
     """Expand the module list with the transitive pkg-config requirements."""
-    seen = list(modules)
-    queue = list(modules)
-    while queue:
-        module = queue.pop(0)
-        for option in ("--print-requires", "--print-requires-private"):
-            result = run([pkg_config, option, module], check=False, timeout=60)
-            for line in result.stdout.splitlines():
-                name = line.split()[0] if line.split() else ""
-                if re.fullmatch(r"[A-Za-z0-9_.+-]+", name) and name not in seen:
-                    seen.append(name)
-                    queue.append(name)
-    return sorted(seen)
+    def query(option, module):
+        return run([pkg_config, option, module], check=False, timeout=60).stdout.splitlines()
+    return transitive_modules(modules, query)
 
 
 def resolve_modules(pkg_config, modules, install_root):
@@ -457,7 +448,9 @@ def main(argv=None):
             binary = install_root / "bin" / "ffmpeg"
             configuration = build_configuration(binary, args.source_dir)
             features = features_from_buildconf(configuration)
-            modules = required_modules(features)
+            modules = required_modules(
+                features,
+                exists=lambda name: run([pkg_config, "--exists", name], check=False, timeout=60).returncode == 0)
             modules = collect_required(pkg_config, modules)
             resolved = resolve_modules(pkg_config, modules, install_root)
             required = [entry["module"] for entry in resolved]
