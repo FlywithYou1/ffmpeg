@@ -73,9 +73,15 @@ class ModuleMappingTests(unittest.TestCase):
                          ["libmpg123", "ogg", "sdl2", "vorbisfile"])
 
     def test_collector_and_packager_use_the_same_module_set(self):
-        # The packager maps the same feature names; a mismatch would hide gaps.
+        # Both sides call required_modules, so the map must be explicit: every
+        # feature either names its pkg-config modules or is documented as being
+        # linked without pkg-config metadata (libxvid uses -lxvidcore).
         for feature, expected in modules.FEATURE_MODULES.items():
-            self.assertTrue(expected, feature)
+            with self.subTest(feature=feature):
+                self.assertIsInstance(expected, tuple)
+                if feature != "libxvid":
+                    self.assertTrue(expected, feature)
+        self.assertEqual(modules.required_modules(["libxvid"], exists=lambda name: False), [])
 
 
 class CollectorTests(unittest.TestCase):
