@@ -317,6 +317,7 @@ jobs:
           RELOCATED="$RUNNER_TEMP/relocated-base"
           SOURCE_ARGS=()
           if [ -d "$CI_BUILD_ROOT/nv-codec-headers" ]; then SOURCE_ARGS+=(--dependency-source "$CI_BUILD_ROOT/nv-codec-headers"); fi
+          SOURCE_ARGS+=(--dependency-source "$CI_BUILD_ROOT/vmaf")
           python3 scripts/ci/package-runtime.py --platform linux \
             --bin-dir "$HOME/ffmpeg-install/bin" --source-dir "$CI_BUILD_ROOT/ffmpeg-src" \
             --output "$STAGING" --license-dir "$HOME/ffmpeg-install/share" "${SOURCE_ARGS[@]}" \
@@ -334,10 +335,11 @@ jobs:
           RELOCATED="$RUNNER_TEMP/relocated-av2"
           SOURCE_ARGS=()
           if [ -d "$CI_BUILD_ROOT/nv-codec-headers" ]; then SOURCE_ARGS+=(--dependency-source "$CI_BUILD_ROOT/nv-codec-headers"); fi
+          SOURCE_ARGS+=(--dependency-source "$CI_BUILD_ROOT/vmaf")
           python3 scripts/ci/package-runtime.py --platform linux \
             --bin-dir "$HOME/ffmpeg-install/bin" --source-dir "$CI_BUILD_ROOT/ffmpeg-src" \
             --output "$STAGING" --license-dir "$HOME/ffmpeg-install/share" "${SOURCE_ARGS[@]}" \
-            --avm-prefix "$AVM_PREFIX" --dependency-source "$RUNNER_TEMP/avm" \
+            --avm-prefix "$AVM_PREFIX" --dependency-source "$RUNNER_TEMP/avm" --dependency-source "$CI_BUILD_ROOT/vmaf" \
             --complete-source-dir "$RUNNER_TEMP/dependency-sources"
           mv "$STAGING" "$RELOCATED"
           env -u LD_LIBRARY_PATH python3 scripts/ci/verify-runtime.py --platform linux \
@@ -925,7 +927,7 @@ jobs:
           $source = "$env:CI_BUILD_ROOT\ffmpeg-src"
           $staging = Join-Path $env:RUNNER_TEMP 'package-base'
           $relocated = Join-Path $env:RUNNER_TEMP 'relocated-base'
-          $sourceArgs = @('--dependency-source', "$env:RUNNER_TEMP\zimg-build\zimg-src", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf-compat")
+          $sourceArgs = @('--dependency-source', "$env:RUNNER_TEMP\zimg-build\zimg-src", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf-compat", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf")
           foreach ($dependency in @('nv-codec-headers', 'AMF')) {
             $path = Join-Path $env:CI_BUILD_ROOT $dependency
             if (Test-Path -LiteralPath $path) { $sourceArgs += @('--dependency-source', $path) }
@@ -948,7 +950,7 @@ jobs:
           $source = "$env:CI_BUILD_ROOT\ffmpeg-src"
           $staging = Join-Path $env:RUNNER_TEMP 'package-av2'
           $relocated = Join-Path $env:RUNNER_TEMP 'relocated-av2'
-          $sourceArgs = @('--dependency-source', "$env:RUNNER_TEMP\zimg-build\zimg-src", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf-compat")
+          $sourceArgs = @('--dependency-source', "$env:RUNNER_TEMP\zimg-build\zimg-src", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf-compat", '--dependency-source', "$env:CI_BUILD_ROOT\vmaf")
           foreach ($dependency in @('nv-codec-headers', 'AMF')) {
             $path = Join-Path $env:CI_BUILD_ROOT $dependency
             if (Test-Path -LiteralPath $path) { $sourceArgs += @('--dependency-source', $path) }
@@ -1117,6 +1119,7 @@ jobs:
           python3 scripts/ci/package-runtime.py --platform macos \
             --bin-dir "$HOME/ffmpeg-install/bin" --source-dir "$CI_BUILD_ROOT/ffmpeg-src" \
             --output "$STAGING" --license-dir "$HOME/ffmpeg-install/share" \
+            --dependency-source "$CI_BUILD_ROOT/vmaf" \
             --complete-source-dir "$RUNNER_TEMP/dependency-sources"
           mv "$STAGING" "$RELOCATED"
           env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH python3 scripts/ci/verify-runtime.py --platform macos \
@@ -1132,7 +1135,7 @@ jobs:
           python3 scripts/ci/package-runtime.py --platform macos \
             --bin-dir "$HOME/ffmpeg-install/bin" --source-dir "$CI_BUILD_ROOT/ffmpeg-src" \
             --output "$STAGING" --license-dir "$HOME/ffmpeg-install/share" \
-            --avm-prefix "$AVM_PREFIX" --dependency-source "$RUNNER_TEMP/avm" \
+            --avm-prefix "$AVM_PREFIX" --dependency-source "$RUNNER_TEMP/avm" --dependency-source "$CI_BUILD_ROOT/vmaf" \
             --complete-source-dir "$RUNNER_TEMP/dependency-sources"
           mv "$STAGING" "$RELOCATED"
           env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH python3 scripts/ci/verify-runtime.py --platform macos \

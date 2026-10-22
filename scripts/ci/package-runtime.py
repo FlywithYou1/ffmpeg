@@ -827,6 +827,8 @@ class Packager:
                 self.output.rmdir()
             self.stage.rename(self.output)
             print(f"Packaged {len(inputs)} binaries, {len(files)} files: {self.output}")
+            for gap in sorted(set(self.gaps)):
+                print(f"GAP: {gap}")
             if self.local_only:
                 print("LOCAL-ONLY — nonfree/unredistributable; do not publish or redistribute.")
             return manifest

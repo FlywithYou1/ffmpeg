@@ -383,6 +383,7 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
     scratch_install = output / "work" / "vcpkg-install-root"
     scratch_install.mkdir(parents=True, exist_ok=True)
     common = [str(Path(vcpkg_root) / "vcpkg.exe"), "install", "--only-downloads",
+              "--binarysource=clear",
               f"--x-downloads-root={downloads}", f"--x-buildtrees-root={buildtrees}",
               f"--triplet={triplet}", f"--x-manifest-root={manifest_root}"]
     result = None
