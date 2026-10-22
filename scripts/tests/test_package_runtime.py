@@ -457,6 +457,18 @@ class LicenseSourceTests(ScratchTest):
             self.assertEqual(tar.extractfile("dependency-sources/foo/foo-1.0.tar.xz").read(), archive.read_bytes())
             self.assertIn("dependency-sources/foo/distribution.patch", tar.getnames())
 
+    def test_generated_compat_tree_is_not_a_dependency_source(self):
+        # vmaf-compat is emitted by the archived prepare-vmaf-windows.py; treating
+        # it as upstream source only adds an unprovable provenance gap.
+        p = self.packager("windows")
+        generated = self.write(p.source.parent / "vmaf-compat" / "pthread_shim.c", b"shim")
+        self.assertTrue(generated.is_file())
+        with mock.patch.object(package.shutil, "which", return_value=None):
+            p.source_metadata()
+        labels = {record["name"] for record in p.sources}
+        self.assertNotIn("vmaf-compat", labels)
+        self.assertIn("build-scripts", labels)
+
     def test_symlinked_sources_are_archived_as_regular_files(self):
         # zimg ships symlinks; omitting them made every package review-required.
         p = self.packager()

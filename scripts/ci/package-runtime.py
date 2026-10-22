@@ -770,7 +770,10 @@ class Packager:
     def source_metadata(self):
         self.archive_source(self.source, "ffmpeg")
         roots = list(self.dependency_sources)
-        for name in ("vmaf", "vmaf-compat", "nv-codec-headers", "AMF", "amf", "zimg"):
+        # vmaf-compat is absent on purpose: scripts/ci/prepare-vmaf-windows.py
+        # generates it and is archived as build-scripts, so it has no upstream
+        # provenance of its own.
+        for name in ("vmaf", "nv-codec-headers", "AMF", "amf", "zimg"):
             candidate = self.source.parent / name
             if candidate.is_dir():
                 roots.append(candidate)
