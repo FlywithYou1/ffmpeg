@@ -149,6 +149,20 @@ def record_files(record, root, files):
 
 # ---------------------------------------------------------------- Linux (apt)
 
+def write_privileged(path, text):
+    """Write a file that may live under a root-owned directory (for example /etc/apt)."""
+    try:
+        path.write_text(text, encoding="utf-8")
+        return
+    except PermissionError:
+        pass
+    process = subprocess.run(["sudo", "tee", str(path)], input=text, text=True,
+                             encoding="utf-8", stdout=subprocess.DEVNULL,
+                             stderr=subprocess.PIPE, check=False)
+    if process.returncode:
+        raise CollectError(f"Cannot write {path}: {process.stderr.strip()}")
+
+
 def enable_deb_src(apt_root=Path("/etc/apt")):
     """Add matching deb-src entries so that apt-get source can run."""
     legacy = []
@@ -176,11 +190,17 @@ def enable_deb_src(apt_root=Path("/etc/apt")):
                 deb822.append("Types: deb-src\nURIs: {0}\nSuites: {1}\nComponents: {2}\n".format(
                     fields.get("URIs"), fields.get("Suites"), fields.get("Components", "main")))
     if legacy:
-        (directory).mkdir(parents=True, exist_ok=True)
-        (directory / "ffmpeg-deb-src.list").write_text("\n".join(legacy) + "\n", encoding="utf-8")
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            pass
+        write_privileged(directory / "ffmpeg-deb-src.list", "\n".join(legacy) + "\n")
     if deb822:
-        (directory).mkdir(parents=True, exist_ok=True)
-        (directory / "ffmpeg-deb-src.sources").write_text("\n".join(deb822), encoding="utf-8")
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            pass
+        write_privileged(directory / "ffmpeg-deb-src.sources", "\n".join(deb822))
     if not legacy and not deb822:
         raise CollectError("No deb-src entries could be derived from the apt configuration")
     run(["sudo", "apt-get", "update", "-qq"], timeout=1800)
@@ -309,9 +329,13 @@ def collect_macos(output, modules):
 # -------------------------------------------------------------- Windows (vcpkg)
 
 def vcpkg_installed_packages(vcpkg_installed):
-    status = Path(vcpkg_installed) / "vcpkg" / "status"
-    if not status.is_file():
-        raise CollectError(f"vcpkg status file not found: {status}")
+    base = Path(vcpkg_installed)
+    # Manifest mode keeps the status file beside the triplet directories;
+    # older layouts nested it inside the triplet directory itself.
+    candidates = [base / "vcpkg" / "status", base.parent / "vcpkg" / "status"]
+    status = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if status is None:
+        raise CollectError(f"vcpkg status file not found: {candidates[0]}")
     packages = []
     current = {}
     for line in status.read_text(encoding="utf-8", errors="replace").splitlines():

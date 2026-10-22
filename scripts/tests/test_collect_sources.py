@@ -125,7 +125,22 @@ class CollectorTests(unittest.TestCase):
 
     def test_missing_vcpkg_status_fails(self):
         with self.assertRaises(collect.CollectError):
-            collect.vcpkg_installed_packages(self.root)
+            collect.vcpkg_installed_packages(self.root / "triplet-only")
+
+    def test_vcpkg_status_beside_triplet_directories_is_found(self):
+        # Manifest mode writes vcpkg_installed/vcpkg/status next to the triplets.
+        status = self.root / "vcpkg_installed" / "vcpkg" / "status"
+        status.parent.mkdir(parents=True)
+        status.write_text("Package: aom\nVersion: 3.0\n---\n")
+        parsed = collect.vcpkg_installed_packages(self.root / "vcpkg_installed" / "x64-windows-static")
+        self.assertEqual([p["Package"] for p in parsed], ["aom"])
+
+    def test_privileged_write_falls_back_to_sudo(self):
+        target = self.root / "sources.list.d" / "ffmpeg-deb-src.sources"
+        with mock.patch.object(Path, "write_text", side_effect=PermissionError), \
+             mock.patch.object(collect.subprocess, "run", return_value=result("")) as runner:
+            collect.write_privileged(target, "Types: deb-src\n")
+        self.assertEqual(runner.call_args.args[0][:2], ["sudo", "tee"])
 
     def test_brew_formula_source_requires_url_and_checksum(self):
         with mock.patch.object(collect, "run", return_value=result('  url "https://example.org/x.tar.gz"\n  sha256 "' + "a" * 64 + '"\n')):
