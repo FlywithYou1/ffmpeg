@@ -441,7 +441,9 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
             target = destination / "downloads" / archive.name
             target.parent.mkdir(parents=True, exist_ok=True)
             files.append(shutil.copy2(archive, target))
-        if not matched and port_fetches_source(port):
+        if not matched and port_fetches_source(port) and not name.startswith("vcpkg-"):
+            # vcpkg-* ports install build tools (make, meson, cmake helpers), not
+            # libraries linked into the product; their recipe is archived above.
             omissions.append(f"vcpkg {name}: no downloaded source archive")
             missing_archives.append(name)
         record = {"id": f"vcpkg:{name}@{version}", "manager": "vcpkg", "package": name,
