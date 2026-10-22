@@ -40,6 +40,9 @@ LINUX_BASE = re.compile(r"^(?:linux-vdso\.so(?:\..*)?|ld-linux[^/]*\.so(?:\..*)?
 LINUX_GPU = re.compile(r"^(?:libcuda\.so(?:\..*)?|libnvidia-[^/]+\.so(?:\..*)?|libnvcuvid\.so(?:\..*)?|[^/]+_drv_video\.so)$")
 WINDOWS_OS = set("advapi32 avrt bcrypt bcryptprimitives cabinet cfgmgr32 comctl32 comdlg32 crypt32 cryptbase d3d9 d3d11 d3d12 dcomp dbghelp dnsapi dwmapi dxgi dxva2 gdi32 gdi32full glu32 hid imm32 iphlpapi kernel32 kernelbase ksuser mf mfcore mfplat mfreadwrite mfuuid mpr msacm32 msvcrt mswsock ncrypt netapi32 normaliz ntdll ole32 oleaut32 opengl32 powrprof propsys psapi rpcrt4 secur32 setupapi shcore shell32 shlwapi strmiids ucrtbase user32 userenv usp10 version vfw32 win32u winhttp wininet winmm winscard winspool wintrust wldap32 ws2_32 wtsapi32".split())
 WINDOWS_OS.update("authz d2d1 d3dcompiler_47 dinput8 dsound dwrite mmdevapi msasn1 msimg32 msvfw32 nsi uxtheme windowscodecs wsock32".split())
+# Video for Windows capture (vfwcap), DirectShow and Enhanced Video Renderer are
+# OS components in System32, shipped with Windows rather than with FFmpeg.
+WINDOWS_OS.update("avicap32 avifil32 evr ksproxy msdmo quartz".split())
 WINDOWS_GPU = {"nvcuda", "nvencodeapi", "nvencodeapi64", "nvcuvid", "nvapi", "nvapi64", "amfrt32", "amfrt64", "amdhip64", "vulkan-1", "opencl"}
 BUILD_DIRS = {".git", ".svn", "build", "_build", "out", "output", "dist", "CMakeFiles", "meson-private", "meson-logs", "__pycache__"}
 BUILD_SUFFIXES = {".o", ".obj", ".a", ".lib", ".dll", ".so", ".dylib", ".exe", ".pdb", ".pyc"}
@@ -554,7 +557,8 @@ class Packager:
             raise PackageError("FFmpeg license output could not be verified")
         self.copy_text("metadata/ffmpeg-license-output.txt", license_output)
         if self.platform == "windows":
-            self.gaps.append("Static vcpkg/custom dependencies require matching source archives and patches; share metadata is attribution only.")
+            if self.inventory is None:
+                self.gaps.append("Static vcpkg/custom dependencies require matching source archives and patches; share metadata is attribution only.")
             return
         if not shutil.which("pkg-config"):
             self.gaps.append("pkg-config absent: static dependency package/source attribution is incomplete.")

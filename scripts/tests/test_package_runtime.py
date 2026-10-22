@@ -294,6 +294,14 @@ class WindowsTests(ScratchTest):
                  self.assertRaisesRegex(package.PackageError, "static /MT"):
                 p.windows_dependencies()
 
+    def test_capture_stack_dlls_are_os_components(self):
+        # vfwcap, dshow and ffplay pull these from System32; they are not ours.
+        p = self.packager("windows")
+        text = "Image has the following dependencies:\n AVICAP32.dll\n avifil32.dll\n evr.dll\n quartz.dll\n"
+        with mock.patch.object(package.shutil, "which", return_value="dumpbin"), mock.patch.object(package, "run", return_value=result(text)):
+            p.windows_dependencies()
+        self.assertEqual({d["disposition"] for d in p.dependencies}, {"external-base-os"})
+
     def test_inspector_required_and_unrecognized_output_fails(self):
         p = self.packager("windows")
         with mock.patch.object(package.shutil, "which", return_value=None), self.assertRaisesRegex(package.PackageError, "requires dumpbin"):
@@ -541,6 +549,21 @@ class LicenseSourceTests(ScratchTest):
         with mock.patch.object(package, "run", return_value=result("configuration: --enable-gpl --enable-version3")), \
              self.assertRaisesRegex(package.PackageError, "nonfree"):
             p.static_attribution()
+
+    def test_windows_gap_only_without_a_source_inventory(self):
+        # A collected vcpkg inventory covers the static ports, so demanding more
+        # would keep every Windows package at review-required forever.
+        p = self.packager("windows")
+        configuration = "configuration: --enable-gpl --enable-version3\nGNU General Public License version 3"
+        with mock.patch.object(package, "run", return_value=result(configuration)):
+            p.static_attribution()
+        self.assertTrue(any("vcpkg" in gap for gap in p.gaps))
+
+        p = self.packager("windows")
+        p.inventory = {"packages": [{"id": "vcpkg:zlib@1.3"}], "coverage": {"provided": ["zlib"], "omissions": []}}
+        with mock.patch.object(package, "run", return_value=result(configuration)):
+            p.static_attribution()
+        self.assertEqual(p.gaps, [])
 
 
 class VerificationTests(ScratchTest):
