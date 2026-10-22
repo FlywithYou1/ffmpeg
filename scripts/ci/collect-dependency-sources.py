@@ -419,7 +419,9 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
                    for a in sorted(root.rglob("*"))
                    if a.is_file() and a.name.lower().startswith(name.lower())]
         for archive in matched:
-            files.append(shutil.copy2(archive, destination / "downloads" / archive.name))
+            target = destination / "downloads" / archive.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            files.append(shutil.copy2(archive, target))
         if not matched and port_fetches_source(port):
             omissions.append(f"vcpkg {name}: no downloaded source archive")
         record = {"id": f"vcpkg:{name}@{version}", "manager": "vcpkg", "package": name,
