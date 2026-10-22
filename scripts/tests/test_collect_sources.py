@@ -142,6 +142,16 @@ class CollectorTests(unittest.TestCase):
             collect.write_privileged(target, "Types: deb-src\n")
         self.assertEqual(runner.call_args.args[0][:2], ["sudo", "tee"])
 
+    def test_only_ports_that_download_sources_require_an_archive(self):
+        helper = self.root / "ports" / "vcpkg-cmake"
+        helper.mkdir(parents=True)
+        (helper / "portfile.cmake").write_text("vcpkg_cmake_configure(SOURCE_PATH ${CURRENT_INSTALLED_DIR})\n")
+        real = self.root / "ports" / "x264"
+        real.mkdir(parents=True)
+        (real / "portfile.cmake").write_text("vcpkg_from_github(OUT_SOURCE_PATH SOURCE_PATH REPO example/x264)\n")
+        self.assertFalse(collect.port_fetches_source(helper))
+        self.assertTrue(collect.port_fetches_source(real))
+
     def test_brew_formula_source_requires_url_and_checksum(self):
         with mock.patch.object(collect, "run", return_value=result('  url "https://example.org/x.tar.gz"\n  sha256 "' + "a" * 64 + '"\n')):
             url, checksum = collect.brew_formula_source("x264")

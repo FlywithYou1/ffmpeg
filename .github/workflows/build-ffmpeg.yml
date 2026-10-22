@@ -735,7 +735,9 @@ jobs:
           VMAF_C_ARGS="-I$COMPAT -I$P_MIXED/include -I$VCPKG_INSTALLED/include -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -DHAVE_ALLOCA_H=0 -DHAVE_STRSEP=0"
           VMAF_CPP_ARGS="$VMAF_C_ARGS"
           if [ "$ARCH" = "arm64" ]; then
-            VMAF_ENABLE_ASM=true
+            # VMAF 的 ARM64 NEON 是 C intrinsics，用到 __builtin_clz 等 GCC 内建，
+            # MSVC 没有这些内建，开启 ASM 会链接失败。
+            VMAF_ENABLE_ASM=false
             VMAF_C_ARGS="$VMAF_C_ARGS -DHAVE_FEATURES_H=0 -DHAVE_LOCALTIME_R=0 -DHAVE_LOCALTIME_S=1 -experimental:c11atomics"
             VMAF_CPP_ARGS="$VMAF_CPP_ARGS -std:c++14"
           elif [ -n "${CLANG_BIN:-}" ] && [ -f "$CLANG_BIN/clang-cl.exe" ] && command -v nasm >/dev/null 2>&1; then

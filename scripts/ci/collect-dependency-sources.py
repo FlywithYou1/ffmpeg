@@ -256,7 +256,10 @@ def collect_linux(output, modules):
                 omissions.append(f"apt-get source {name}={version} produced no directory")
                 continue
             extracted = candidates[0]
-        destination = output / "sources" / "dpkg" / f"{name}-{version}"
+        # Debian versions may carry an epoch ("1:0.17.4-2"); ":" is not portable
+        # in archive member paths and is rejected by the manifest validator.
+        safe_version = str(version).replace(":", "_")
+        destination = output / "sources" / "dpkg" / f"{name}-{safe_version}"
         files = store_tree(output / "sources" / "dpkg", extracted, destination)
         for extra in sorted(work.glob(f"{name}-{version}*.tar.*")) + sorted(work.glob(f"{name}*.diff.gz")):
             files.append(shutil.copy2(extra, output / "sources" / "dpkg" / extra.name))
@@ -361,6 +364,21 @@ def vcpkg_git_sha(vcpkg_root):
     return result.stdout.strip() if result.returncode == 0 else "unknown"
 
 
+def port_fetches_source(port):
+    """True when a vcpkg port downloads an upstream archive.
+
+    Helper ports such as vcpkg-cmake or pkgconf install their own contents and
+    never produce a download, so a missing archive is not an omission there.
+    """
+    portfile = Path(port) / "portfile.cmake"
+    if not portfile.is_file():
+        return False
+    text = portfile.read_text(encoding="utf-8", errors="replace")
+    return bool(re.search(
+        r"vcpkg_(?:from_github|from_gitlab|from_bitbucket|from_git|from_url|download_distfile|from_azure)",
+        text, re.I))
+
+
 def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet):
     records = []
     omissions = []
@@ -388,10 +406,12 @@ def collect_windows(output, vcpkg_root, vcpkg_installed, manifest_root, triplet)
             files.extend(store_tree(output / "sources" / "vcpkg", port, destination / "port"))
         else:
             omissions.append(f"vcpkg {name}: no port directory")
-        matched = [a for a in sorted(downloads.rglob("*")) if a.is_file() and a.name.lower().startswith(name.lower())]
+        matched = [a for root in (downloads, Path(vcpkg_root) / "downloads") if root.is_dir()
+                   for a in sorted(root.rglob("*"))
+                   if a.is_file() and a.name.lower().startswith(name.lower())]
         for archive in matched:
             files.append(shutil.copy2(archive, destination / "downloads" / archive.name))
-        if not matched:
+        if not matched and port_fetches_source(port):
             omissions.append(f"vcpkg {name}: no downloaded source archive")
         record = {"id": f"vcpkg:{name}@{version}", "manager": "vcpkg", "package": name,
                   "version": version, "modules": [], "vcpkg_sha": sha, "files": {}}
