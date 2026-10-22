@@ -709,6 +709,11 @@ jobs:
           cd vmaf/libvmaf
           COMPAT="$(cygpath -m "$CI_BUILD_ROOT")/vmaf-compat"
           COMPAT_WIN="$(cygpath -w "$COMPAT")"
+          # Git for Windows 的 usr/bin/link.exe 会遮蔽 MSVC 的 link.exe，
+          # Meson 检测到非 MSVC linker 会直接报错，这里把工具链目录提前。
+          if [ -n "${VCToolsInstallDir:-}" ]; then
+            export PATH="$(cygpath -u "${VCToolsInstallDir%/}")/bin/Host${VSCMD_ARG_HOST_ARCH}/${VSCMD_ARG_TGT_ARCH}:$PATH"
+          fi
           ARCH="${VSCMD_ARG_TGT_ARCH:-x64}"
           PREPARE_ARGS=(--architecture "$ARCH")
           if [ "${{ matrix.cuda }}" = "true" ]; then
