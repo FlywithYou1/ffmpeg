@@ -212,10 +212,13 @@ class Verifier:
         encoder_names = registry_names(encoders)
         decoder_names = registry_names(decoders)
         filter_names = registry_names(filters)
-        if "libvmaf" not in filter_names:
-            raise VerificationError("Required libvmaf filter is missing")
+        if "libvmaf" not in filter_names and not re.search(r"(?<![\w-])libvmaf(?![\w-])", filters):
+            raise VerificationError(
+                f"Required libvmaf filter is missing ({len(filter_names)} filters parsed from {len(filters)} bytes)")
         if "libjxl" not in encoder_names or "libjxl" not in decoder_names:
-            raise VerificationError("Required libjxl JPEG XL encoder/decoder is missing")
+            raise VerificationError(
+                f"Required libjxl JPEG XL encoder/decoder is missing "
+                f"({len(encoder_names)} encoders, {len(decoder_names)} decoders parsed)")
         if not re.search(r"^\s*DE[A-Z.]*\s+jpegxl\s", codecs, re.M):
             raise VerificationError("JPEG XL codec does not register encoding AND decoding")
         for name in self.require_encoders:
