@@ -1,7 +1,7 @@
 {
   "name": "ffmpeg-build",
   "version": "1.0.0",
-  "builtin-baseline": "84297877a7c1a155661ea562462f1b72fab080d1",
+  "builtin-baseline": "6fdd23fa0a9479a9f9a1c48178696f60cf39255d",
   "dependencies": [
     "pkgconf",
     "sdl2",
