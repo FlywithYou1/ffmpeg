@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
 
       - name: 检查并回写 builtin-baseline
         run: |
@@ -79,7 +79,7 @@ jobs:
     if: github.event.schedule != '0 14 * * 1'
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: Python regression tests
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Script and workflow syntax
@@ -100,7 +100,7 @@ jobs:
       prerelease: ${{ steps.vars.outputs.prerelease }}
       should_release: ${{ steps.vars.outputs.should_release }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
 
       - name: 确定 Release 参数
         id: vars
@@ -198,7 +198,7 @@ jobs:
             verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
             artifact: ffmpeg-linux-arm-nvidia.tar.xz
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: 准备构建目录
         run: |
           BUILD_ROOT="${RUNNER_TEMP}/ffmpeg-build"
@@ -224,7 +224,7 @@ jobs:
       - name: 安装最新 CUDA 工具包
         id: cuda
         if: matrix.cuda
-        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
+        uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
           method: 'auto'
@@ -371,14 +371,14 @@ jobs:
             --directory "$RELOCATED" ${{ matrix.verify_args }} --avm --require-complete-source
           tar -C "$RELOCATED" -cJf "${{ matrix.av2_artifact }}" .
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -466,7 +466,7 @@ jobs:
       - name: 禁用 Git CRLF 自动转换
         shell: bash
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: 准备构建目录
         shell: bash
         run: |
@@ -475,7 +475,7 @@ jobs:
           echo "CI_BUILD_ROOT=$BUILD_ROOT" >> "$GITHUB_ENV"
 
       - name: 配置 MSVC
-        uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: ${{ matrix.msvc_arch }}
 
@@ -673,7 +673,7 @@ jobs:
         # 或 local 安装包直接以 100（0xE0E00064）退出。失败后重试一次，
         # 由下一步统一报告，避免把安装器的瞬时故障当成构建失败。
         continue-on-error: true
-        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
+        uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
           method: 'auto'
@@ -682,7 +682,7 @@ jobs:
         id: cuda-retry
         if: matrix.cuda && steps.cuda.outcome == 'failure'
         continue-on-error: true
-        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
+        uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
           method: 'network'
@@ -1012,14 +1012,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Relocated AV2 runtime verification failed' }
           Compress-Archive -Path "$relocated\*" -DestinationPath '${{ matrix.av2_artifact }}' -Force
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -1042,7 +1042,7 @@ jobs:
             av2_artifact: ffmpeg-macos-arm-av2.tar.xz
             verify_args: --require-encoder h264_videotoolbox --require-encoder hevc_videotoolbox --require-hwaccel videotoolbox
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: 准备构建目录
         run: |
           BUILD_ROOT="${RUNNER_TEMP}/ffmpeg-build"
@@ -1188,14 +1188,14 @@ jobs:
             --directory "$RELOCATED" ${{ matrix.verify_args }} --avm --require-complete-source
           tar -C "$RELOCATED" -cJf "${{ matrix.av2_artifact }}" .
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -1219,7 +1219,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -1239,7 +1239,7 @@ jobs:
           PY
           ls -lh release-assets/
 
-      - uses: softprops/action-gh-release@fe965f7af51af5f2602596916f38a38df2e33de0 # v3.0.2
+      - uses: softprops/action-gh-release@v3.0.2
         with:
           tag_name: ${{ needs.metadata.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
