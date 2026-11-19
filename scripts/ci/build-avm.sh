@@ -27,15 +27,18 @@ else
   arm=0
 fi
 cmake -S "$ROOT" -B "$ROOT/build" "${args[@]}"
-# AVM turns SIMD flavours off quietly when a compiler probe fails; check here.
+# AVM turns SIMD flavours off quietly when a compiler probe fails; the arm
+# defines appear at configure time, x86 asm objects only after the build.
 if [ "$arm" = 1 ]; then
   grep -Eq '^#define HAVE_NEON 1' "$ROOT/build/config/avm_config.h" || { echo "错误：AVM 未启用 NEON"; exit 1; }
   grep -Eq '^#define AVM_ARCH_AARCH64 1' "$ROOT/build/config/avm_config.h" || { echo "错误：AVM 未以 AArch64 为目标"; exit 1; }
-else
-  # NASM objects are named <file>.asm.o by CMake.
-  find "$ROOT/build" -name '*.asm.o' | grep -q . || { echo "错误：AVM 未编译 x86 汇编目标"; exit 1; }
 fi
 cmake --build "$ROOT/build" --parallel "$THREADS" --target avmenc avmdec
+if [ "$arm" != 1 ]; then
+  find "$ROOT/build" -name '*.o' -path '*asm_objects*' | grep -q . || { echo "错误：AVM 未编译 x86 汇编目标"; exit 1; }
+fi
+# avm.pc is only produced by the avm_pc target, and install() needs it.
+cmake --build "$ROOT/build" --parallel "$THREADS" --target avm_pc
 cmake --install "$ROOT/build"
 mkdir -p "$P/licenses/avm"
 cp "$ROOT/LICENSE" "$ROOT/PATENTS" "$P/licenses/avm/"
