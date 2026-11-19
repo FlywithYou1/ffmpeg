@@ -4,7 +4,7 @@ build_linux() {
   trap 'echo "错误：第 ${LINENO} 行" >&2; exit 1' ERR
   source "$(dirname "${BASH_SOURCE[0]}")/build-env.sh"
   init_build_env "$0"
-  local vendor="$1" configure_extra=() verify_extra=() extra_cflags="" extra_ldflags=""
+  local vendor="$1" configure_extra=() verify_extra=() extra_cflags="" extra_ldflags="" cuda=false
   THREADS="${THREADS:-$(nproc)}"
   [[ "$THREADS" =~ ^[1-9][0-9]*$ ]] || { echo "THREADS 必须为正整数" >&2; return 1; }
   export PATH="$P/bin:$PATH"
@@ -18,12 +18,13 @@ build_linux() {
   done
   export FFMPEG_PKG_CONFIG="$(command -v pkg-config)"
   case "$vendor" in
-    arm)
+    arm|arm-nvidia)
       [ "$(uname -m)" = aarch64 ] || { echo "ARM64 构建必须在 AArch64 主机运行" >&2; return 1; }
       ;;
   esac
   case "$vendor" in
-    nvidia)
+    nvidia|arm-nvidia)
+      cuda=true
       CUDA_HOME="${CUDA_HOME:-${CUDA_PATH:-}}"
       if [ -z "$CUDA_HOME" ]; then
         for d in /usr/local/cuda /opt/cuda /usr/local/cuda-*; do
@@ -31,10 +32,14 @@ build_linux() {
         done
       fi
       [ -x "${CUDA_HOME}/bin/nvcc" ] || { echo "未找到 CUDA Toolkit" >&2; return 1; }
+      # SBSA (ARM) 工具链没有 sm_75；x86 保留可移植目标。
+      local cuda_arch=75
+      [ "$(uname -m)" = aarch64 ] && cuda_arch="${CUDA_ARCH:-100}"
       # 只有一种构建形态：直接用 CUDA Toolkit 的 nvcc（nonfree）。
       configure_extra+=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm \
-        "--nvcc=$CUDA_HOME/bin/nvcc" "--nvccflags=${NVCCFLAGS:--gencode arch=compute_75,code=sm_75 -O2}" --enable-cuvid --enable-nvenc)
-      verify_extra+=(--require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc)
+        "--nvcc=$CUDA_HOME/bin/nvcc" "--nvccflags=${NVCCFLAGS:--gencode arch=compute_${cuda_arch},code=sm_${cuda_arch} -O2}" --enable-cuvid --enable-nvenc)
+      verify_extra+=(--require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc \
+        --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda)
       export CUDA_PATH="$CUDA_HOME" CUDACXX="$CUDA_HOME/bin/nvcc"
       export PATH="$CUDA_HOME/bin:$PATH"
       export C_INCLUDE_PATH="$P/include:$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
@@ -45,11 +50,11 @@ build_linux() {
       ;;
     intel-qsv)
       configure_extra+=(--enable-libvpl --enable-vaapi --disable-ffnvcodec --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-nvenc)
-      verify_extra+=(--require-encoder h264_qsv --require-encoder hevc_qsv)
+      verify_extra+=(--require-encoder h264_qsv --require-encoder hevc_qsv --require-hwaccel qsv --require-hwaccel vaapi)
       ;;
     amd|arm)
       configure_extra+=(--enable-vaapi --disable-ffnvcodec --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-nvenc)
-      verify_extra+=(--require-encoder h264_vaapi)
+      verify_extra+=(--require-encoder h264_vaapi --require-hwaccel vaapi)
       ;;
     *) echo "Unknown Linux vendor: $vendor" >&2; return 1 ;;
   esac
@@ -63,7 +68,7 @@ build_linux() {
   git clone --depth 1 https://github.com/Netflix/vmaf.git "$BUILD_ROOT/vmaf"
   cd "$BUILD_ROOT/vmaf/libvmaf"
   meson setup build --buildtype release --prefix="$P" --libdir=lib -Ddefault_library=static \
-    -Denable_cuda="$([ "$vendor" = nvidia ] && echo true || echo false)" \
+    -Denable_cuda="$cuda" \
     -Denable_tests=false -Denable_tools=false -Denable_docs=false \
     -Dc_link_args=-lstdc++ -Dcpp_link_args=-lstdc++
   ninja -C build && ninja -C build install

@@ -2,11 +2,13 @@
 """Verify a relocated package (or install bin directory) without build PATHs.
 
 Usage: verify-runtime.py --platform linux|macos|windows --directory DIRECTORY
-    [--require-encoder NAME ...] [--avm]
+    [--require-encoder NAME ...] [--require-decoder NAME ...]
+    [--require-hwaccel NAME ...] [--avm]
 
 Checks all three programs headlessly, license, libvmaf and libjxl registration,
 software/VMAF/JPEG XL smoke tests, and optional packaged AVM roundtrip. Hardware
-encoders are inspected for registration only; no GPU or ffplay GUI is required.
+encoders, decoders and hwaccels are inspected for registration only; no GPU or
+ffplay GUI is required.
 """
 import argparse
 import importlib.util
@@ -37,7 +39,7 @@ def run(args, *, env, cwd, timeout=120):
     return result
 
 
-def clean_environment(platform, directory, inherited=None):
+def clean_environment(platform, inherited=None):
     env = dict(os.environ if inherited is None else inherited)
     for key in list(env):
         upper = key.upper()
@@ -79,7 +81,7 @@ def load_packager():
 
 class Verifier:
     def __init__(self, platform, directory, require_encoders=(), avm=False, local_only=False,
-                 require_complete_source=False):
+                 require_complete_source=False, require_hwaccels=(), require_decoders=()):
         self.platform = platform
         self.local_only = local_only
         self.require_complete_source = require_complete_source
@@ -90,10 +92,12 @@ class Verifier:
             self.binaries.update({n: self.directory / (n + extension) for n in ("avmenc", "avmdec")})
         self.avm = avm
         self.require_encoders = tuple(require_encoders)
-        for name in self.require_encoders:
+        self.require_hwaccels = tuple(require_hwaccels)
+        self.require_decoders = tuple(require_decoders)
+        for name in (*self.require_encoders, *self.require_hwaccels, *self.require_decoders):
             if not re.fullmatch(r"[A-Za-z0-9_]+", name):
-                raise VerificationError(f"Invalid required encoder name: {name}")
-        self.env = clean_environment(platform, self.directory)
+                raise VerificationError(f"Invalid required name: {name}")
+        self.env = clean_environment(platform)
         self.work = self.directory / (".runtime-check-" + uuid.uuid4().hex)
 
     def command(self, name, *args):
@@ -209,9 +213,11 @@ class Verifier:
         filters = self.command("ffmpeg", "-hide_banner", "-filters").stdout
         codecs = self.command("ffmpeg", "-hide_banner", "-codecs").stdout
         decoders = self.command("ffmpeg", "-hide_banner", "-decoders").stdout
+        hwaccels = self.command("ffmpeg", "-hide_banner", "-hwaccels").stdout
         encoder_names = registry_names(encoders)
         decoder_names = registry_names(decoders)
         filter_names = registry_names(filters)
+        hwaccel_names = set(hwaccels.split())
         if "libvmaf" not in filter_names and not re.search(r"(?<![\w-])libvmaf(?![\w-])", filters):
             raise VerificationError(
                 f"Required libvmaf filter is missing ({len(filter_names)} filters parsed from {len(filters)} bytes)")
@@ -224,7 +230,21 @@ class Verifier:
         for name in self.require_encoders:
             if name not in encoder_names:
                 raise VerificationError(f"Required encoder is missing: {name}")
-        print("Required registrations: libvmaf, libjxl encode/decode" + (", " + ", ".join(self.require_encoders) if self.require_encoders else ""))
+        for name in self.require_decoders:
+            if name not in decoder_names:
+                raise VerificationError(f"Required decoder is missing: {name}")
+        for name in self.require_hwaccels:
+            if name not in hwaccel_names:
+                raise VerificationError(
+                    f"Required hwaccel is missing: {name} (registered: {' '.join(sorted(hwaccel_names))})")
+        required = ["libvmaf", "libjxl encode/decode"]
+        if self.require_encoders:
+            required.append(", ".join(self.require_encoders))
+        if self.require_decoders:
+            required.append(", ".join(self.require_decoders))
+        if self.require_hwaccels:
+            required.append(", ".join(self.require_hwaccels))
+        print("Required registrations: " + ", ".join(required))
 
     def smoke(self):
         common = ("-hide_banner", "-nostdin", "-v", "error", "-y", "-threads", "1", "-filter_threads", "1")
@@ -301,13 +321,15 @@ def main(argv=None):
     parser.add_argument("--platform", required=True, choices=("linux", "macos", "windows"))
     parser.add_argument("--directory", required=True)
     parser.add_argument("--require-encoder", action="append", default=[])
+    parser.add_argument("--require-decoder", action="append", default=[])
+    parser.add_argument("--require-hwaccel", action="append", default=[])
     parser.add_argument("--avm", action="store_true")
     parser.add_argument("--local-only", action="store_true")
     parser.add_argument("--require-complete-source", action="store_true")
     args = parser.parse_args(argv)
     try:
         Verifier(args.platform, args.directory, args.require_encoder, args.avm, args.local_only,
-                 args.require_complete_source).verify()
+                 args.require_complete_source, args.require_hwaccel, args.require_decoder).verify()
     except (VerificationError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

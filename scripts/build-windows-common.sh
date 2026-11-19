@@ -328,13 +328,17 @@ windows_verify_and_package() {
       hardware_output="$("$P/bin/ffmpeg.exe" -hide_banner -filters)"
       [[ "$hardware_output" == *libvmaf_cuda* ]] || windows_die "缺少 libvmaf_cuda"
       ;;
-    intel-qsv|amd-amf)
+    intel-qsv)
       hardware_output="$("$P/bin/ffmpeg.exe" -hide_banner -encoders)"
-      if [ "$WINDOWS_FLAVOR" = intel-qsv ]; then
-        [[ "$hardware_output" == *h264_qsv* ]] || windows_die "缺少 Intel QSV"
-      else
-        [[ "$hardware_output" == *h264_amf* ]] || windows_die "缺少 AMD AMF"
-      fi
+      [[ "$hardware_output" == *h264_qsv* ]] || windows_die "缺少 Intel QSV"
+      hardware_output="$("$P/bin/ffmpeg.exe" -hide_banner -hwaccels)"
+      [[ "$hardware_output" == *qsv* && "$hardware_output" == *d3d11va* ]] || windows_die "缺少 QSV/D3D11VA 硬件加速"
+      ;;
+    amd-amf)
+      hardware_output="$("$P/bin/ffmpeg.exe" -hide_banner -encoders)"
+      [[ "$hardware_output" == *h264_amf* ]] || windows_die "缺少 AMD AMF"
+      hardware_output="$("$P/bin/ffmpeg.exe" -hide_banner -hwaccels)"
+      [[ "$hardware_output" == *d3d11va* ]] || windows_die "缺少 D3D11VA 硬件加速"
       ;;
   esac
   for root in "${LICENSE_ROOTS[@]}"; do license_args+=(--license-dir "$root"); done
@@ -344,9 +348,10 @@ windows_verify_and_package() {
   python3 "$REPO_ROOT/scripts/ci/package-runtime.py" --platform windows --bin-dir "$P/bin" --output "$output" \
     --source-dir "$BUILD_ROOT/ffmpeg-src" --license-dir "$P/share" "${license_args[@]}" "${source_args[@]}"
   case "$WINDOWS_FLAVOR" in
-    nvidia) verify_args=(--require-encoder h264_nvenc --require-encoder hevc_nvenc) ;;
-    intel-qsv) verify_args=(--require-encoder h264_qsv) ;;
-    amd-amf) verify_args=(--require-encoder h264_amf) ;;
+    nvidia) verify_args=(--require-encoder h264_nvenc --require-encoder hevc_nvenc \
+      --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda) ;;
+    intel-qsv) verify_args=(--require-encoder h264_qsv --require-hwaccel qsv --require-hwaccel d3d11va) ;;
+    amd-amf) verify_args=(--require-encoder h264_amf --require-hwaccel d3d11va) ;;
   esac
   python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform windows --directory "$output" "${verify_args[@]}"
   echo "输出：$output"

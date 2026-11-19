@@ -3,8 +3,8 @@ name: FFmpeg 多厂商构建
 on:
   workflow_dispatch:
   schedule:
-    # 北京时间每天 22:00 = UTC 14:00 — 仅更新 vcpkg baseline（比编译提前 2 小时）
-    - cron: '0 14 * * *'
+    # 北京时间每周一 22:00 = UTC 14:00 — 仅更新 vcpkg baseline，比构建早 2 小时
+    - cron: '0 14 * * 1'
     # 北京时间每天 0:00 = UTC 16:00 — 完整构建 / nightly Release
     - cron: '0 16 * * *'
   push:
@@ -14,6 +14,7 @@ on:
       - '.github/workflows/build-ffmpeg.yml'
       - 'scripts/**'
       - 'vcpkg.json'
+  # 机器人用 GITHUB_TOKEN 推送，不会再次触发 push 工作流；baseline 由下次夜间构建验证。
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,12 +27,12 @@ jobs:
   # ============================================================
   vcpkg-update:
     name: 更新 vcpkg baseline
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *'
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * 1'
     runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: 检查并回写 builtin-baseline
         run: |
@@ -75,10 +76,10 @@ jobs:
 
   quality-check:
     name: CI helper tests and syntax
-    if: github.event.schedule != '0 14 * * *'
+    if: github.event.schedule != '0 14 * * 1'
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Python regression tests
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Script and workflow syntax
@@ -92,14 +93,14 @@ jobs:
   # ============================================================
   metadata:
     name: 构建元数据
-    if: github.event.schedule != '0 14 * * *'
+    if: github.event.schedule != '0 14 * * 1'
     runs-on: ubuntu-26.04
     outputs:
       release_tag: ${{ steps.vars.outputs.release_tag }}
       prerelease: ${{ steps.vars.outputs.prerelease }}
       should_release: ${{ steps.vars.outputs.should_release }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: 确定 Release 参数
         id: vars
@@ -132,7 +133,7 @@ jobs:
   linux:
     name: ${{ matrix.name }}
     needs: quality-check
-    if: github.event.schedule != '0 14 * * *'
+    if: github.event.schedule != '0 14 * * 1'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -145,7 +146,7 @@ jobs:
             cuda: true
             vmaf_cuda: true
             configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
             artifact: ffmpeg-linux-nvidia.tar.xz
           - id: intel-qsv
             name: Linux（Intel QSV）
@@ -154,7 +155,7 @@ jobs:
             cuda: false
             vmaf_cuda: false
             configure_extra: --enable-libvmaf --enable-libvpl --enable-vaapi --disable-ffnvcodec --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-nvenc
-            verify_args: --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi
+            verify_args: --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi --require-hwaccel qsv --require-hwaccel vaapi
             artifact: ffmpeg-linux-intel-qsv.tar.xz
           - id: amd
             name: Linux（AMD VAAPI）
@@ -163,7 +164,7 @@ jobs:
             cuda: false
             vmaf_cuda: false
             configure_extra: --enable-libvmaf --enable-vaapi --disable-ffnvcodec --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-nvenc
-            verify_args: --require-encoder h264_vaapi --require-encoder hevc_vaapi
+            verify_args: --require-encoder h264_vaapi --require-encoder hevc_vaapi --require-hwaccel vaapi
             artifact: ffmpeg-linux-amd.tar.xz
           - id: x86-all
             name: "Linux x86 整合版（NVIDIA + Intel QSV + AMD VAAPI）"
@@ -172,7 +173,7 @@ jobs:
             cuda: true
             vmaf_cuda: true
             configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel qsv --require-hwaccel vaapi
             artifact: ffmpeg-linux-x86-all.tar.xz
             av2: true
             av2_artifact: ffmpeg-linux-x86-all-av2.tar.xz
@@ -183,10 +184,21 @@ jobs:
             cuda: false
             vmaf_cuda: false
             configure_extra: --enable-libvmaf --enable-vaapi --disable-ffnvcodec --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-nvenc
-            verify_args: --require-encoder h264_vaapi --require-encoder hevc_vaapi
+            verify_args: --require-encoder h264_vaapi --require-encoder hevc_vaapi --require-hwaccel vaapi
             artifact: ffmpeg-linux-arm.tar.xz
+            av2: true
+            av2_artifact: ffmpeg-linux-arm-av2.tar.xz
+          - id: arm-nvidia
+            name: Linux（ARM64 NVIDIA NVENC/CUDA，SBSA）
+            runner: ubuntu-26.04-arm
+            extra_packages: libva-dev libdrm-dev
+            cuda: true
+            vmaf_cuda: true
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
+            artifact: ffmpeg-linux-arm-nvidia.tar.xz
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: 准备构建目录
         run: |
           BUILD_ROOT="${RUNNER_TEMP}/ffmpeg-build"
@@ -212,7 +224,7 @@ jobs:
       - name: 安装最新 CUDA 工具包
         id: cuda
         if: matrix.cuda
-        uses: mjun0812/setup-cuda@v1
+        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
         with:
           version: 'latest'
           method: 'auto'
@@ -226,8 +238,23 @@ jobs:
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc" --version
           printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu"
-          "${CUDA_BASE}/bin/nvcc" -ptx --gpu-architecture=sm_75 \
-            -o "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx" "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu"
+          # SBSA (ARM) ships no sm_75 toolchain support; take the first arch the
+          # installed nvcc accepts. x86 keeps the portable sm_75 target.
+          if [ "${RUNNER_ARCH:-}" = ARM64 ]; then
+            CANDIDATES="110 100 90 80"
+          else
+            CANDIDATES="75"
+          fi
+          ARCH=""
+          for candidate in $CANDIDATES; do
+            if "${CUDA_BASE}/bin/nvcc" -ptx --gpu-architecture="sm_${candidate}" \
+                 -o "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx" "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu" 2>/dev/null; then
+              ARCH="$candidate"; break
+            fi
+          done
+          [ -n "$ARCH" ] || { echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"; exit 1; }
+          echo "CUDA_ARCH=$ARCH" >> "${GITHUB_ENV}"
+          echo "使用 CUDA 架构 sm_${ARCH}"
           grep -q '\.entry' "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx"
 
       - name: 编译 nv-codec-headers
@@ -280,7 +307,8 @@ jobs:
           CUDA_ARGS=()
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export PATH="${CUDA_HOME}/bin:${PATH}"
-            CUDA_ARGS=(--nvcc="${CUDA_HOME}/bin/nvcc" "--nvccflags=-gencode arch=compute_75,code=sm_75 -O2")
+            # 架构由上一步探测并写入 CUDA_ARCH（ARM 的 SBSA 工具链没有 sm_75）。
+            CUDA_ARGS=(--nvcc="${CUDA_HOME}/bin/nvcc" "--nvccflags=-gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -O2")
           fi
           cd "$CI_BUILD_ROOT" && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
@@ -341,17 +369,16 @@ jobs:
           mv "$STAGING" "$RELOCATED"
           env -u LD_LIBRARY_PATH python3 scripts/ci/verify-runtime.py --platform linux \
             --directory "$RELOCATED" ${{ matrix.verify_args }} --avm --require-complete-source
-          bash scripts/ci/verify-avm.sh "$RELOCATED/ffmpeg"
           tar -C "$RELOCATED" -cJf "${{ matrix.av2_artifact }}" .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -365,7 +392,7 @@ jobs:
   windows:
     name: ${{ matrix.name }}
     needs: quality-check
-    if: github.event.schedule != '0 14 * * *'
+    if: github.event.schedule != '0 14 * * 1'
     runs-on: ${{ matrix.runner }}
     permissions:
       packages: write    # NuGet readwrite via vcpkg binary cache
@@ -384,7 +411,7 @@ jobs:
             amf: false
             vpl: false
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
             artifact: ffmpeg-windows-nvidia.zip
           - id: amd-amf
             name: Windows（AMD AMF）
@@ -395,7 +422,7 @@ jobs:
             amf: true
             vpl: false
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-amf
-            verify_args: --require-encoder h264_amf --require-encoder hevc_amf
+            verify_args: --require-encoder h264_amf --require-encoder hevc_amf --require-hwaccel d3d11va
             artifact: ffmpeg-windows-amd-amf.zip
           - id: intel-qsv
             name: Windows（Intel QSV）
@@ -406,7 +433,7 @@ jobs:
             amf: false
             vpl: true
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-libvpl
-            verify_args: --require-encoder h264_qsv --require-encoder hevc_qsv
+            verify_args: --require-encoder h264_qsv --require-encoder hevc_qsv --require-hwaccel qsv --require-hwaccel d3d11va
             artifact: ffmpeg-windows-intel-qsv.zip
           - id: arm64
             name: Windows ARM64（Snapdragon）
@@ -421,7 +448,7 @@ jobs:
             artifact: ffmpeg-windows-arm64.zip
             av2: true
             av2_artifact: ffmpeg-windows-arm64-av2.zip
-            verify_args: ''
+            verify_args: --require-hwaccel d3d11va --require-hwaccel dxva2
           - id: x86-all
             name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
             runner: windows-2025-vs2026
@@ -431,7 +458,7 @@ jobs:
             amf: true
             vpl: true
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_amf
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_amf --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel qsv --require-hwaccel d3d11va
             artifact: ffmpeg-windows-x86-all.zip
             av2: true
             av2_artifact: ffmpeg-windows-x86-all-av2.zip
@@ -439,7 +466,7 @@ jobs:
       - name: 禁用 Git CRLF 自动转换
         shell: bash
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: 准备构建目录
         shell: bash
         run: |
@@ -448,7 +475,7 @@ jobs:
           echo "CI_BUILD_ROOT=$BUILD_ROOT" >> "$GITHUB_ENV"
 
       - name: 配置 MSVC
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
         with:
           arch: ${{ matrix.msvc_arch }}
 
@@ -646,7 +673,7 @@ jobs:
         # 或 local 安装包直接以 100（0xE0E00064）退出。失败后重试一次，
         # 由下一步统一报告，避免把安装器的瞬时故障当成构建失败。
         continue-on-error: true
-        uses: mjun0812/setup-cuda@v1
+        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
         with:
           version: 'latest'
           method: 'auto'
@@ -655,7 +682,7 @@ jobs:
         id: cuda-retry
         if: matrix.cuda && steps.cuda.outcome == 'failure'
         continue-on-error: true
-        uses: mjun0812/setup-cuda@v1
+        uses: mjun0812/setup-cuda@429e4ee9d53d1774763bd6e1136036072b278b80 # v1
         with:
           version: 'latest'
           method: 'network'
@@ -983,17 +1010,16 @@ jobs:
           Move-Item -LiteralPath $staging -Destination $relocated -ErrorAction Stop
           python scripts/ci/verify-runtime.py --platform windows --directory $relocated ${{ matrix.verify_args }} --avm --require-complete-source
           if ($LASTEXITCODE -ne 0) { throw 'Relocated AV2 runtime verification failed' }
-          ./scripts/ci/verify-avm.ps1 -Ffmpeg "$relocated\ffmpeg.exe"
           Compress-Archive -Path "$relocated\*" -DestinationPath '${{ matrix.av2_artifact }}' -Force
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -1004,7 +1030,7 @@ jobs:
   macos-arm:
     name: ${{ matrix.name }}
     needs: quality-check
-    if: github.event.schedule != '0 14 * * *'
+    if: github.event.schedule != '0 14 * * 1'
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -1014,9 +1040,9 @@ jobs:
             av2: true
             artifact: ffmpeg-macos-arm.tar.xz
             av2_artifact: ffmpeg-macos-arm-av2.tar.xz
-            verify_args: --require-encoder h264_videotoolbox --require-encoder hevc_videotoolbox
+            verify_args: --require-encoder h264_videotoolbox --require-encoder hevc_videotoolbox --require-hwaccel videotoolbox
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: 准备构建目录
         run: |
           BUILD_ROOT="${RUNNER_TEMP}/ffmpeg-build"
@@ -1160,17 +1186,16 @@ jobs:
           mv "$STAGING" "$RELOCATED"
           env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH python3 scripts/ci/verify-runtime.py --platform macos \
             --directory "$RELOCATED" ${{ matrix.verify_args }} --avm --require-complete-source
-          bash scripts/ci/verify-avm.sh "$RELOCATED/ffmpeg"
           tar -C "$RELOCATED" -cJf "${{ matrix.av2_artifact }}" .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: matrix.av2
         with:
           name: ${{ matrix.av2_artifact }}
@@ -1194,7 +1219,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artifacts
 
@@ -1205,8 +1230,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           assets = list(Path('release-assets').iterdir())
-          if len(assets) != 15:
-              raise SystemExit(f'Expected all 15 release assets, found {len(assets)}')
+          if len(assets) != 17:
+              raise SystemExit(f'Expected all 17 release assets, found {len(assets)}')
           for asset in assets:
               size = asset.stat().st_size
               if not 0 < size < 2 * 1024**3:
@@ -1214,7 +1239,7 @@ jobs:
           PY
           ls -lh release-assets/
 
-      - uses: softprops/action-gh-release@v3.0.2
+      - uses: softprops/action-gh-release@fe965f7af51af5f2602596916f38a38df2e33de0 # v3.0.2
         with:
           tag_name: ${{ needs.metadata.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
@@ -1238,6 +1263,7 @@ jobs:
             | 产物 | GPU | 硬件加速 | VMAF |
             |---|---|---|---|
             | `ffmpeg-linux-arm.tar.xz` | — | VAAPI / CPU | ✅ CPU |
+            | `ffmpeg-linux-arm-nvidia.tar.xz` | NVIDIA GB10 等 SBSA | NVENC/CUDA | ✅ CUDA |
 
             ### 📦 Windows（x86_64，MSVC）
 
@@ -1267,9 +1293,10 @@ jobs:
             | `ffmpeg-linux-x86-all-av2.tar.xz` | NVENC/CUDA + QSV + VAAPI | avmenc / avmdec |
             | `ffmpeg-windows-x86-all-av2.zip` | NVENC/CUDA + QSV + AMF | avmenc / avmdec |
             | `ffmpeg-windows-arm64-av2.zip` | D3D11VA / DXVA2 / MF | avmenc / avmdec |
+            | `ffmpeg-linux-arm-av2.tar.xz` | VAAPI / CPU | avmenc / avmdec |
             | `ffmpeg-macos-arm-av2.tar.xz` | VideoToolbox | avmenc / avmdec |
 
-            AV2 由 AVM 1.0.0 的独立工具提供，不是 FFmpeg 原生编解码器；原有 libaom AV1 保留。
+            AV2 由 AVM 的独立工具提供（每次构建跟 `av2-enc` 分支最新提交，提交号见构建日志与包内清单），不是 FFmpeg 原生编解码器；原有 libaom AV1 保留。
 
             > 所有构建均包含： SDL2 (ffplay) + libx264 + libx265 + libvpx + libopus + libvorbis + libtheora + libaom + libwebp + libass + libfreetype + fontconfig + libzimg + libsoxr + libopenjpeg + libsnappy
             > 所有构建启用 libjxl / JPEG XL 与 libvmaf，并带 `--enable-nonfree`（FFmpeg 会标记为 nonfree and unredistributable）。

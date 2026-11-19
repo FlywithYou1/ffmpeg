@@ -13,6 +13,7 @@ non-ignored source files. Source URLs and license copies alone are NOT a
 complete GPL corresponding-source offer.
 """
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -25,7 +26,7 @@ import tarfile
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from dependency_modules import features_from_buildconf, required_modules  # noqa: E402
+from dependency_modules import features_from_buildconf, is_macos_sdk_shim, required_modules, transitive_modules  # noqa: E402
 
 
 class PackageError(RuntimeError):
@@ -497,7 +498,16 @@ class Packager:
 
     def brew_attribution(self, path):
         path = Path(path).resolve()
+        try:
+            if path.is_relative_to(self.bin_dir.parent.resolve()):
+                # Installed by this build (VMAF, AVM, ...); the matching source
+                # arrives through --dependency-source, so Homebrew has no owner.
+                return
+        except (OSError, ValueError):
+            pass
         parts = path.parts
+        if is_macos_sdk_shim(path):
+            return
         if "Cellar" not in parts:
             self.gaps.append(f"Non-Homebrew dependency requires source/license attribution: {path}")
             return
@@ -566,23 +576,22 @@ class Packager:
         modules = required_modules(
             features,
             exists=lambda name: run(["pkg-config", "--exists", name], check=False).returncode == 0)
-        queue = list(modules)
-        seen = set()
-        while queue:
-            module = queue.pop(0)
-            if module in seen:
-                continue
-            seen.add(module)
+        # One shared walk with the source collector: transitive Requires sets
+        # must decide identically on both sides.
+        for module in transitive_modules(
+                modules,
+                query=lambda option, name: run(["pkg-config", option, name], check=False).stdout.splitlines()):
             query = run(["pkg-config", "--variable=pcfiledir", module], check=False)
             directory = query.stdout.strip()
-            if query.returncode or not directory:
-                self.gaps.append(f"No static package attribution for pkg-config module {module}")
-                continue
-            pcfile = Path(directory) / (module + ".pc")
+            resolved = query.returncode == 0 and bool(directory)
+            pcfile = Path(directory) / (module + ".pc") if resolved else None
             version = run(["pkg-config", "--modversion", module], check=False).stdout.strip()
             link_result = run(["pkg-config", "--libs", "--static", module], check=False)
             libs = link_result.stdout.strip()
             self.static_links.append({"module": module, "version": version or "unknown", "link_flags": libs})
+            if not resolved:
+                self.gap_for_unresolved_module(module)
+                continue
             if pcfile.is_file():
                 self.copy(pcfile, f"metadata/pkg-config/{module}.pc")
                 try:
@@ -596,24 +605,44 @@ class Packager:
                     self.dpkg_attribution(pcfile)
                 else:
                     self.brew_attribution(pcfile)
-            libdir = run(["pkg-config", "--variable=libdir", module], check=False).stdout.strip()
-            directories = [Path(libdir)] if libdir else []
-            directories += [Path(match.group(1) or match.group(2))
-                            for match in re.finditer(r'(?:^|\s)-L(?:"([^"]+)"|([^\s]+))', libs)]
-            for name in re.findall(r"(?:^|\s)-l([A-Za-z0-9_.+-]+)", libs):
-                library = next((d / ("lib" + name + suffix) for d in dict.fromkeys(directories)
-                                for suffix in (".a", ".dylib", ".so") if (d / ("lib" + name + suffix)).is_file()), None)
-                if library:
-                    if self.platform == "linux":
-                        self.dpkg_attribution(library.resolve())
-                    else:
-                        self.brew_attribution(library.resolve())
-            for option in ("--print-requires", "--print-requires-private"):
-                result = run(["pkg-config", option, module], check=False)
-                for line in result.stdout.splitlines():
-                    name = line.split()[0] if line.split() else ""
-                    if re.fullmatch(r"[A-Za-z0-9_.+-]+", name):
-                        queue.append(name)
+            if resolved:
+                libdir = run(["pkg-config", "--variable=libdir", module], check=False).stdout.strip()
+                directories = [Path(libdir)] if libdir else []
+                directories += [Path(match.group(1) or match.group(2))
+                                for match in re.finditer(r'(?:^|\s)-L(?:"([^"]+)"|([^\s]+))', libs)]
+                for name in re.findall(r"(?:^|\s)-l([A-Za-z0-9_.+-]+)", libs):
+                    library = next((d / ("lib" + name + suffix) for d in dict.fromkeys(directories)
+                                    for suffix in (".a", ".dylib", ".so") if (d / ("lib" + name + suffix)).is_file()), None)
+                    if library:
+                        if self.platform == "linux":
+                            self.dpkg_attribution(library.resolve())
+                        else:
+                            self.brew_attribution(library.resolve())
+
+    def locate_library(self, name):
+        """Find lib<name> when a module is required but ships no .pc file.
+
+        snappy has no upstream .pc at all; Homebrew and Debian still install the
+        library, so attribution can use the file instead of the metadata.
+        """
+        directories = ["/usr/lib", "/usr/local/lib", "/opt/homebrew/lib"]
+        directories += glob.glob("/usr/lib/*-linux-gnu")
+        for directory in directories:
+            for suffix in (".dylib", ".so", ".a"):
+                matches = sorted(glob.glob(os.path.join(directory, "lib" + name + suffix + "*")))
+                if matches:
+                    return Path(matches[0])
+        return None
+
+    def gap_for_unresolved_module(self, module):
+        library = self.locate_library(module)
+        if library is None:
+            self.gaps.append(f"No static package attribution for pkg-config module {module}")
+            return
+        if self.platform == "linux":
+            self.dpkg_attribution(library.resolve())
+        else:
+            self.brew_attribution(library.resolve())
 
     def copy_text(self, relative, content):
         target = self.stage / safe_relative(relative)

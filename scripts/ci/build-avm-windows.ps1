@@ -6,17 +6,14 @@ if (-not $env:GITHUB_ACTIONS -or -not $env:RUNNER_TEMP -or -not $env:GITHUB_ENV)
 $source = Join-Path $env:RUNNER_TEMP 'avm'
 $build = Join-Path $source 'build'
 $prefix = Join-Path $env:RUNNER_TEMP 'avm-install'
-$ref = '224c347d185d85c906df1e69e65bf569fd7e2c23' # reviewed av2-enc branch tip
-& git clone --no-checkout https://github.com/AOMediaCodec/avm.git $source
+# Follow the av2-enc branch head; the resolved commit is logged for the record.
+& git clone --depth 1 --branch av2-enc https://github.com/AOMediaCodec/avm.git $source
 if ($LASTEXITCODE -ne 0) { throw 'AVM clone failed' }
-& git -C $source checkout --detach $ref
-if ($LASTEXITCODE -ne 0) { throw 'AVM checkout failed' }
+Write-Host "AVM commit: $(& git -C $source rev-parse HEAD)"
 $cmakeArgs = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF',
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW',
-    '-DCONFIG_AV2_ENCODER=1', '-DCONFIG_AV2_DECODER=1',
     '-DENABLE_APPS=ON', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=ON', '-DENABLE_DOCS=OFF',
-    '-DCONFIG_WEBM_IO=1', '-DCONFIG_LIBYUV=1', '-DCONFIG_LANCZOS_RESAMPLE=1',
-    '-DCONFIG_DIP_EXT_PRUNING=0', '-DCONFIG_ML_PART_SPLIT=0', '-DCONFIG_TENSORFLOW_LITE=0')
+    '-DCONFIG_DIP_EXT_PRUNING=0', '-DCONFIG_ML_PART_SPLIT=0')
 $isArm64 = $env:VSCMD_ARG_TGT_ARCH -eq 'arm64'
 if ($isArm64) {
     if (-not $env:CLANG_BIN) { throw 'VS Clang is required for AVM ARM64 NEON' }

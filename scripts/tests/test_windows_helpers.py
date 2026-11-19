@@ -40,16 +40,15 @@ class FixtureTest(unittest.TestCase):
 
 class FFmpegPatchTests(FixtureTest):
     def test_shared_patch_idempotency_and_exact_tokens(self):
-        configure = self.put("ffmpeg/configure", r'gsub(/\\/, "/")' + '\n' +
+        configure = self.put("ffmpeg/configure",
             'require libsnappy snappy-c.h snappy_compress -lsnappy -lstdc++\n' +
             'require libtwolame twolame.h twolame_init -ltwolame\n' +
             'check_lib libtwolame twolame.h twolame_encode_buffer_float32_interleaved -ltwolame\n' +
             'check_lib math math.h sin -lm -lmfplat -lmfuuid\n')
-        library = self.put("ffmpeg/ffbuild/library.mak", 'ifeq ($(RESPONSE_FILES),yes)\n\t$(Q)echo $^ > $@.objs\n\t$(AR) $(ARFLAGS) $(AR_O) @$@.objs\nelse\nendif\n')
         common = self.put("ffmpeg/ffbuild/common.mak", 'INSTALL_FILES = @$(foreach F,$(2),printf "INSTALL %s" $(F)); $(INSTALL) $(1) $(2) "$(3)"\n')
         command = [os.sys.executable, str(CI / "patch-ffmpeg-msvc.py"), str(configure.parent)]
         subprocess.run(command, check=True, capture_output=True)
-        files = [configure, library, common]
+        files = [configure, common]
         first = [p.read_bytes() for p in files]
         subprocess.run(command, check=True, capture_output=True)
         self.assertEqual(first, [p.read_bytes() for p in files])
@@ -58,8 +57,14 @@ class FFmpegPatchTests(FixtureTest):
         self.assertNotIn(' -lm ', text)
         self.assertIn('-lmfplat -lmfuuid', text)
         self.assertEqual(text.count('-DLIBTWOLAME_STATIC'), 2)
-        self.assertIn('$(file > $@.objs', library.read_text())
         self.assertIn('$(call ECHO,INSTALL', common.read_text())
+
+    def test_install_files_drift_fails_loudly(self):
+        configure = self.put("ffmpeg/configure", 'check_lib math math.h sin -lm\n')
+        self.put("ffmpeg/ffbuild/common.mak", 'INSTALL_FILES = $(INSTALL) $(1) $(2) "$(3)"\n')
+        result = subprocess.run([os.sys.executable, str(CI / "patch-ffmpeg-msvc.py"), str(configure.parent)], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("INSTALL_FILES", result.stderr + result.stdout)
 
 
 class VmafPatchTests(FixtureTest):

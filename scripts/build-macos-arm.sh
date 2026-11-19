@@ -97,4 +97,4 @@ strip "$P/bin/ffmpeg" "$P/bin/ffprobe" "$P/bin/ffplay"
 python3 "$REPO_ROOT/scripts/ci/package-runtime.py" --platform macos --bin-dir "$P/bin" \
   --source-dir "$BUILD_ROOT/ffmpeg-src" --output "$ORIG_DIR/output" --license-dir "$P/share"
 python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform macos --directory "$ORIG_DIR/output" \
-  --require-encoder h264_videotoolbox --require-encoder hevc_videotoolbox
+  --require-encoder h264_videotoolbox --require-encoder hevc_videotoolbox --require-hwaccel videotoolbox

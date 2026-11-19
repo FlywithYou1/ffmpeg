@@ -232,6 +232,25 @@ class LinuxTests(ScratchTest):
 
 
 class MacTests(ScratchTest):
+    def test_attribution_skips_own_build_and_sdk_shims(self):
+        p = self.packager("macos")
+        own = p.bin_dir.parent / "lib" / "libvmaf.a"
+        own.parent.mkdir(parents=True, exist_ok=True)
+        self.write(own, b"archive")
+        shim = self.root / "homebrew" / "Library" / "Homebrew" / "os" / "mac" / "pkgconfig" / "26" / "zlib.pc"
+        self.write(shim, b"Name: zlib\n")
+        p.brew_attribution(own)
+        p.brew_attribution(shim)
+        self.assertEqual(p.gaps, [])
+        self.assertEqual(p.packages, {})
+
+    def test_attribution_still_reports_unknown_paths(self):
+        p = self.packager("macos")
+        stray = self.write(self.root / "elsewhere" / "libfoo.dylib", b"\xcf\xfa\xed\xfe")
+        p.brew_attribution(stray)
+        self.assertEqual(len(p.gaps), 1)
+        self.assertIn("Non-Homebrew dependency", p.gaps[0])
+
     def test_recursive_rpath_loader_executable_rewrite_and_sign_order(self):
         p = self.packager("macos")
         a = self.write(self.root / "external" / "liba.dylib", b"\xcf\xfa\xed\xfea")
@@ -599,11 +618,11 @@ class LicenseSourceTests(ScratchTest):
 
 
 class VerificationTests(ScratchTest):
-    def verifier(self, encoders=(), avm=False):
+    def verifier(self, encoders=(), avm=False, hwaccels=(), decoders=()):
         directory = self.root / "runtime"
         for name in ("ffmpeg", "ffprobe", "ffplay", *( ("avmenc", "avmdec") if avm else ())):
             self.write(directory / name)
-        return verify.Verifier("linux", directory, encoders, avm)
+        return verify.Verifier("linux", directory, encoders, avm, False, False, hwaccels, decoders)
 
     def registration_command(self, name, *args):
         if "-version" in args:
@@ -613,7 +632,9 @@ class VerificationTests(ScratchTest):
         if "-encoders" in args:
             return result(" V..... libjxl JPEG XL\n V....D h264_nvenc NVENC\n")
         if "-decoders" in args:
-            return result(" V..... libjxl JPEG XL\n")
+            return result(" V..... libjxl JPEG XL\n V....D h264_cuvid CUDA\n")
+        if "-hwaccels" in args:
+            return result("Hardware acceleration methods:\ncuda\nvaapi\n")
         if "-filters" in args:
             return result(" ... libvmaf VV->V VMAF\n")
         if "-codecs" in args:
@@ -623,7 +644,7 @@ class VerificationTests(ScratchTest):
     def test_clean_environment_uses_allowlisted_path(self):
         inherited = {"PATH": str(self.bin) + os.pathsep + "C:\\vcpkg\\bin", "Path": "build-dir", "LD_LIBRARY_PATH": "deps", "LD_PRELOAD": "unsafe", "DYLD_LIBRARY_PATH": "build", "DYLD_FALLBACK_LIBRARY_PATH": "deps", "LIBPATH": "x", "FFREPORT": "file=outside.log", "SystemRoot": r"C:\Windows"}
         for platform in ("linux", "macos", "windows"):
-            env = verify.clean_environment(platform, self.bin, inherited)
+            env = verify.clean_environment(platform, inherited)
             self.assertFalse(any(k.startswith(("LD_", "DYLD_")) for k in env))
             self.assertNotIn("Path", env)
             self.assertNotIn(str(self.bin), env["PATH"])
@@ -656,6 +677,17 @@ class VerificationTests(ScratchTest):
         self.assertFalse(any("-c:v" in c.args for c in commands.call_args_list))
         v = self.verifier(["hevc_qsv"])
         with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "hevc_qsv"):
+            v.registrations()
+
+    def test_hardware_hwaccel_and_decoder_registration(self):
+        v = self.verifier(["h264_nvenc"], hwaccels=["cuda"], decoders=["h264_cuvid"])
+        with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"):
+            v.registrations()
+        v = self.verifier(hwaccels=["videotoolbox"])
+        with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "Required hwaccel is missing: videotoolbox"):
+            v.registrations()
+        v = self.verifier(decoders=["hevc_cuvid"])
+        with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "Required decoder is missing: hevc_cuvid"):
             v.registrations()
 
     def test_missing_feature_fails(self):

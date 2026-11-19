@@ -26,6 +26,7 @@ Windows 使用 **/MT 静态运行时** 和 vcpkg 静态依赖；显卡驱动、�
 | Artifact | GPU | HW Accel | VMAF |
 |---|---|---|---|
 | `ffmpeg-linux-arm.tar.xz` | — | VAAPI / CPU | ✅ CPU |
+| `ffmpeg-linux-arm-nvidia.tar.xz` | NVIDIA GB10 等 SBSA | NVENC/CUDA | ✅ CUDA |
 
 ### Windows (x86_64, MSVC 2026)
 
@@ -57,9 +58,10 @@ Windows 使用 **/MT 静态运行时** 和 vcpkg 静态依赖；显卡驱动、�
 | `ffmpeg-linux-x86-all-av2.tar.xz` | Linux x86_64 | NVENC/CUDA + QSV + VAAPI |
 | `ffmpeg-windows-x86-all-av2.zip` | Windows x86_64 | NVENC/CUDA + QSV + AMF |
 | `ffmpeg-windows-arm64-av2.zip` | Windows ARM64 | D3D11VA / DXVA2 / MF |
+| `ffmpeg-linux-arm-av2.tar.xz` | Linux ARM64 | VAAPI / CPU |
 | `ffmpeg-macos-arm-av2.tar.xz` | macOS ARM64 | VideoToolbox |
 
-这些产物额外包含 [AOMediaCodec/avm `av2-enc` 分支](https://github.com/AOMediaCodec/avm/tree/av2-enc) 的 `avmenc`、`avmdec` 和许可证，CI 固定到已审阅的分支提交 `224c347d185d85c906df1e69e65bf569fd7e2c23`。该分支提供 AArch64 专用 NEON、CRC、DotProd、I8MM 和 SVE/SVE2 优化；Linux/macOS ARM64 构建显式启用基础 NEON，并让 AVM 根据编译器能力检测高级 flavor。恢复了 AVM 内置 libyuv、WebM I/O 和 Lanczos resampling。AV2 使用独立工具编解码，**不是 FFmpeg 原生 AV2 支持**；原有 libaom 的 AV1 支持保留。Windows ARM64 使用 VS `clang-cl` 和 MSVC ABI，显式指定 `aarch64-pc-windows-msvc` 目标并启用 AVM NEON。CPU 探测使用 Windows ARM64 保证支持的基础 NEON，避开上游 ARM32 `__emit` 探针，并保留 `AVM_SIMD_CAPS`/`AVM_SIMD_CAPS_MASK` 控制；CI 检查生成配置中的 `AVM_ARCH_AARCH64=1` 和 `HAVE_NEON=1`，并执行 AV2 编解码往返测试。
+这些产物额外包含 [AOMediaCodec/avm `av2-enc` 分支](https://github.com/AOMediaCodec/avm/tree/av2-enc) 的 `avmenc`、`avmdec` 和许可证，CI 每次构建都跟随该分支最新提交，实际提交号打印在构建日志并记入包的源码清单。该分支提供 AArch64 专用 NEON、CRC、DotProd、I8MM 和 SVE/SVE2 优化；Linux/macOS ARM64 构建显式启用基础 NEON 并校验生成的 `HAVE_NEON`/`AVM_ARCH_AARCH64`，x86 构建校验 NASM 目标，AVM 悄悄关掉 SIMD 时立即失败。恢复了 AVM 内置 libyuv、WebM I/O 和 Lanczos resampling。AV2 使用独立工具编解码，**不是 FFmpeg 原生 AV2 支持**；原有 libaom 的 AV1 支持保留。Windows ARM64 使用 VS `clang-cl` 和 MSVC ABI，显式指定 `aarch64-pc-windows-msvc` 目标并启用 AVM NEON。CPU 探测使用 Windows ARM64 保证支持的基础 NEON，避开上游 ARM32 `__emit` 探针，并保留 `AVM_SIMD_CAPS`/`AVM_SIMD_CAPS_MASK` 控制；CI 检查生成配置中的 `AVM_ARCH_AARCH64=1` 和 `HAVE_NEON=1`，并执行 AV2 编解码往返测试。
 
 Windows x86_64 的 AVM 同样使用 VS `clang-cl`，保留 Release、`/MT`、NASM 和现有 SIMD 配置；FFmpeg 及其他依赖的编译器不变。
 
@@ -161,6 +163,9 @@ bash scripts/build-linux-amd.sh
 
 # ARM64 VAAPI / CPU
 bash scripts/build-linux-arm.sh
+
+# ARM64 + NVIDIA（GB10 等 SBSA 平台）
+bash scripts/build-linux-arm-nvidia.sh
 ```
 
 输出在 `output/` 目录。安装缓存默认使用 `~/ffmpeg-install`；可设置 `INSTALL_PREFIX`、`THREADS`。脚本只接受空目录或本仓库标记过的安装目录，不会递归删除安装目录或系统文件。旧版留下的非空目录请保留，改用新的 `INSTALL_PREFIX`。临时源码使用唯一目录，退出自动清理；同一安装目录禁止并行构建。
@@ -198,8 +203,8 @@ bash ffmpeg-archlinux-nvidia.sh
 │   ├── build-linux-intel-qsv.sh         # Linux Intel QSV + VAAPI
 │   ├── build-linux-amd.sh               # Linux AMD VAAPI
 │   ├── build-linux-arm.sh               # Linux ARM64 VAAPI / CPU
-│   ├── build-macos-arm.sh               # macOS Apple Silicon
-│   ├── build-env.sh                     # 安装目录归属、并发锁、临时目录
+│   ├── build-linux-arm-nvidia.sh        # Linux ARM64 SBSA NVENC/CUDA
+│   ├── build-macos-arm.sh               # macOS Apple Silicon│   ├── build-env.sh                     # 安装目录归属、并发锁、临时目录
 │   ├── build-linux-common.sh            # Linux/Arch 公共构建
 │   ├── build-windows-common.sh          # Windows 公共构建
 │   ├── ci/                             # 链接、源码修补、源码收集、运行时打包和验证
@@ -250,7 +255,7 @@ python scripts/ci/collect-dependency-sources.py --platform linux \
   --output /tmp/dependency-sources --source-dir <ffmpeg 源码目录> --install-root <安装前缀>
 ```
 
-CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL 编解码往返及平台声明的编码器；AV2 另做编码/解码往返。仅检查编码器注册，不要求构建机器有可用显卡。
+CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL 编解码往返、平台声明的编解码器注册，以及该产物应有的硬件加速器（`cuda`/`qsv`/`vaapi`/`d3d11va`/`videotoolbox`）与 NVDEC 解码器；AV2 另做编码/解码往返。只查注册，不要求构建机器有可用显卡。
 
 ### 许可
 

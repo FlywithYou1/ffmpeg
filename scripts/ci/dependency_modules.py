@@ -6,6 +6,7 @@ which external libraries are linked into the binaries. Keeping the mapping in
 one place makes an incomplete source collection detectable instead of silent.
 """
 import re
+from pathlib import Path
 
 # FFmpeg --enable-<feature> -> pkg-config module names that satisfy it.
 FEATURE_MODULES = {
@@ -56,6 +57,17 @@ BASE_MODULES = ("zlib", "liblzma", "bzip2", "sdl2", "iconv")
 # -lxvidcore and distributions ship no xvidcore.pc, so there is nothing for the
 # collector or the packager to query. It is covered by the bundled library
 # attribution instead.
+
+
+def is_macos_sdk_shim(pcfile):
+    """True for Homebrew's .pc shims for libraries Apple ships in the SDK.
+
+    Homebrew writes zlib/bzip2/iconv .pc files under
+    Library/Homebrew/os/mac/pkgconfig without installing a keg, so they have no
+    Homebrew package and no separate source to archive.
+    """
+    parts = Path(pcfile).parts
+    return "os" in parts and "mac" in parts and "pkgconfig" in parts
 
 
 def features_from_buildconf(text):

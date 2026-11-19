@@ -220,6 +220,12 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(records[0]["modules"], ["zlib"])
         self.assertEqual(records[0]["files"], {})
 
+    def test_shared_shim_predicate_matches_collector_and_packager(self):
+        shim = "/opt/homebrew/Library/Homebrew/os/mac/pkgconfig/26/bzip2.pc"
+        keg = "/opt/homebrew/Cellar/x264/1.0/lib/pkgconfig/x264.pc"
+        self.assertTrue(collect.is_macos_sdk_shim(shim))
+        self.assertFalse(collect.is_macos_sdk_shim(keg))
+
     def test_macos_non_keg_paths_are_still_reported(self):
         entry = {"module": "libfoo", "pcfile": "/usr/lib/pkgconfig/libfoo.pc", "version": "1"}
         records, omissions = collect.collect_macos(self.root, [entry])

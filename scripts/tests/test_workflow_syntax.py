@@ -39,7 +39,8 @@ class WorkflowSyntaxTests(unittest.TestCase):
         artifacts = set(re.findall(r'^\s*(?:av2_)?artifact: (ffmpeg-\S+)$', text, re.M))
         expected = {
             'ffmpeg-linux-nvidia.tar.xz', 'ffmpeg-linux-intel-qsv.tar.xz', 'ffmpeg-linux-amd.tar.xz',
-            'ffmpeg-linux-arm.tar.xz', 'ffmpeg-linux-x86-all.tar.xz', 'ffmpeg-linux-x86-all-av2.tar.xz',
+            'ffmpeg-linux-arm.tar.xz', 'ffmpeg-linux-arm-av2.tar.xz', 'ffmpeg-linux-arm-nvidia.tar.xz',
+            'ffmpeg-linux-x86-all.tar.xz', 'ffmpeg-linux-x86-all-av2.tar.xz',
             'ffmpeg-windows-nvidia.zip', 'ffmpeg-windows-intel-qsv.zip', 'ffmpeg-windows-amd-amf.zip',
             'ffmpeg-windows-arm64.zip', 'ffmpeg-windows-arm64-av2.zip', 'ffmpeg-windows-x86-all.zip',
             'ffmpeg-windows-x86-all-av2.zip', 'ffmpeg-macos-arm.tar.xz', 'ffmpeg-macos-arm-av2.tar.xz',
@@ -59,6 +60,22 @@ class WorkflowSyntaxTests(unittest.TestCase):
         self.assertIn('--enable-libjxl', windows)
         self.assertIn('--enable-cuda-nvcc', windows)
         self.assertNotIn('--enable-cuda-llvm', windows)
+
+    def test_avm_follows_the_branch_head(self):
+        for name in ('build-avm.sh', 'build-avm-windows.ps1'):
+            script = (ROOT / 'scripts/ci' / name).read_text()
+            self.assertIn('--branch av2-enc', script)
+            self.assertNotRegex(script, r'\b224c347d')
+        self.assertFalse((ROOT / 'scripts/ci/avm-ref.txt').exists())
+
+    def test_hardware_expectations_match_each_artifact(self):
+        text = (ROOT / '.github/workflows/build-ffmpeg.yml').read_text()
+        rows = dict(re.findall(r'(?m)^\s+- id: (\S+)\n(.*?)(?=^\s+- id: |^    steps:)', text, re.S))
+        self.assertIn('--require-hwaccel cuda', rows['nvidia'])
+        self.assertIn('--require-hwaccel vaapi', rows['arm'])
+        self.assertIn('--require-hwaccel d3d11va', rows['arm64'])
+        self.assertIn('--require-hwaccel videotoolbox', text)
+        self.assertNotRegex(text, r"verify_args: ''")
 
 
 if __name__ == '__main__':

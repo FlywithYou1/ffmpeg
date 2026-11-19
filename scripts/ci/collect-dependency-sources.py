@@ -27,7 +27,7 @@ import sys
 import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from dependency_modules import features_from_buildconf, required_modules, transitive_modules  # noqa: E402
+from dependency_modules import features_from_buildconf, is_macos_sdk_shim, required_modules, transitive_modules  # noqa: E402
 
 INVENTORY = "source-inventory.json"
 SCHEMA = 1
@@ -290,7 +290,7 @@ def collect_macos(output, modules):
         if "Cellar" not in parts:
             # Apple ships zlib, bzip2 and iconv in the SDK; Homebrew only adds a
             # .pc shim under Library/Homebrew/os/mac/pkgconfig, never a keg.
-            if "os" in parts and "mac" in parts and "pkgconfig" in parts:
+            if is_macos_sdk_shim(entry["pcfile"]):
                 system_modules.append(entry["module"])
                 continue
             omissions.append(f"{entry['module']}: {entry['pcfile']} is not a Homebrew keg")
