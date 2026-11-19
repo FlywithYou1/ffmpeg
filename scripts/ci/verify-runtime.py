@@ -81,7 +81,7 @@ def load_packager():
 
 class Verifier:
     def __init__(self, platform, directory, require_encoders=(), avm=False, local_only=False,
-                 require_complete_source=False, require_hwaccels=(), require_decoders=()):
+                 require_complete_source=False, require_hwaccels=(), require_decoders=(), require_filters=()):
         self.platform = platform
         self.local_only = local_only
         self.require_complete_source = require_complete_source
@@ -94,7 +94,8 @@ class Verifier:
         self.require_encoders = tuple(require_encoders)
         self.require_hwaccels = tuple(require_hwaccels)
         self.require_decoders = tuple(require_decoders)
-        for name in (*self.require_encoders, *self.require_hwaccels, *self.require_decoders):
+        self.require_filters = tuple(require_filters)
+        for name in (*self.require_encoders, *self.require_hwaccels, *self.require_decoders, *self.require_filters):
             if not re.fullmatch(r"[A-Za-z0-9_]+", name):
                 raise VerificationError(f"Invalid required name: {name}")
         self.env = clean_environment(platform)
@@ -237,6 +238,9 @@ class Verifier:
             if name not in hwaccel_names:
                 raise VerificationError(
                     f"Required hwaccel is missing: {name} (registered: {' '.join(sorted(hwaccel_names))})")
+        for name in self.require_filters:
+            if name not in filter_names:
+                raise VerificationError(f"Required filter is missing: {name}")
         required = ["libvmaf", "libjxl encode/decode"]
         if self.require_encoders:
             required.append(", ".join(self.require_encoders))
@@ -244,6 +248,8 @@ class Verifier:
             required.append(", ".join(self.require_decoders))
         if self.require_hwaccels:
             required.append(", ".join(self.require_hwaccels))
+        if self.require_filters:
+            required.append(", ".join(self.require_filters))
         print("Required registrations: " + ", ".join(required))
 
     def smoke(self):
@@ -323,13 +329,15 @@ def main(argv=None):
     parser.add_argument("--require-encoder", action="append", default=[])
     parser.add_argument("--require-decoder", action="append", default=[])
     parser.add_argument("--require-hwaccel", action="append", default=[])
+    parser.add_argument("--require-filter", action="append", default=[])
     parser.add_argument("--avm", action="store_true")
     parser.add_argument("--local-only", action="store_true")
     parser.add_argument("--require-complete-source", action="store_true")
     args = parser.parse_args(argv)
     try:
         Verifier(args.platform, args.directory, args.require_encoder, args.avm, args.local_only,
-                 args.require_complete_source, args.require_hwaccel, args.require_decoder).verify()
+                 args.require_complete_source, args.require_hwaccel, args.require_decoder,
+                 args.require_filter).verify()
     except (VerificationError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

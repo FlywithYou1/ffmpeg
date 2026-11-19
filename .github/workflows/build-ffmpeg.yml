@@ -146,7 +146,7 @@ jobs:
             cuda: true
             vmaf_cuda: true
             configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda
             artifact: ffmpeg-linux-nvidia.tar.xz
           - id: intel-qsv
             name: Linux（Intel QSV）
@@ -173,7 +173,7 @@ jobs:
             cuda: true
             vmaf_cuda: true
             configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel qsv --require-hwaccel vaapi
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda --require-hwaccel qsv --require-hwaccel vaapi
             artifact: ffmpeg-linux-x86-all.tar.xz
             av2: true
             av2_artifact: ffmpeg-linux-x86-all-av2.tar.xz
@@ -195,7 +195,7 @@ jobs:
             cuda: true
             vmaf_cuda: true
             configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda
             artifact: ffmpeg-linux-arm-nvidia.tar.xz
     steps:
       - uses: actions/checkout@v7
@@ -429,10 +429,11 @@ jobs:
             msvc_arch: amd64
             triplet: x64-windows-static
             cuda: true
+            vmaf_cuda: true
             amf: false
             vpl: false
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda
             artifact: ffmpeg-windows-nvidia.zip
           - id: amd-amf
             name: Windows（AMD AMF）
@@ -480,7 +481,7 @@ jobs:
             amf: false
             vpl: false
             configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel d3d11va
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda --require-hwaccel d3d11va
             artifact: ffmpeg-windows-arm64-nvidia.zip
             av2: true
             av2_artifact: ffmpeg-windows-arm64-nvidia-av2.zip
@@ -490,10 +491,11 @@ jobs:
             msvc_arch: amd64
             triplet: x64-windows-static
             cuda: true
+            vmaf_cuda: true
             amf: true
             vpl: true
             configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_amf --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel qsv --require-hwaccel d3d11va
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_amf --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda --require-hwaccel qsv --require-hwaccel d3d11va
             artifact: ffmpeg-windows-x86-all.zip
             av2: true
             av2_artifact: ffmpeg-windows-x86-all-av2.zip

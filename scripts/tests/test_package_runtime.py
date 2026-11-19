@@ -618,11 +618,11 @@ class LicenseSourceTests(ScratchTest):
 
 
 class VerificationTests(ScratchTest):
-    def verifier(self, encoders=(), avm=False, hwaccels=(), decoders=()):
+    def verifier(self, encoders=(), avm=False, hwaccels=(), decoders=(), filters=()):
         directory = self.root / "runtime"
         for name in ("ffmpeg", "ffprobe", "ffplay", *( ("avmenc", "avmdec") if avm else ())):
             self.write(directory / name)
-        return verify.Verifier("linux", directory, encoders, avm, False, False, hwaccels, decoders)
+        return verify.Verifier("linux", directory, encoders, avm, False, False, hwaccels, decoders, filters)
 
     def registration_command(self, name, *args):
         if "-version" in args:
@@ -636,7 +636,7 @@ class VerificationTests(ScratchTest):
         if "-hwaccels" in args:
             return result("Hardware acceleration methods:\ncuda\nvaapi\n")
         if "-filters" in args:
-            return result(" ... libvmaf VV->V VMAF\n")
+            return result(" ... libvmaf VV->V VMAF\n ... libvmaf_cuda VV->V VMAF CUDA\n")
         if "-codecs" in args:
             return result(" DEVILS jpegxl JPEG XL\n")
         return result()
@@ -688,6 +688,14 @@ class VerificationTests(ScratchTest):
             v.registrations()
         v = self.verifier(decoders=["hevc_cuvid"])
         with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "Required decoder is missing: hevc_cuvid"):
+            v.registrations()
+
+    def test_required_filter_registration(self):
+        v = self.verifier(filters=["libvmaf_cuda"])
+        with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"):
+            v.registrations()
+        v = self.verifier(filters=["libplacebo"])
+        with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "Required filter is missing: libplacebo"):
             v.registrations()
 
     def test_missing_feature_fails(self):
