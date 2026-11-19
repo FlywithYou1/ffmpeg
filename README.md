@@ -77,7 +77,7 @@ avmdec --codec=av2 -o decoded.y4m output.ivf
 
 - **软件编解码器**: libx264 (H.264), libx265 (HEVC), libvpx (VP8/VP9), libopus, libvorbis, libtheora, libaom (AV1), libsvtav1 (AV1), libdav1d (AV1 解码), libkvazaar (HEVC), libopenh264, libxvid, libtwolame, libspeex, libcodec2, libjxl (JPEG XL), libopenmpt, libbs2b, libaribb24, libplacebo, librubberband, libvidstab, libwebp, libass (字幕), libfreetype, fontconfig, libzimg, libsoxr, libopenjpeg, libsnappy, SDL2 (ffplay)（Windows 通过 vcpkg 当前可用的扩展编解码器：svt-av1、dav1d、openh264、libtwolame、speex、libjxl）
 - **硬件加速**: NVENC/NVDEC, Intel QSV, AMD AMF/VAAPI, VideoToolbox, D3D11VA/D3D12VA/DXVA2
-- **CUDA 处理**: 公开发布版由 Clang/LLVM 编译 PTX（不启用非自由的 `cuda-nvcc` / `libnpp`），NVENC/NVDEC 和 VMAF-CUDA 保留；本地构建可用 `BUILD_POLICY=local` 启用 `cuda-nvcc`（产物不可再分发）
+- **CUDA 处理**: 只有一种构建形态——`--enable-nonfree` + CUDA Toolkit 的 `cuda-nvcc`，NVENC/NVDEC 和 VMAF-CUDA 保留；产物带 nonfree 标记，不能当作普通 GPL v3 二进制再分发
 - **VMAF**: Netflix 视频质量评分（CPU 或 CUDA 加速）
 - **容器格式**: MP4, MKV, MOV, AVI, TS, FLV, WebM, OGG 等
 
@@ -91,9 +91,9 @@ avmdec --codec=av2 -o decoded.y4m output.ivf
 - [Git for Windows](https://git-scm.com/) (提供 Bash 环境)
 - [vcpkg](https://github.com/microsoft/vcpkg)（Windows 使用本仓库 `vcpkg.json` 锁定依赖；包括 libjxl、x64 的 libvpl。zimg 通过共享脚本从源码编译）
 - [NASM](https://www.nasm.us/) (x86/x64 汇编优化)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Linux/Windows CI 使用 [mjun0812/setup-cuda](https://github.com/mjun0812/setup-cuda)，每次构建自动安装 NVIDIA 最新稳定版；网络安装失败时自动改用本地安装器，仅在 GitHub Actions runner 执行)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA GPU 加速；Linux/Windows CI 使用 [mjun0812/setup-cuda](https://github.com/mjun0812/setup-cuda)，每次构建自动安装 NVIDIA 最新稳定版；安装器失败会自动重试一次，仅在 GitHub Actions runner 执行)
 - [Meson](https://mesonbuild.com/) + [Ninja](https://ninja-build.org/) (VMAF 构建)
-- Python 3、CMake；NVIDIA FFmpeg 需要具备 NVPTX 后端的 Clang（Windows 可使用 VS LLVM，Linux 安装 `clang`）
+- Python 3、CMake；NVIDIA FFmpeg 直接用 CUDA Toolkit 的 `nvcc` 编译 CUDA 代码（Clang 只用于 Windows 的 clang-cl 与 AVM 交叉编译）
 
 ### Windows (VS 2026 Developer Command Prompt + Git Bash)
 
@@ -163,7 +163,7 @@ bash scripts/build-linux-amd.sh
 bash scripts/build-linux-arm.sh
 ```
 
-输出在 `output/` 目录（本地 `BUILD_POLICY=local` 的 NVIDIA 构建输出到 `output-local-only/`）。安装缓存默认使用 `~/ffmpeg-install`；可设置 `INSTALL_PREFIX`、`THREADS`。脚本只接受空目录或本仓库标记过的安装目录，不会递归删除安装目录或系统文件。旧版留下的非空目录请保留，改用新的 `INSTALL_PREFIX`。临时源码使用唯一目录，退出自动清理；同一安装目录禁止并行构建。
+输出在 `output/` 目录。安装缓存默认使用 `~/ffmpeg-install`；可设置 `INSTALL_PREFIX`、`THREADS`。脚本只接受空目录或本仓库标记过的安装目录，不会递归删除安装目录或系统文件。旧版留下的非空目录请保留，改用新的 `INSTALL_PREFIX`。临时源码使用唯一目录，退出自动清理；同一安装目录禁止并行构建。
 
 ### macOS (Apple Silicon)
 
@@ -254,19 +254,19 @@ CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL �
 
 ### 许可
 
-公开发布构建使用 `--enable-gpl --enable-version3 --enable-nonfree`。启用 `--enable-nonfree` 后 FFmpeg 会把自身标记为 **nonfree and unredistributable**（`ffmpeg -L` 输出 "This version of FFmpeg has nonfree parts compiled in"），因此这些产物**不能当作普通 GPL v3 二进制再分发**，仅限自行使用。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
+所有构建（CI 与本地脚本）使用 `--enable-gpl --enable-version3 --enable-nonfree`。启用 `--enable-nonfree` 后 FFmpeg 会把自身标记为 **nonfree and unredistributable**（`ffmpeg -L` 输出 "This version of FFmpeg has nonfree parts compiled in"），因此这些产物**不能当作普通 GPL v3 二进制再分发**，仅限自行使用。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
 
-**本地构建与公开发布共用 nonfree 配置**：
+只有一个 nonfree 构建形态，不再并存“不带 nonfree 组件”的变体：
 
-| | 本地（`BUILD_POLICY=local`，默认） | 公开 Release（`BUILD_POLICY=release`） |
-|---|---|---|
-| NVIDIA CUDA | `--enable-nonfree` + `cuda-nvcc` | CUDA LLVM（Clang 编译 PTX） |
-| nonfree 标记 | 有 | 有 |
-| NVENC / NVDEC / VMAF-CUDA | 有 | 有 |
-| 产物目录 | `output-local-only/` | `output/` |
+| 项目 | 取值 |
+|---|---|
+| 许可开关 | `--enable-gpl --enable-version3 --enable-nonfree` |
+| NVIDIA CUDA | `--enable-cuda-nvcc`（CUDA Toolkit 的 `nvcc`） |
+| NVENC / NVDEC / VMAF-CUDA | 有 |
+| 产物目录 | `output/` |
 
-本地脚本（`scripts/build-*.sh`）与 CI 一致，固定启用 `--enable-nonfree`；`BUILD_POLICY` 只决定 CUDA 实现方式、产物目录，以及是否用 `--local-only` 标记清单。`package-runtime.py` 与 `verify-runtime.py` 接受 nonfree 产物，把 `ffmpeg -L` 的许可证输出记录进 `metadata/ffmpeg-license-output.txt`，不再以许可证为由中止打包。`--local-only` 仍要求构建必须是 nonfree，并把清单里的 `distribution` 标为 `local-only-unredistributable`。
+本地脚本（`scripts/build-*.sh`）与 CI 完全一致，都使用上面这套 nonfree 配置；`BUILD_POLICY` 已移除，CUDA 统一由 `nvcc` 编译，不再提供 Clang/LLVM PTX 变体。`package-runtime.py` 与 `verify-runtime.py` 接受 nonfree 产物，把 `ffmpeg -L` 的许可证输出记录进 `metadata/ffmpeg-license-output.txt`，不再以许可证为由中止打包。
 
-**对应源码**：每个公开包都包含 `scripts/ci/collect-dependency-sources.py` 收集并校验的完整依赖源码（apt 的 deb-src 源码包、Homebrew formula 源码、vcpkg port 与下载的源码包），以及修改后的 FFmpeg / VMAF / AVM 源码和本仓库构建脚本。清单记录在 `runtime-manifest.json`（`corresponding_source.status` 为 `complete`）和 `metadata/dependency-source-inventory.json`。CI 在移动后的发布目录用 `verify-runtime.py --require-complete-source` 复核；任何依赖缺失都会使构建失败，从而阻止发布不完整的包。
+**对应源码**：每个公开包都包含 `scripts/ci/collect-dependency-sources.py` 收集并校验的完整依赖源码（apt 的 deb-src 源码包、Homebrew formula 源码、vcpkg port 与下载的源码包），以及修改后的 FFmpeg / VMAF / AVM 源码和本仓库构建脚本。清单记录在 `runtime-manifest.json`（`corresponding_source.status` 为 `complete`）和 `metadata/dependency-source-inventory.json`。由操作系统提供、动态链接且不随包分发的库（macOS SDK 的 zlib、bzip2）在清单中记为 `manager: system`，不计为源码缺口。CI 在移动后的发布目录用 `verify-runtime.py --require-complete-source` 复核；任何依赖缺失都会使构建失败，从而阻止发布不完整的包。
 
 压缩包还应保留 FFmpeg、AVM 及随附第三方依赖的许可证、实际版本和对应源码信息。再分发者仍需满足 GPL v3 的完整对应源码及第三方许可要求。系统框架和 GPU 驱动不随包分发。参见 [FFmpeg 许可说明](https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md)。

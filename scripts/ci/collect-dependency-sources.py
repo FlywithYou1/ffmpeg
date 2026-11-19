@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -278,6 +279,7 @@ def brew_formula_source(formula):
 def collect_macos(output, modules):
     records = []
     omissions = []
+    system_modules = []
     cache = output / "work" / "brew-cache"
     cache.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
@@ -286,6 +288,11 @@ def collect_macos(output, modules):
     for entry in modules:
         parts = Path(entry["pcfile"]).parent.parts
         if "Cellar" not in parts:
+            # Apple ships zlib, bzip2 and iconv in the SDK; Homebrew only adds a
+            # .pc shim under Library/Homebrew/os/mac/pkgconfig, never a keg.
+            if "os" in parts and "mac" in parts and "pkgconfig" in parts:
+                system_modules.append(entry["module"])
+                continue
             omissions.append(f"{entry['module']}: {entry['pcfile']} is not a Homebrew keg")
             continue
         index = parts.index("Cellar")
@@ -317,6 +324,11 @@ def collect_macos(output, modules):
                   "source_urls": [url], "files": {}}
         record_files(record, output, files)
         records.append(record)
+    if system_modules:
+        records.append({"id": "system:macos-sdk", "manager": "system", "package": "macOS SDK",
+                        "version": platform.mac_ver()[0] or "unknown",
+                        "modules": sorted(set(system_modules)), "source_urls": [], "files": {},
+                        "note": "Provided by macOS (SDK stubs) and linked dynamically; not redistributed with the package."})
     return records, omissions
 
 

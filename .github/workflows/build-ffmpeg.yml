@@ -144,7 +144,7 @@ jobs:
             extra_packages: libva-dev libvpl-dev libdrm-dev
             cuda: true
             vmaf_cuda: true
-            configure_extra: --enable-libvmaf --enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm --enable-cuvid --enable-nvenc
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
             verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc
             artifact: ffmpeg-linux-nvidia.tar.xz
           - id: intel-qsv
@@ -171,7 +171,7 @@ jobs:
             extra_packages: libva-dev libvpl-dev libdrm-dev
             cuda: true
             vmaf_cuda: true
-            configure_extra: --enable-libvmaf --enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
+            configure_extra: --enable-libvmaf --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-vaapi --enable-libvpl
             verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_vaapi
             artifact: ffmpeg-linux-x86-all.tar.xz
             av2: true
@@ -221,17 +221,14 @@ jobs:
         if: matrix.cuda
         run: |
           CUDA_BASE="${CUDA_HOME:-${CUDA_PATH:-}}"
+          [ -n "${CUDA_BASE}" ] || { echo "::error::未找到 CUDA"; exit 1; }
           [ -x "${CUDA_BASE}/bin/nvcc" ] || { echo "::error::Action 未提供有效 CUDA 路径"; exit 1; }
-          [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc" --version
-          CUDA_CLANG="$(command -v clang)"
-          "$CUDA_CLANG" --print-targets | grep -q nvptx || { echo "::error::Clang lacks the NVPTX backend"; exit 1; }
-          printf '%s\n' '__attribute__((global)) void ffmpeg_cuda_probe(void) {}' > "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu"
-          "$CUDA_CLANG" -S -x cuda --cuda-device-only -nocudainc -nocudalib --cuda-gpu-arch=sm_75 \
-            "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu" -o "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx"
+          printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu"
+          "${CUDA_BASE}/bin/nvcc" -ptx --gpu-architecture=sm_75 \
+            -o "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx" "${RUNNER_TEMP}/ffmpeg-cuda-probe.cu"
           grep -q '\.entry' "${RUNNER_TEMP}/ffmpeg-cuda-probe.ptx"
-          echo "FFMPEG_CUDA_CLANG=$CUDA_CLANG" >> "${GITHUB_ENV}"
 
       - name: 编译 nv-codec-headers
         if: matrix.cuda
@@ -283,7 +280,7 @@ jobs:
           CUDA_ARGS=()
           if [ "${{ matrix.cuda }}" = "true" ]; then
             export PATH="${CUDA_HOME}/bin:${PATH}"
-            CUDA_ARGS=(--nvcc="$FFMPEG_CUDA_CLANG" --nvccflags="-S -nocudainc -nocudalib --cuda-gpu-arch=sm_75 -O2")
+            CUDA_ARGS=(--nvcc="${CUDA_HOME}/bin/nvcc" "--nvccflags=-gencode arch=compute_75,code=sm_75 -O2")
           fi
           cd "$CI_BUILD_ROOT" && git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           cd ffmpeg-src
@@ -386,7 +383,7 @@ jobs:
             cuda: true
             amf: false
             vpl: false
-            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm --enable-cuvid --enable-nvenc
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
             verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc
             artifact: ffmpeg-windows-nvidia.zip
           - id: amd-amf
@@ -433,7 +430,7 @@ jobs:
             cuda: true
             amf: true
             vpl: true
-            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc --enable-amf --enable-libvpl
             verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-encoder h264_qsv --require-encoder hevc_qsv --require-encoder h264_amf
             artifact: ffmpeg-windows-x86-all.zip
             av2: true
@@ -645,28 +642,48 @@ jobs:
       - name: 安装最新 CUDA 工具包
         id: cuda
         if: matrix.cuda
+        # 安装器会偶发失败：网络安装包的下载载荷损坏（0x80070570），
+        # 或 local 安装包直接以 100（0xE0E00064）退出。失败后重试一次，
+        # 由下一步统一报告，避免把安装器的瞬时故障当成构建失败。
+        continue-on-error: true
         uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
           method: 'auto'
 
-      - name: CUDA LLVM 检测
-        if: matrix.cuda && matrix.cuda_strategy == 'llvm'
+      - name: 重试安装 CUDA 工具包
+        id: cuda-retry
+        if: matrix.cuda && steps.cuda.outcome == 'failure'
+        continue-on-error: true
+        uses: mjun0812/setup-cuda@v1
+        with:
+          version: 'latest'
+          method: 'network'
+
+      - name: 校验 CUDA 工具包
+        if: matrix.cuda
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cuda = $env:CUDA_HOME
+          if (-not $cuda) { throw 'CUDA installation failed: CUDA_HOME is not set' }
+          if (-not (Test-Path "$cuda\bin\nvcc.exe")) { throw 'CUDA installation failed: nvcc.exe is missing' }
+          Write-Host "CUDA: $cuda"
+
+      - name: 检测 CUDA
+        if: matrix.cuda
         shell: bash
         run: |
           CUDA_BASE="${CUDA_HOME:-${CUDA_PATH:-}}"
+          [ -n "${CUDA_BASE}" ] || { echo "::error::未找到 CUDA"; exit 1; }
           CUDA_BASE="$(cygpath -u "$CUDA_BASE")"
           [ -x "${CUDA_BASE}/bin/nvcc.exe" ] || { echo "::error::Action 未提供有效 CUDA 路径"; exit 1; }
-          [ -z "${CUDA_BASE}" ] && { echo "::error::未找到 CUDA"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc.exe" --version
-          CUDA_CLANG="$(cygpath -u "${CLANG_BIN}/clang.exe")"
-          [ -x "$CUDA_CLANG" ] || { echo "::error::Visual Studio LLVM clang.exe is required"; exit 1; }
-          "$CUDA_CLANG" --print-targets | grep -q nvptx || { echo "::error::Visual Studio Clang lacks the NVPTX backend"; exit 1; }
           WORK="$(cygpath -m "$RUNNER_TEMP")"
-          printf '%s\n' '__attribute__((global)) void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
-          "$CUDA_CLANG" -S -x cuda --cuda-device-only -nocudainc -nocudalib --cuda-gpu-arch=sm_75 \
-            "$WORK/ffmpeg-cuda-probe.cu" -o "$WORK/ffmpeg-cuda-probe.ptx"
+          printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
+          "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture=sm_75 \
+            -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu"
           grep -q '\.entry' "$WORK/ffmpeg-cuda-probe.ptx"
 
       - name: 创建 CUDA junction
@@ -825,10 +842,9 @@ jobs:
           git clone --depth 1 https://github.com/FFmpeg/FFmpeg ffmpeg-src
           python3 "${GITHUB_WORKSPACE}/scripts/ci/patch-ffmpeg-msvc.py" "$CI_BUILD_ROOT/ffmpeg-src"
           cd ffmpeg-src
-          # CUDA PTX uses LLVM; nvcc remains available only for the VMAF CUDA library.
           CUDA_ARGS=()
           if [ "${{ matrix.cuda }}" = "true" ]; then
-            CUDA_ARGS=(--nvcc="${CLANG_BIN}/clang.exe" --nvccflags="-S -nocudainc -nocudalib --cuda-gpu-arch=sm_75 -O2")
+            CUDA_ARGS=(--nvcc="${CUDA_HOME_MIXED}/bin/nvcc.exe" "--nvccflags=-gencode arch=compute_75,code=sm_75 -O2")
             export CUDA_HOME="$(cygpath -u "$CUDA_HOME_MIXED")"
             export CUDA_PATH="$CUDA_HOME_MIXED"
             export CUDACXX="$CUDA_HOME_MIXED/bin/nvcc.exe"

@@ -5,12 +5,6 @@ build_linux() {
   source "$(dirname "${BASH_SOURCE[0]}")/build-env.sh"
   init_build_env "$0"
   local vendor="$1" configure_extra=() verify_extra=() extra_cflags="" extra_ldflags=""
-  local policy="${BUILD_POLICY:-local}" license_flags=(--enable-nonfree) package_flags=()
-  local output_dir=output
-  case "$policy" in
-    local|release) ;;
-    *) echo "BUILD_POLICY 必须为 local 或 release" >&2; return 1 ;;
-  esac
   THREADS="${THREADS:-$(nproc)}"
   [[ "$THREADS" =~ ^[1-9][0-9]*$ ]] || { echo "THREADS 必须为正整数" >&2; return 1; }
   export PATH="$P/bin:$PATH"
@@ -37,23 +31,9 @@ build_linux() {
         done
       fi
       [ -x "${CUDA_HOME}/bin/nvcc" ] || { echo "未找到 CUDA Toolkit" >&2; return 1; }
-      if [ "$policy" = local ]; then
-        license_flags=(--enable-nonfree)
-        package_flags=(--local-only)
-        output_dir=output-local-only
-        configure_extra+=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm \
-          "--nvcc=$CUDA_HOME/bin/nvcc" "--nvccflags=${NVCCFLAGS:--gencode arch=compute_75,code=sm_75 -O2}" --enable-cuvid --enable-nvenc)
-      else
-        CUDA_CLANG="${CUDA_CLANG:-$(command -v clang || true)}"
-        [ -n "$CUDA_CLANG" ] || { echo "可发布 CUDA 构建需要支持 NVPTX 的 Clang" >&2; return 1; }
-        "$CUDA_CLANG" --print-targets | grep nvptx >/dev/null
-        printf '%s\n' '__attribute__((global)) void ffmpeg_cuda_probe(void) {}' > "$BUILD_ROOT/cuda-probe.cu"
-        "$CUDA_CLANG" -S -x cuda --cuda-device-only -nocudainc -nocudalib --cuda-gpu-arch=sm_75 \
-          "$BUILD_ROOT/cuda-probe.cu" -o "$BUILD_ROOT/cuda-probe.ptx"
-        grep '\.entry' "$BUILD_ROOT/cuda-probe.ptx" >/dev/null
-        configure_extra+=(--enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm "--nvcc=$CUDA_CLANG" \
-          "--nvccflags=-S -nocudainc -nocudalib --cuda-gpu-arch=sm_75 -O2" --enable-cuvid --enable-nvenc)
-      fi
+      # 只有一种构建形态：直接用 CUDA Toolkit 的 nvcc（nonfree）。
+      configure_extra+=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm \
+        "--nvcc=$CUDA_HOME/bin/nvcc" "--nvccflags=${NVCCFLAGS:--gencode arch=compute_75,code=sm_75 -O2}" --enable-cuvid --enable-nvenc)
       verify_extra+=(--require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc)
       export CUDA_PATH="$CUDA_HOME" CUDACXX="$CUDA_HOME/bin/nvcc"
       export PATH="$CUDA_HOME/bin:$PATH"
@@ -99,7 +79,7 @@ build_linux() {
     --pkg-config-flags=--static \
     --extra-cflags="-I$P/include $extra_cflags" \
     --extra-ldflags="-L$P/lib $extra_ldflags" --extra-libs="-lpthread -lm -ldl -lstdc++" \
-    --enable-gpl --enable-version3 "${license_flags[@]}" --enable-libvmaf "${configure_extra[@]}" \
+    --enable-gpl --enable-version3 --enable-nonfree --enable-libvmaf "${configure_extra[@]}" \
     --enable-opencl --enable-vulkan \
     --enable-libx264 --enable-libx265 --enable-libvpx --enable-libopus --enable-libvorbis --enable-libtheora \
     --enable-libaom --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libzimg \
@@ -114,6 +94,6 @@ build_linux() {
     source_args+=(--dependency-source "$BUILD_ROOT/nv-codec-headers")
   fi
   python3 "$REPO_ROOT/scripts/ci/package-runtime.py" --platform linux --bin-dir "$P/bin" \
-    --source-dir "$BUILD_ROOT/ffmpeg-src" --output "$ORIG_DIR/$output_dir" --license-dir "$P/share" "${source_args[@]}" "${package_flags[@]}"
-  python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform linux --directory "$ORIG_DIR/$output_dir" "${verify_extra[@]}" "${package_flags[@]}"
+    --source-dir "$BUILD_ROOT/ffmpeg-src" --output "$ORIG_DIR/output" --license-dir "$P/share" "${source_args[@]}"
+  python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform linux --directory "$ORIG_DIR/output" "${verify_extra[@]}"
 }

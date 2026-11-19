@@ -90,6 +90,14 @@ class VmafPatchTests(FixtureTest):
         self.assertIn('usleep(', (compat / 'unistd.h').read_text())
         self.assertIn('#include <unistd.h>', (source / 'src/feature/mkdirp.c').read_text())
 
+    def test_msvc_atomic_shim_does_not_shadow_the_toolchain_header(self):
+        source = self.root / 'libvmaf'
+        self.put('libvmaf/src/compat/msvc/stdatomic.h', '#if defined(__clang__) && __has_include_next(<stdatomic.h>)\n')
+        self.put('libvmaf/src/compat/msvc/builtin_clz.h', '#define __builtin_clz(x) x\n')
+        vmaf.prepare(source, self.root / 'compat', 'arm64')
+        self.assertFalse((source / 'src/compat/msvc/stdatomic.h').exists())
+        self.assertTrue((source / 'src/compat/msvc/builtin_clz.h').is_file())
+
     def test_arm_neon_and_real_intrinsics(self):
         source = self.root / 'libvmaf'
         self.put('libvmaf/src/feature/integer_vif.h', '#define __builtin_clz(x) __lzcnt(x)\n#define __builtin_clzll(x) __lzcnt64(x)\n__lzcnt64(y);\n')
@@ -279,11 +287,10 @@ class ShellContractTests(unittest.TestCase):
         self.assertNotIn('/tmp', text)
         self.assertNotIn('rm -rf', text)
         self.assertIn('WINDOWS_LICENSE_FLAGS=(--enable-nonfree)', text)
-        self.assertIn('WINDOWS_PACKAGE_FLAGS=(--local-only)', text)
-        self.assertIn('if [ "$WINDOWS_POLICY" = local ]; then', text)
         self.assertIn('HARDWARE_FLAGS=(--enable-ffnvcodec --enable-cuda-nvcc', text)
         self.assertNotIn('--enable-libnpp', text)
-        self.assertIn('--disable-cuda-nvcc --enable-cuda-llvm', text)
+        self.assertNotIn('--enable-cuda-llvm', text)
+        self.assertNotIn('BUILD_POLICY', text)
         self.assertIn('target=_M_ARM64', text)
         self.assertIn('-Db_vscrt=mt', text)
         self.assertIn('cl.exe -nologo -MT -c', text)

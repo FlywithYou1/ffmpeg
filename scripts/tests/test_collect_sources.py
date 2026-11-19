@@ -209,6 +209,23 @@ class CollectorTests(unittest.TestCase):
         with mock.patch.object(collect, "run", return_value=result('  url "https://example.org/x.tar.gz"\n')):
             self.assertEqual(collect.brew_formula_source("x264"), (None, None))
 
+    def test_macos_sdk_shims_are_system_modules(self):
+        # Apple ships zlib/bzip2 in the SDK; Homebrew only adds a .pc shim.
+        entry = {"module": "zlib",
+                 "pcfile": "/opt/homebrew/Library/Homebrew/os/mac/pkgconfig/26/zlib.pc",
+                 "version": "1.2"}
+        records, omissions = collect.collect_macos(self.root, [entry])
+        self.assertEqual(omissions, [])
+        self.assertEqual([record["id"] for record in records], ["system:macos-sdk"])
+        self.assertEqual(records[0]["modules"], ["zlib"])
+        self.assertEqual(records[0]["files"], {})
+
+    def test_macos_non_keg_paths_are_still_reported(self):
+        entry = {"module": "libfoo", "pcfile": "/usr/lib/pkgconfig/libfoo.pc", "version": "1"}
+        records, omissions = collect.collect_macos(self.root, [entry])
+        self.assertEqual(records, [])
+        self.assertTrue(any("not a Homebrew keg" in omission for omission in omissions))
+
 
 class InventoryIntegrationTests(unittest.TestCase):
     def setUp(self):

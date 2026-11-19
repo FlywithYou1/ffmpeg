@@ -185,30 +185,8 @@ windows_hardware() {
       CUDA_HOME="$WINDOWS_PATH_RESULT"
       CUDA_MIXED="$(windows_mixed "$CUDA_HOME")"
       [ -f "$CUDA_HOME/bin/nvcc.exe" ] || windows_die "CUDA nvcc.exe 未找到（VMAF CUDA 需要）"
-      if [ "$WINDOWS_POLICY" = local ]; then
-        WINDOWS_LICENSE_FLAGS=(--enable-nonfree)
-        WINDOWS_PACKAGE_FLAGS=(--local-only)
-        HARDWARE_FLAGS=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm "--nvcc=$CUDA_MIXED/bin/nvcc.exe" --enable-cuvid --enable-nvenc)
-      else
-        [ -f "${CLANG_BIN:-}/clang.exe" ] || windows_die "可发布 CUDA FFmpeg 需要支持 CUDA LLVM 的 VS clang.exe；设置 CLANG_BIN"
-        export CUDA_PATH="$CUDA_MIXED" CUDACXX="$CUDA_HOME/bin/nvcc.exe" PATH="$CUDA_HOME/bin:$PATH"
-        CUDA_LIB_DIR="$CUDA_MIXED/lib/x64"
-        [ -d "$CUDA_LIB_DIR" ] || windows_die "缺少 CUDA x64 库目录"
-        export INCLUDE="$CUDA_MIXED/include;$INCLUDE" LIB="$CUDA_LIB_DIR;$LIB"
-        # Probe PTX compilation with exactly the FFmpeg CUDA LLVM compiler and flags.
-        local clang_targets
-        clang_targets="$("$CLANG_BIN/clang.exe" --print-targets)"
-        [[ "$clang_targets" == *nvptx* ]] || windows_die "VS Clang 不含 NVPTX 后端；不会回退到 nonfree cuda-nvcc"
-        printf '__attribute__((global)) void ffmpeg_cuda_probe(void) {}\n' > "$BUILD_ROOT/cuda-probe.cu"
-        cuda_flags=(-S -nocudainc -nocudalib --cuda-gpu-arch=sm_75 -O2)
-        "$CLANG_BIN/clang.exe" "${cuda_flags[@]}" -x cuda --cuda-device-only -o "$(windows_mixed "$BUILD_ROOT/cuda-probe.ptx")" "$(windows_mixed "$BUILD_ROOT/cuda-probe.cu")" || windows_die "VS Clang PTX 编译失败；不会回退到 nonfree cuda-nvcc"
-        python3 - "$BUILD_ROOT/cuda-probe.ptx" <<'PY'
-import pathlib, sys
-if '.entry' not in pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'):
-    raise SystemExit('CUDA LLVM probe produced no PTX kernel entry')
-PY
-        HARDWARE_FLAGS=(--enable-ffnvcodec --disable-cuda-nvcc --enable-cuda-llvm "--nvcc=$(windows_mixed "$CLANG_BIN")/clang.exe" "--nvccflags=${cuda_flags[*]}" --enable-cuvid --enable-nvenc)
-      fi
+      # 只有一种构建形态：直接用 CUDA Toolkit 的 nvcc（nonfree）。
+      HARDWARE_FLAGS=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm "--nvcc=$CUDA_MIXED/bin/nvcc.exe" --enable-cuvid --enable-nvenc)
       export CUDA_PATH="$CUDA_MIXED" CUDACXX="$CUDA_HOME/bin/nvcc.exe" PATH="$CUDA_HOME/bin:$PATH"
       CUDA_LIB_DIR="$CUDA_MIXED/lib/x64"
       [ -d "$CUDA_LIB_DIR" ] || windows_die "缺少 CUDA x64 库目录"
@@ -336,7 +314,6 @@ windows_ffmpeg() {
 
 windows_verify_and_package() {
   local output="$ORIG_DIR/output" root
-  if [ "$WINDOWS_POLICY" = local ] && [ "$WINDOWS_FLAVOR" = nvidia ]; then output="$ORIG_DIR/output-local-only"; fi
   local license_args=() source_args=() verify_args=()
   # Required feature/runtime checks are not grep pipelines or best-effort logs.
   local hardware_output
@@ -365,22 +342,20 @@ windows_verify_and_package() {
     [ ! -d "$root" ] || source_args+=(--dependency-source "$root")
   done
   python3 "$REPO_ROOT/scripts/ci/package-runtime.py" --platform windows --bin-dir "$P/bin" --output "$output" \
-    --source-dir "$BUILD_ROOT/ffmpeg-src" --license-dir "$P/share" "${license_args[@]}" "${source_args[@]}" "${WINDOWS_PACKAGE_FLAGS[@]}"
+    --source-dir "$BUILD_ROOT/ffmpeg-src" --license-dir "$P/share" "${license_args[@]}" "${source_args[@]}"
   case "$WINDOWS_FLAVOR" in
     nvidia) verify_args=(--require-encoder h264_nvenc --require-encoder hevc_nvenc) ;;
     intel-qsv) verify_args=(--require-encoder h264_qsv) ;;
     amd-amf) verify_args=(--require-encoder h264_amf) ;;
   esac
-  python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform windows --directory "$output" "${verify_args[@]}" "${WINDOWS_PACKAGE_FLAGS[@]}"
+  python3 "$REPO_ROOT/scripts/ci/verify-runtime.py" --platform windows --directory "$output" "${verify_args[@]}"
   echo "输出：$output"
 }
 
 windows_build() {
   WINDOWS_FLAVOR="$1"
-  WINDOWS_POLICY="${BUILD_POLICY:-local}"
-  case "$WINDOWS_POLICY" in local|release) ;; *) windows_die "BUILD_POLICY 必须为 local 或 release" ;; esac
+  # 只有一个构建形态：nonfree（CUDA 由 nvcc 编译）。
   WINDOWS_LICENSE_FLAGS=(--enable-nonfree)
-  WINDOWS_PACKAGE_FLAGS=()
   WINDOWS_ARCH=x64
   WINDOWS_FFMPEG_ARCH=x86_64
   if [ "$WINDOWS_FLAVOR" = arm64 ]; then WINDOWS_ARCH=arm64; WINDOWS_FFMPEG_ARCH=aarch64; fi

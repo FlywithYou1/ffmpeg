@@ -133,6 +133,15 @@ def prepare(source, compat, architecture, cuda=False, include_dirs=()):
     if not attributes.exists():
         attributes.write_text("#ifndef VMAF_MSVC_ATTRIBUTES_H\n#define VMAF_MSVC_ATTRIBUTES_H\n#include <stddef.h>\n#define ALIGN(n) __declspec(align(n))\n#endif\n", encoding="utf-8")
 
+    # VMAF puts src/compat/msvc on the include path for builtin_clz.h, so the
+    # dav1d stdatomic.h shipped there shadows the compiler's own header. That
+    # shim only works with clang's __has_include_next; MSVC 14.51 rejects it
+    # ("function-like macro '__has_include_next' is not defined"). cl.exe is
+    # always invoked here with -experimental:c11atomics, so the shim is unused.
+    atomic_shim = source / "src/compat/msvc/stdatomic.h"
+    if atomic_shim.exists():
+        atomic_shim.unlink()
+
     for relative in ("src/libvmaf.c", "src/predict.c", "src/read_json_model.c", "src/feature/integer_vif.h", "src/feature/integer_vif.c", "src/feature/integer_adm.c", "src/log.c", "src/feature/cuda/integer_adm_cuda.c", "src/feature/mkdirp.c", "src/feature/mkdirp.h", "src/feature/arm64/adm_neon.c", "src/feature/integer_adm.h", "src/meson.build"):
         path = source / relative
         if not path.exists():

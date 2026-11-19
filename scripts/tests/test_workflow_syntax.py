@@ -57,8 +57,8 @@ class WorkflowSyntaxTests(unittest.TestCase):
             self.assertIn('--enable-nonfree', section)
         windows = text.split('  windows:', 1)[1].split('  macos-arm:', 1)[0]
         self.assertIn('--enable-libjxl', windows)
-        self.assertIn('--enable-cuda-llvm', windows)
-        self.assertIn('--disable-cuda-nvcc', windows)
+        self.assertIn('--enable-cuda-nvcc', windows)
+        self.assertNotIn('--enable-cuda-llvm', windows)
 
 
 if __name__ == '__main__':
