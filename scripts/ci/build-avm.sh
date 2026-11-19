@@ -35,7 +35,8 @@ if [ "$arm" = 1 ]; then
 fi
 cmake --build "$ROOT/build" --parallel "$THREADS" --target avmenc avmdec
 if [ "$arm" != 1 ]; then
-  find "$ROOT/build" -name '*.o' -path '*asm_objects*' | grep -q . || { echo "错误：AVM 未编译 x86 汇编目标"; exit 1; }
+  # ASM_NASM objects are named <source>.asm.o by CMake.
+  find "$ROOT/build" -name '*.asm.o' | grep -q . || { echo "错误：AVM 未编译 x86 汇编目标"; exit 1; }
 fi
 # avm.pc is only produced by the avm_pc target, and install() needs it.
 cmake --build "$ROOT/build" --parallel "$THREADS" --target avm_pc

@@ -42,7 +42,8 @@ class WorkflowSyntaxTests(unittest.TestCase):
             'ffmpeg-linux-arm.tar.xz', 'ffmpeg-linux-arm-av2.tar.xz', 'ffmpeg-linux-arm-nvidia.tar.xz',
             'ffmpeg-linux-x86-all.tar.xz', 'ffmpeg-linux-x86-all-av2.tar.xz',
             'ffmpeg-windows-nvidia.zip', 'ffmpeg-windows-intel-qsv.zip', 'ffmpeg-windows-amd-amf.zip',
-            'ffmpeg-windows-arm64.zip', 'ffmpeg-windows-arm64-av2.zip', 'ffmpeg-windows-x86-all.zip',
+            'ffmpeg-windows-arm64.zip', 'ffmpeg-windows-arm64-av2.zip', 'ffmpeg-windows-arm64-nvidia.zip',
+            'ffmpeg-windows-arm64-nvidia-av2.zip', 'ffmpeg-windows-x86-all.zip',
             'ffmpeg-windows-x86-all-av2.zip', 'ffmpeg-macos-arm.tar.xz', 'ffmpeg-macos-arm-av2.tar.xz',
         }
         self.assertEqual(artifacts, expected)

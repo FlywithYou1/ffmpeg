@@ -221,6 +221,14 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev libnuma-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
 
+      - name: 使用 GCC 16
+        run: |
+          sudo apt-get install -y -qq --no-install-recommends gcc-16 g++-16
+          echo "CC=gcc-16" >> "$GITHUB_ENV"
+          echo "CXX=g++-16" >> "$GITHUB_ENV"
+          gcc-16 --version | head -n1
+          g++-16 --version | head -n1
+
       - name: 安装最新 CUDA 工具包
         id: cuda
         if: matrix.cuda
@@ -449,6 +457,20 @@ jobs:
             av2: true
             av2_artifact: ffmpeg-windows-arm64-av2.zip
             verify_args: --require-hwaccel d3d11va --require-hwaccel dxva2
+          - id: arm64-nvidia
+            name: Windows ARM64（Snapdragon + NVENC/CUDA）
+            runner: windows-11-vs2026-arm
+            msvc_arch: amd64_arm64
+            triplet: arm64-windows-static
+            cuda: true
+            cuda_native_arm: true
+            amf: false
+            vpl: false
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-hwaccel d3d11va
+            artifact: ffmpeg-windows-arm64-nvidia.zip
+            av2: true
+            av2_artifact: ffmpeg-windows-arm64-nvidia-av2.zip
           - id: x86-all
             name: "Windows x86 整合版（NVIDIA + Intel QSV + AMD AMF）"
             runner: windows-2025-vs2026
@@ -668,7 +690,7 @@ jobs:
 
       - name: 安装最新 CUDA 工具包
         id: cuda
-        if: matrix.cuda
+        if: matrix.cuda && matrix.cuda_native_arm != true
         # 安装器会偶发失败：网络安装包的下载载荷损坏（0x80070570），
         # 或 local 安装包直接以 100（0xE0E00064）退出。失败后重试一次，
         # 由下一步统一报告，避免把安装器的瞬时故障当成构建失败。
@@ -680,12 +702,54 @@ jobs:
 
       - name: 重试安装 CUDA 工具包
         id: cuda-retry
-        if: matrix.cuda && steps.cuda.outcome == 'failure'
+        if: matrix.cuda && matrix.cuda_native_arm != true && steps.cuda.outcome == 'failure'
         continue-on-error: true
         uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
           method: 'network'
+
+      - name: 安装 CUDA 工具包（Windows ARM64）
+        if: matrix.cuda_native_arm
+        shell: pwsh
+        # setup-cuda 只支持 Windows x86_64；这里有原生 arm64 安装包，但要先从
+        # 归档里查最新的小版本号。下载失败重试一次，校验交给下一步。
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://developer.download.nvidia.com/compute/cuda'
+          # 只挑确实带 Windows arm64 安装包的版本，按从新到旧尝试。
+          $version = $null
+          foreach ($candidate in @('13.5', '13.4')) {
+            try {
+              $sums = (Invoke-WebRequest -UseBasicParsing "$base/$candidate.0/docs/sidebar/md5sum.txt" -TimeoutSec 60).Content
+            } catch { continue }
+            if ($sums -split "`n" | Where-Object { $_ -match "cuda_${candidate}\.0_windows_arm64\.exe\s*$" }) {
+              $version = $candidate
+              break
+            }
+          }
+          if (-not $version) { throw 'No CUDA release with a Windows arm64 installer found' }
+          $file = Join-Path $env:RUNNER_TEMP "cuda_$version.0_windows_arm64.exe"
+          $url = "$base/$version.0/local_installers/cuda_$version.0_windows_arm64.exe"
+          for ($i = 1; $i -le 2; $i++) {
+            Write-Host "Downloading $url (attempt $i/2)"
+            try {
+              Invoke-WebRequest -UseBasicParsing $url -OutFile $file -TimeoutSec 3600
+              break
+            } catch {
+              if ($i -eq 2) { throw "CUDA download failed: $_" }
+            }
+          }
+          $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
+          Write-Host "Installing CUDA $version natively (arm64)"
+          $process = Start-Process -FilePath $file -Wait -PassThru -ArgumentList @(
+            '-s', "nvcc_$version", "cudart_$version", "thrust_$version", "cub_$version", "cuobjdump_$version",
+            '-n', '-N', "-p", "`"$root`"")
+          if ($process.ExitCode -notin @(0, 3010)) { throw "CUDA installer failed: $($process.ExitCode)" }
+          $home = Get-ChildItem -LiteralPath $root -Directory -Filter "v$version*" | Select-Object -First 1
+          if (-not $home) { throw "CUDA installed but no v$version directory under $root" }
+          echo "CUDA_HOME=$($home.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "CUDA: $($home.FullName)"
 
       - name: 校验 CUDA 工具包
         if: matrix.cuda
@@ -709,8 +773,22 @@ jobs:
           "${CUDA_BASE}/bin/nvcc.exe" --version
           WORK="$(cygpath -m "$RUNNER_TEMP")"
           printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
-          "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture=sm_75 \
-            -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu"
+          # Windows ARM64 has no sm_75; take the first arch this nvcc accepts.
+          if [ "${VSCMD_ARG_TGT_ARCH:-}" = arm64 ]; then
+            CANDIDATES="110 100 90 80"
+          else
+            CANDIDATES="75"
+          fi
+          ARCH=""
+          for candidate in $CANDIDATES; do
+            if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
+                 -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu" 2>/dev/null; then
+              ARCH="$candidate"; break
+            fi
+          done
+          [ -n "$ARCH" ] || { echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"; exit 1; }
+          echo "CUDA_ARCH=$ARCH" >> "${GITHUB_ENV}"
+          echo "使用 CUDA 架构 sm_${ARCH}"
           grep -q '\.entry' "$WORK/ffmpeg-cuda-probe.ptx"
 
       - name: 创建 CUDA junction
@@ -871,7 +949,7 @@ jobs:
           cd ffmpeg-src
           CUDA_ARGS=()
           if [ "${{ matrix.cuda }}" = "true" ]; then
-            CUDA_ARGS=(--nvcc="${CUDA_HOME_MIXED}/bin/nvcc.exe" "--nvccflags=-gencode arch=compute_75,code=sm_75 -O2")
+            CUDA_ARGS=(--nvcc="${CUDA_HOME_MIXED}/bin/nvcc.exe" "--nvccflags=-gencode arch=compute_${CUDA_ARCH},code=sm_${CUDA_ARCH} -O2")
             export CUDA_HOME="$(cygpath -u "$CUDA_HOME_MIXED")"
             export CUDA_PATH="$CUDA_HOME_MIXED"
             export CUDACXX="$CUDA_HOME_MIXED/bin/nvcc.exe"

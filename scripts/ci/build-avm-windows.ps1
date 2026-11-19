@@ -10,6 +10,17 @@ $prefix = Join-Path $env:RUNNER_TEMP 'avm-install'
 & git clone --depth 1 --branch av2-enc https://github.com/AOMediaCodec/avm.git $source
 if ($LASTEXITCODE -ne 0) { throw 'AVM clone failed' }
 Write-Host "AVM commit: $(& git -C $source rev-parse HEAD)"
+# av2_loopfilter.c declares these two in the header but defines them AVM_INLINE,
+# which is plain __inline for MSVC. clang inlines them on x64 by luck, but ARM64
+# links ethread.c against them and fails with "undefined symbol".
+$loopfilter = Join-Path $source 'av2\common\av2_loopfilter.c'
+$text = Get-Content -LiteralPath $loopfilter -Raw
+foreach ($symbol in @('loop_filter_tip_plane', 'setup_tip_dst_planes')) {
+    $pattern = "(?m)^AVM_INLINE void $symbol\("
+    if ($text -notmatch $pattern) { throw "AVM inline declaration changed: $symbol" }
+    $text = $text -replace $pattern, "void $symbol("
+}
+[IO.File]::WriteAllText($loopfilter, $text, [Text.UTF8Encoding]::new($false))
 $cmakeArgs = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF',
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW',
     '-DENABLE_APPS=ON', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=ON', '-DENABLE_DOCS=OFF',

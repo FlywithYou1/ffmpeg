@@ -16,6 +16,11 @@ build_linux() {
   for tool in cc c++ git make meson ninja pkg-config python3 patchelf; do
     command -v "$tool" >/dev/null || { echo "缺少工具: $tool" >&2; return 1; }
   done
+  # 优先 GCC 16；缺失时沿用系统默认编译器。
+  if [ -z "${CC:-}" ] && command -v gcc-16 >/dev/null; then
+    export CC=gcc-16 CXX=g++-16
+    echo "使用 $(gcc-16 --version | head -n1)"
+  fi
   export FFMPEG_PKG_CONFIG="$(command -v pkg-config)"
   case "$vendor" in
     arm|arm-nvidia)
