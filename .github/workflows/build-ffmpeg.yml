@@ -221,13 +221,26 @@ jobs:
             libtwolame-dev libspeex-dev libcodec2-dev libjxl-dev libopenmpt-dev libnuma-dev \
             liblcms2-dev libxxhash-dev libbs2b-dev libaribb24-dev libplacebo-dev glslang-dev spirv-tools librubberband-dev libvidstab-dev
 
-      - name: 使用 GCC 16
+      - name: 使用 GCC 16.2
         run: |
+          # 26.04 自带 gcc-16 是 2026-03 的 trunk 快照；16.2.0 只在 26.10 源里。
+          # 只给工具链包提高 pin 优先级，其余仍取 26.04，避免整体升级。
+          . /etc/os-release
+          ARCH="$(dpkg --print-architecture)"
+          if [ "$ARCH" = arm64 ]; then MIRROR="http://ports.ubuntu.com/ubuntu-ports"; else MIRROR="http://archive.ubuntu.com/ubuntu"; fi
+          echo "deb $MIRROR stonking main universe" | sudo tee /etc/apt/sources.list.d/stonking.list > /dev/null
+          printf '%s\n' \
+            'Package: gcc-16* g++-16* cpp-16* libstdc++-16-dev* libstdc++6 libgcc-s1' \
+            'Pin: release n=stonking' \
+            'Pin-Priority: 1001' | sudo tee /etc/apt/preferences.d/gcc16.pref > /dev/null
+          sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends gcc-16 g++-16
           echo "CC=gcc-16" >> "$GITHUB_ENV"
           echo "CXX=g++-16" >> "$GITHUB_ENV"
           gcc-16 --version | head -n1
           g++-16 --version | head -n1
+          # 必须是已发布的 16.2，而不是发行版里的 trunk 快照。
+          gcc-16 -dumpfullversion | grep -Eq '^16\.[2-9]' || { echo "::error::未拿到 GCC 16.2"; exit 1; }
 
       - name: 安装最新 CUDA 工具包
         id: cuda
@@ -742,10 +755,21 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          $process = Start-Process -FilePath $file -Wait -PassThru -ArgumentList @(
-            '-s', "nvcc_$version", "cudart_$version", "thrust_$version", "cub_$version", "cuobjdump_$version",
-            '-n', '-N', "-p", "`"$root`"")
-          if ($process.ExitCode -notin @(0, 3010)) { throw "CUDA installer failed: $($process.ExitCode)" }
+          # 子包名随版本变动，先只装 nvcc/cudart（够用），失败再退回默认集合。
+          $quoted = '"' + $root + '"'
+          $attempts = @(
+            @('-s', "nvcc_$version", "cudart_$version", '-n', '-N', '-p', $quoted),
+            @('-s', '-n', '-N', '-p', $quoted)
+          )
+          $code = $null
+          foreach ($arguments in $attempts) {
+            Write-Host "cuda installer $($arguments -join ' ')"
+            $process = Start-Process -FilePath $file -Wait -PassThru -ArgumentList $arguments
+            $code = $process.ExitCode
+            if ($code -in @(0, 3010)) { break }
+            Write-Host "exit $code"
+          }
+          if ($code -notin @(0, 3010)) { throw "CUDA installer failed: $code" }
           $home = Get-ChildItem -LiteralPath $root -Directory -Filter "v$version*" | Select-Object -First 1
           if (-not $home) { throw "CUDA installed but no v$version directory under $root" }
           echo "CUDA_HOME=$($home.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
