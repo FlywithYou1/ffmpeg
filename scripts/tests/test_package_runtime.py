@@ -624,7 +624,7 @@ class VerificationTests(ScratchTest):
             self.write(directory / name)
         return verify.Verifier("linux", directory, encoders, avm, False, False, hwaccels, decoders, filters)
 
-    def registration_command(self, name, *args):
+    def registration_command(self, name, *args, **kwargs):
         if "-version" in args:
             return result(name + " version unit-test\n" + "full output\n" * 1000)
         if "-L" in args:
@@ -712,7 +712,7 @@ class VerificationTests(ScratchTest):
     def test_missing_feature_fails(self):
         for option in ("-encoders", "-decoders", "-filters", "-codecs"):
             v = self.verifier()
-            def command(name, *args):
+            def command(name, *args, **kwargs):
                 return result("") if option in args else self.registration_command(name, *args)
             with self.subTest(option=option), mock.patch.object(v, "command", side_effect=command), mock.patch("builtins.print"), self.assertRaises(verify.VerificationError):
                 v.registrations()
@@ -756,7 +756,7 @@ class VerificationTests(ScratchTest):
         v = self.verifier()
         v.work.mkdir()
         calls = []
-        def command(name, *args):
+        def command(name, *args, **kwargs):
             calls.append((name, args))
             if any("libvmaf=" in a for a in args):
                 (v.work / "vmaf.json").write_text(json.dumps({"frames": [{"metrics": {"vmaf": 100}}], "pooled_metrics": {"vmaf": {"mean": 100}}}))
@@ -782,7 +782,7 @@ class VerificationTests(ScratchTest):
         v = self.verifier(avm=True)
         v.work.mkdir()
         calls = []
-        def command(name, *args):
+        def command(name, *args, **kwargs):
             calls.append(name)
             if name == "avmenc":
                 self.write(v.work / "avm-output.ivf", b"ivf")

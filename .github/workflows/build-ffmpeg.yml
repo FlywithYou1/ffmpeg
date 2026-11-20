@@ -804,18 +804,20 @@ jobs:
           "${CUDA_BASE}/bin/nvcc.exe" --version
           WORK="$(cygpath -m "$RUNNER_TEMP")"
           printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
-          # Windows ARM64 has no sm_75; take the first arch this nvcc accepts.
+          # Windows ARM64 has no sm_75. x86 needs a fallback too: newer CUDA
+          # toolkits drop old targets, and VSCMD_ARG_TGT_ARCH may be unset here.
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = arm64 ]; then
-            CANDIDATES="110 100 90 80"
+            CANDIDATES="110 100 90 80 75"
           else
-            CANDIDATES="75"
+            CANDIDATES="75 80 90 100"
           fi
           ARCH=""
           for candidate in $CANDIDATES; do
             if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
-                 -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu" 2>/dev/null; then
+                 -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu"; then
               ARCH="$candidate"; break
             fi
+            echo "sm_${candidate} rejected"
           done
           [ -n "$ARCH" ] || { echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"; exit 1; }
           echo "CUDA_ARCH=$ARCH" >> "${GITHUB_ENV}"

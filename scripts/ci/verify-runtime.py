@@ -107,8 +107,8 @@ class Verifier:
         self.env = clean_environment(platform)
         self.work = self.directory / (".runtime-check-" + uuid.uuid4().hex)
 
-    def command(self, name, *args):
-        return run([str(self.binaries[name]), *args], env=self.env, cwd=self.work if self.work.exists() else self.directory)
+    def command(self, name, *args, timeout=120):
+        return run([str(self.binaries[name]), *args], env=self.env, cwd=self.work if self.work.exists() else self.directory, timeout=timeout)
 
     def check_required(self):
         for name, binary in self.binaries.items():
@@ -206,8 +206,15 @@ class Verifier:
                 run(["codesign", "--verify", "--strict", str(binary)], env=self.env, cwd=self.directory)
 
     def registrations(self):
+        if self.platform == "macos":
+            # Ad-hoc signed binaries are checked by Gatekeeper on first launch;
+            # in CI that can stall for minutes, so drop the quarantine flag.
+            run(["xattr", "-dr", "com.apple.quarantine", str(self.directory)], env=self.env,
+                cwd=self.directory, timeout=120)
         for name in ("ffmpeg", "ffprobe", "ffplay"):
-            result = self.command(name, "-version")
+            # ffplay links SDL; give it a shorter leash so a GUI/audio probe that
+            # never returns fails fast instead of burning the whole job budget.
+            result = self.command(name, "-version", timeout=60 if name == "ffplay" else 120)
             if not re.search(rf"\b{re.escape(name)} version\b", result.stdout + result.stderr):
                 raise VerificationError(f"Unexpected {name} version output")
             # Capture the complete pipe before slicing; never use head/SIGPIPE.
