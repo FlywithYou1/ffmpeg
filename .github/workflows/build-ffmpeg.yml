@@ -757,10 +757,11 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 安装器是 NVIDIA 自研（不是 NSIS），静默安装参数为 -s；-y 接受 EULA，
-          # -gm2 关闭 UI。失败时按更宽松的组合重试，并把输出全部打印出来。
+          # 安装器是 NVIDIA 自研（不是 NSIS），静默参数为 -s；-y 接受 EULA，
+          # -gm2 关闭 UI。只装 nvcc+cudart 会缺 crt/host_config.h（属于 CCCL），
+          # 所以先装包含 CCCL 的组合，最后回退到全部默认组件。
           $attempts = @(
-            @('-y', '-gm2', '-s', "nvcc_$version", "cudart_$version", '-n'),
+            @('-y', '-gm2', '-s', "nvcc_$version", "cudart_$version", "cccl_$version", '-n'),
             @('-y', '-gm2', '-s', '-n'),
             @('-s')
           )
@@ -802,14 +803,20 @@ jobs:
           CUDA_BASE="$(cygpath -u "$CUDA_BASE")"
           [ -x "${CUDA_BASE}/bin/nvcc.exe" ] || { echo "::error::Action 未提供有效 CUDA 路径"; exit 1; }
           echo "CUDA_HOME=${CUDA_BASE}" >> "${GITHUB_ENV}"
+          echo "CUDA_PATH=${CUDA_BASE}" >> "${GITHUB_ENV}"
           "${CUDA_BASE}/bin/nvcc.exe" --version
           WORK="$(cygpath -m "$RUNNER_TEMP")"
           printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
-          # nvcc needs the MSVC host compiler. ilammy/msvc-dev-cmd exports
-          # INCLUDE/LIB but Git Bash may not have cl.exe on PATH.
+          # nvcc needs a host compiler for the host side even with -ptx. On an
+          # ARM64 Windows runner the arm64 cl.exe is a cross target; nvcc wants
+          # the x64 host toolchain, so prefer Host*/x64 when present.
           if [ -n "${VCToolsInstallDir:-}" ]; then
-            HOST_BIN="$(cygpath -u "${VCToolsInstallDir%/}")/bin/Host${VSCMD_ARG_HOST_ARCH:-x64}/${VSCMD_ARG_TGT_ARCH:-x64}"
-            [ -d "$HOST_BIN" ] && export PATH="$HOST_BIN:$PATH"
+            VCTOOLS="$(cygpath -u "${VCToolsInstallDir%/}")"
+            for host in x64 arm64; do
+              candidate="$VCTOOLS/bin/Host${VSCMD_ARG_HOST_ARCH:-x64}/$host"
+              if [ -d "$candidate" ]; then HOST_BIN="$candidate"; break; fi
+            done
+            [ -n "${HOST_BIN:-}" ] && export PATH="$HOST_BIN:$PATH"
           fi
           command -v cl.exe >/dev/null && echo "cl.exe: $(command -v cl.exe)" || echo "::warning::cl.exe not on PATH"
           # Windows ARM64 has no sm_75; x86 keeps the portable target. Probe the
@@ -821,8 +828,14 @@ jobs:
           fi
           ARCH=""
           ERROR_LOG="$WORK/nvcc-probe.log"
+          # nvcc 未继承 CUDA_PATH 时找不到自带头文件；显式补上 include 目录。
+          INCLUDE_ARGS=(-I "$CUDA_BASE/include")
+          for targets in "$CUDA_BASE/targets/x86_64-windows/include" "$CUDA_BASE/targets/aarch64-windows/include"; do
+            [ -d "$targets" ] && INCLUDE_ARGS+=(-I "$targets")
+          done
           for candidate in $CANDIDATES; do
             if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
+                 "${INCLUDE_ARGS[@]}" \
                  -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu" > "$ERROR_LOG" 2>&1; then
               ARCH="$candidate"; break
             fi
