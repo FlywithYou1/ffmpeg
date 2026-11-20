@@ -472,20 +472,16 @@ jobs:
             av2_artifact: ffmpeg-windows-arm64-av2.zip
             verify_args: --require-hwaccel d3d11va --require-hwaccel dxva2
           - id: arm64-nvidia
-            name: Windows ARM64（Snapdragon + NVENC/NVDEC）
+            name: Windows ARM64（Snapdragon + NVENC/CUDA）
             runner: windows-11-vs2026-arm
             msvc_arch: amd64_arm64
             triplet: arm64-windows-static
-            # NVENC/NVDEC only need nv-codec-headers: FFmpeg dlopens the driver
-            # DLL at runtime. Snapdragon runners have no NVIDIA GPU, and the
-            # CUDA installer refuses to install on non-NVIDIA hardware
-            # (0xE0E00059), so CUDA filters cannot be built or tested here.
-            cuda: false
-            nvenc_headers: true
+            cuda: true
+            cuda_native_arm: true
             amf: false
             vpl: false
-            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel d3d11va
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-encoder av1_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda --require-hwaccel d3d11va
             artifact: ffmpeg-windows-arm64-nvidia.zip
             av2: true
             av2_artifact: ffmpeg-windows-arm64-nvidia-av2.zip
@@ -729,6 +725,33 @@ jobs:
           version: 'latest'
           method: 'local'
 
+      - name: 精简磁盘（Windows ARM64 CUDA）
+        if: matrix.cuda_native_arm
+        shell: pwsh
+        # 标准 runner 只有 14 GB 磁盘，CUDA local 安装包解压后远超此值。
+        # 只删除本任务确定用不到的组件；Python/Node 等后续步骤仍需要。
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $targets = @(
+            'C:\Program Files\Android',
+            'C:\Program Files\Java',
+            'C:\Program Files\dotnet',
+            'C:\Program Files\Microsoft\jdk*',
+            'C:\Program Files\Go',
+            'C:\Program Files\Git\mingw64\share\doc',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\Python'
+          )
+          foreach ($pattern in $targets) {
+            Get-Item -Path $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "removing $($_.FullName)"
+              Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          Get-PSDrive -Name C | ForEach-Object {
+            Write-Host ("free: {0:N1} GB" -f ($_.Free / 1GB))
+          }
+
       - name: 安装 CUDA 工具包（Windows ARM64）
         if: matrix.cuda_native_arm
         shell: pwsh
@@ -762,9 +785,9 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 组件名来自 NVIDIA 的 version.json（无版本后缀）：cuda_nvcc 编译器、
-          # cuda_cudart 运行库与头文件、cuda_crt 的基础 crt 头。
-          # 只装这三项，避免 2.6 GB 全量安装拖到超时。
+          # 组件名来自 NVIDIA 的 version_13.5.0.json（无版本后缀）。
+          # 先装 nvcc + cudart + crt 三件套；失败再退回完整默认集合
+          # （磁盘已在上一一步清理，够用）。
           $attempts = @(
             @('-y', '-gm2', '-s', 'cuda_nvcc', 'cuda_cudart', 'cuda_crt', '-n'),
             @('-y', '-gm2', '-s', '-n')
@@ -1424,9 +1447,9 @@ jobs:
             | 产物 | CPU | 硬件加速 | VMAF |
             |---|---|---|---|
             | `ffmpeg-windows-arm64.zip` | Snapdragon X | D3D11VA / DXVA2 / MF | ✅ CPU |
-            | `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC / NVDEC + D3D11VA | ✅ CPU |
+            | `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC/NVDEC + CUDA | ✅ CPU |
 
-            > GitHub Actions 的 ARM64 runner 没有 NVIDIA 显卡（也无 RTX Spark），因此 Windows ARM64 的 NVENC/NVDEC 只做编译与注册验证，CUDA 滤镜不可用；详见 README 的「局限性」。
+            > GitHub Actions 的 ARM64 runner 没有 NVIDIA 显卡（也无 RTX Spark），Windows ARM64 的 NVENC/CUDA 只做编译与注册验证；详见 README 的「局限性」。
 
             ### 📦 macOS（ARM64）
 

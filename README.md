@@ -42,9 +42,9 @@ Windows 使用 **/MT 静态运行时** 和 vcpkg 静态依赖；显卡驱动、�
 | Artifact | CPU | HW Accel | VMAF |
 |---|---|---|---|
 | `ffmpeg-windows-arm64.zip` | Snapdragon X | D3D11VA / DXVA2 / MF | ✅ CPU |
-| `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC / NVDEC + D3D11VA | ✅ CPU |
+| `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC/NVDEC + CUDA | ✅ CPU |
 
-`ffmpeg-windows-arm64-nvidia.zip` 只包含 **NVENC/NVDEC**，**不含 CUDA 滤镜**（`scale_cuda`、`overlay_cuda` 等）。原因见下方[局限性](#-局限性)。
+`ffmpeg-windows-arm64-nvidia.zip` 包含 `--enable-cuda-nvcc` 编译的 CUDA 滤镜（`scale_cuda` 等）。构建机没有 NVIDIA 显卡，因此只能验证编译与注册，实际编码无法在 CI 中测试——详见下方[局限性](#-局限性)。
 
 ### macOS (ARM64)
 
@@ -270,7 +270,7 @@ GitHub 官方托管 runner **没有任何 GPU**——[官方规格表](https://d
 
 要用 RTX Spark 跑 CI，只能自建 runner 并打自定义标签（如 `runs-on: [self-hosted, linux, ARM64, gpu]`），本项目未配置。由此带来四条硬限制：
 
-1. **Windows ARM64 无法安装 CUDA 工具包。** NVIDIA 安装器在无 NVIDIA 硬件的机器上直接拒绝安装，返回 `0xE0E00059`（通用安装失败）。换组件名、`-y -gm2` 静默参数、完整安装包都绕不过去，因此 `ffmpeg-windows-arm64-nvidia.zip` 不带 `--enable-cuda-nvcc`，也就没有 `scale_cuda` 等 CUDA 滤镜。
+1. **Windows ARM64 的 CUDA 编译需要自己清理磁盘并绕过硬件检查。** 标准 runner 只有 14 GB 磁盘，CUDA local 安装包解压后远超；CI 会先删除 Android/JDK/dotnet 等无关组件腾空间。此外无 NVIDIA 显卡时安装器会返回 `0xE0E00059`，因此这条路径比 x86_64 脆弱，失败时该 job 会红，但**不影响其他产物**。
 2. **Windows ARM64 的 NVENC/NVDEC 只能验证「注册」，不能验证「编码」。** FFmpeg 的 `nvenc`/`cuvid` 只依赖 `nv-codec-headers`，运行时通过 `dlopen` 加载驱动 DLL（Arm64X 代理 `nvEncodeAPI.dll`）。所以在 Snapdragon runner 上能编译、能确认编码器已注册，但没有驱动和显卡，实际编码无法测试。发布产物在真正的 NVIDIA ARM 硬件上**未经验证**。
 3. **Linux ARM64 的 NVIDIA 产物（`ffmpeg-linux-arm-nvidia.tar.xz`）同样只有注册级验证。** 它用 SBSA 版 CUDA 工具包编译，CUDA 滤镜和 NVENC 都编进去了，但构建机没有 NVIDIA GPU，无法做实际编码。
 4. **CUDA 架构探测覆盖不到 RTX Spark。** DGX Spark 的 GB10 是 **compute capability 12.1（sm_121）**，而 CI 的探测候选是 `sm_75/80/90/100/110`。即使将来在 Spark 上构建，也需要显式加 `sm_121` 目标；当前产物不含该架构，PTX 可由驱动 JIT 兼容运行，但不会有针对性地优化。
