@@ -69,6 +69,18 @@ class WorkflowSyntaxTests(unittest.TestCase):
             self.assertNotRegex(script, r'\b224c347d')
         self.assertFalse((ROOT / 'scripts/ci/avm-ref.txt').exists())
 
+    def test_pwsh_blocks_avoid_readonly_variables(self):
+        # $HOME/$Host/$Error etc. are read-only in PowerShell; assigning them
+        # fails at runtime, which a syntax check cannot catch.
+        text = (ROOT / '.github/workflows/build-ffmpeg.yml').read_text()
+        reserved = ('home', 'host', 'error', 'input', 'args', 'this', 'true', 'false', 'null', 'pid')
+        for line, shell, source in SYNTAX.workflow_blocks(text):
+            if shell != 'pwsh':
+                continue
+            for match in re.finditer(r'(?m)^\s*\$(\w+)\s*=', source):
+                self.assertNotIn(match.group(1).lower(), reserved,
+                                 f'workflow:{line} assigns read-only ${match.group(1)}')
+
     def test_hardware_expectations_match_each_artifact(self):
         text = (ROOT / '.github/workflows/build-ffmpeg.yml').read_text()
         rows = dict(re.findall(r'(?m)^\s+- id: (\S+)\n(.*?)(?=^\s+- id: |^    steps:)', text, re.S))
