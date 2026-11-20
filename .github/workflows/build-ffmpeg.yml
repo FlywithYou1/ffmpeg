@@ -1424,6 +1424,9 @@ jobs:
             | 产物 | CPU | 硬件加速 | VMAF |
             |---|---|---|---|
             | `ffmpeg-windows-arm64.zip` | Snapdragon X | D3D11VA / DXVA2 / MF | ✅ CPU |
+            | `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC / NVDEC + D3D11VA | ✅ CPU |
+
+            > GitHub Actions 的 ARM64 runner 没有 NVIDIA 显卡（也无 RTX Spark），因此 Windows ARM64 的 NVENC/NVDEC 只做编译与注册验证，CUDA 滤镜不可用；详见 README 的「局限性」。
 
             ### 📦 macOS（ARM64）
 

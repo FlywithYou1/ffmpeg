@@ -42,6 +42,9 @@ Windows 使用 **/MT 静态运行时** 和 vcpkg 静态依赖；显卡驱动、�
 | Artifact | CPU | HW Accel | VMAF |
 |---|---|---|---|
 | `ffmpeg-windows-arm64.zip` | Snapdragon X | D3D11VA / DXVA2 / MF | ✅ CPU |
+| `ffmpeg-windows-arm64-nvidia.zip` | Snapdragon X | NVENC / NVDEC + D3D11VA | ✅ CPU |
+
+`ffmpeg-windows-arm64-nvidia.zip` 只包含 **NVENC/NVDEC**，**不含 CUDA 滤镜**（`scale_cuda`、`overlay_cuda` 等）。原因见下方[局限性](#-局限性)。
 
 ### macOS (ARM64)
 
@@ -257,6 +260,29 @@ python scripts/ci/collect-dependency-sources.py --platform linux \
 
 CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL 编解码往返、平台声明的编解码器注册，以及该产物应有的硬件加速器（`cuda`/`qsv`/`vaapi`/`d3d11va`/`videotoolbox`）与 NVDEC 解码器；AV2 另做编码/解码往返。只查注册，不要求构建机器有可用显卡。
 
+### 局限性
+
+本节记录**已知且当前无法消除**的限制，避免把「构建通过」误认为「功能可用」。
+
+#### GitHub Actions 没有 RTX Spark / NVIDIA ARM 硬件
+
+所有 Windows/Linux ARM64 runner 都是 ARM SoC（Windows 侧为 Snapdragon X，Linux 侧为共用云主机），**没有 NVIDIA 独立显卡，也没有 RTX Spark（GB10）**。由此带来三条硬限制：
+
+1. **Windows ARM64 无法安装 CUDA 工具包。** NVIDIA 安装器在无 NVIDIA 硬件的机器上直接拒绝安装，返回 `0xE0E00059`（通用安装失败）。无论换组件名、`-y -gm2` 静默参数还是完整安装包都绕不过去，因此 `ffmpeg-windows-arm64-nvidia.zip` 不带 `--enable-cuda-nvcc`，也就没有 `scale_cuda` 等 CUDA 滤镜。
+2. **Windows ARM64 的 NVENC/NVDEC 只能验证「注册」，不能验证「编码」。** FFmpeg 的 `nvenc`/`cuvid` 只依赖 `nv-codec-headers`，运行时通过 `dlopen` 加载驱动 DLL（Arm64X 代理 `nvEncodeAPI.dll`）。所以在 Snapdragon runner 上能编译、能确认编码器已注册，但没有驱动和显卡，实际编码无法测试。发布产物在真正的 NVIDIA ARM 硬件上**未经验证**。
+3. **Linux ARM64 的 NVIDIA 产物（`ffmpeg-linux-arm-nvidia.tar.xz`）同样只有注册级验证。** 它用 SBSA 版 CUDA 工具包编译，CUDA 滤镜和 NVENC 都编进去了，但构建机没有 NVIDIA GPU，无法做实际编码。
+
+#### 关于 CUDA 架构
+
+构建时探测 nvcc 支持的 `sm_XX` 并按结果设置 `nvccflags`。x86_64 从 `sm_75` 起逐级回退，ARM 从 `sm_110` 起回退。这个探测只是给出编译目标，**不代表构建机上有对应算力的显卡**。
+
+#### 其它
+
+- 硬件加速能力依赖目标机器安装对应厂商驱动；产物只保证编译期链接和注册，不含驱动。
+- `--enable-nonfree` 产物不可再分发（见[许可](#-许可)）。
+- macOS 的 `ffplay -version` 在某些 runner 上会卡住（SDL 后端初始化），验证脚本对此只告警不失败；`ffplay` 的可执行性由文件存在性保证。
+
+
 ### 许可
 
 所有构建（CI 与本地脚本）使用 `--enable-gpl --enable-version3 --enable-nonfree`。启用 `--enable-nonfree` 后 FFmpeg 会把自身标记为 **nonfree and unredistributable**（`ffmpeg -L` 输出 "This version of FFmpeg has nonfree parts compiled in"），因此这些产物**不能当作普通 GPL v3 二进制再分发**，仅限自行使用。FFmpeg 本身的 `static=yes` 也不表示全部外部依赖已经静态链接。
@@ -266,8 +292,9 @@ CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL �
 | 项目 | 取值 |
 |---|---|
 | 许可开关 | `--enable-gpl --enable-version3 --enable-nonfree` |
-| NVIDIA CUDA | `--enable-cuda-nvcc`（CUDA Toolkit 的 `nvcc`） |
-| NVENC / NVDEC / VMAF-CUDA | 有 |
+| NVIDIA CUDA | `--enable-cuda-nvcc`（CUDA Toolkit 的 `nvcc`；Windows ARM64 除外，见局限性） |
+| NVENC / NVDEC | 所有含 NVIDIA 的产物 |
+| VMAF-CUDA | 仅 x86_64 产物（ARM64 无 GPU 可验证） |
 | 产物目录 | `output/` |
 
 本地脚本（`scripts/build-*.sh`）与 CI 完全一致，都使用上面这套 nonfree 配置；`BUILD_POLICY` 已移除，CUDA 统一由 `nvcc` 编译，不再提供 Clang/LLVM PTX 变体。`package-runtime.py` 与 `verify-runtime.py` 接受 nonfree 产物，把 `ffmpeg -L` 的许可证输出记录进 `metadata/ffmpeg-license-output.txt`，不再以许可证为由中止打包。
