@@ -71,6 +71,12 @@ def registry_names(text):
     return set(re.findall(r"^\s*[A-Z.]{3,8}\s+([A-Za-z0-9_]+)\s", text, re.M))
 
 
+def filter_names_from(text):
+    # -filters prints two flag chars ("..", "TS", "A.", ...) then the name.
+    names = set(re.findall(r"^\s*[A-Z.]{2}\s+([A-Za-z0-9_]+)\s", text, re.M))
+    return names or registry_names(text)
+
+
 def load_packager():
     path = Path(__file__).with_name("package-runtime.py")
     spec = importlib.util.spec_from_file_location("ffmpeg_runtime_packager", path)
@@ -217,7 +223,7 @@ class Verifier:
         hwaccels = self.command("ffmpeg", "-hide_banner", "-hwaccels").stdout
         encoder_names = registry_names(encoders)
         decoder_names = registry_names(decoders)
-        filter_names = registry_names(filters)
+        filter_names = filter_names_from(filters)
         hwaccel_names = set(hwaccels.split())
         if "libvmaf" not in filter_names and not re.search(r"(?<![\w-])libvmaf(?![\w-])", filters):
             raise VerificationError(

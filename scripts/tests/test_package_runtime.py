@@ -698,6 +698,17 @@ class VerificationTests(ScratchTest):
         with mock.patch.object(v, "command", side_effect=self.registration_command), mock.patch("builtins.print"), self.assertRaisesRegex(verify.VerificationError, "Required filter is missing: libplacebo"):
             v.registrations()
 
+    def test_filter_names_parse_two_flag_columns(self):
+        # FFmpeg prints two flag characters for filters, not the 3+ used by
+        # -encoders/-decoders. A wrong pattern silently finds no names at all.
+        text = ("Filters:\n"
+                "  T.. = Timeline support\n"
+                "  ------\n"
+                " .. libvmaf           VV->V      Calculate VMAF\n"
+                " TS libvmaf_cuda      VV->V      Calculate VMAF CUDA\n")
+        self.assertEqual(verify.filter_names_from(text), {"libvmaf", "libvmaf_cuda"})
+        self.assertEqual(verify.registry_names(text), set())
+
     def test_missing_feature_fails(self):
         for option in ("-encoders", "-decoders", "-filters", "-codecs"):
             v = self.verifier()

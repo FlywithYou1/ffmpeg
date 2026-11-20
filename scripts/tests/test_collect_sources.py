@@ -113,6 +113,33 @@ class CollectorTests(unittest.TestCase):
         with mock.patch.object(collect, "run", return_value=result("libx264-dev:amd64, x264-dev:amd64: /usr/lib/x86_64-linux-gnu/pkgconfig/x264.pc\n")):
             self.assertEqual(collect.dpkg_owner("/usr/lib/pkgconfig/x264.pc"), "libx264-dev:amd64")
 
+    def test_module_without_pc_file_is_kept_for_attribution(self):
+        # snappy ships no .pc; dropping it silently made the inventory look
+        # complete while verify_source_coverage later failed on the module.
+        def fake_run(args, **kwargs):
+            if args[1] == "--variable=pcfiledir":
+                return result("", code=1)
+            return result("1.2.1")
+        with mock.patch.object(collect, "run", side_effect=fake_run):
+            resolved = collect.resolve_modules("pkg-config", ["snappy"], self.root)
+        self.assertEqual(resolved, [{"module": "snappy", "pcfile": None, "version": "1.2.1"}])
+
+    def test_linux_collector_reports_unattributable_module(self):
+        with mock.patch.object(collect, "enable_deb_src"):
+            records, omissions = collect.collect_linux(self.root, [{"module": "snappy", "pcfile": None, "version": "1.2.1"}])
+        self.assertEqual(records, [])
+        self.assertTrue(any("snappy" in omission for omission in omissions))
+
+    def test_macos_collector_attributes_pc_less_module_by_library(self):
+        keg = self.root / "Cellar" / "snappy" / "1.2.1" / "lib" / "libsnappy.dylib"
+        keg.parent.mkdir(parents=True)
+        keg.write_bytes(b"\xcf\xfa\xed\xfe")
+        with mock.patch.object(collect, "brew_library", return_value=str(keg)), \
+             mock.patch.object(collect, "brew_formula_source", return_value=(None, None)):
+            records, omissions = collect.collect_macos(self.root, [{"module": "snappy", "pcfile": None, "version": "1.2.1"}])
+        self.assertTrue(any("snappy" in omission for omission in omissions))
+        self.assertEqual(records, [])
+
     def test_dpkg_owner_returns_none_when_unknown(self):
         with mock.patch.object(collect, "run", return_value=result("", code=1)):
             self.assertIsNone(collect.dpkg_owner("/nowhere.pc"))

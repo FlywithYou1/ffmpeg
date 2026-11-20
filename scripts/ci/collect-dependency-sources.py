@@ -93,16 +93,24 @@ def collect_required(pkg_config, modules):
 
 
 def resolve_modules(pkg_config, modules, install_root):
-    """Resolve modules to their .pc location, skipping locally built ones."""
+    """Resolve modules to their .pc location, skipping locally built ones.
+
+    A module without a .pc file (snappy never ships one) is returned with
+    ``pcfile=None`` so the platform collector can attribute it by library file
+    instead of silently dropping it from coverage.
+    """
     resolved = []
     root = Path(install_root).resolve()
     for module in modules:
         query = run([pkg_config, "--variable=pcfiledir", module], check=False, timeout=60)
         directory = query.stdout.strip()
+        version = run([pkg_config, "--modversion", module], check=False, timeout=60).stdout.strip()
         if query.returncode or not directory:
+            resolved.append({"module": module, "pcfile": None, "version": version or "unknown"})
             continue
         path = Path(directory) / (module + ".pc")
         if not path.is_file():
+            resolved.append({"module": module, "pcfile": None, "version": version or "unknown"})
             continue
         try:
             inside = Path(directory).resolve().is_relative_to(root)
@@ -111,7 +119,6 @@ def resolve_modules(pkg_config, modules, install_root):
         if inside:
             # Built by this project (VMAF, zimg); its source is archived already.
             continue
-        version = run([pkg_config, "--modversion", module], check=False, timeout=60).stdout.strip()
         resolved.append({"module": module, "pcfile": str(path), "version": version or "unknown"})
     return resolved
 
@@ -226,6 +233,9 @@ def collect_linux(output, modules):
     enable_deb_src()
     packages = {}
     for entry in modules:
+        if not entry["pcfile"]:
+            omissions.append(f"{entry['module']}: no pkg-config metadata to attribute")
+            continue
         owner = dpkg_owner(entry["pcfile"])
         if not owner:
             omissions.append(f"{entry['module']}: no dpkg owner for {entry['pcfile']}")
@@ -276,6 +286,22 @@ def brew_formula_source(formula):
     return None, None
 
 
+def brew_library(module, env):
+    """Locate the Homebrew keg path for a module that ships no .pc file."""
+    result = run(["brew", "--prefix", module], check=False, timeout=300, env=env)
+    if result.returncode != 0:
+        return None
+    prefix = result.stdout.strip()
+    if not prefix:
+        return None
+    for suffix in (".dylib", ".a"):
+        candidate = Path(prefix) / "lib" / ("lib" + module + suffix)
+        if candidate.exists():
+            # A keg path is what collect_macos parses; report the library.
+            return str(candidate)
+    return None
+
+
 def collect_macos(output, modules):
     records = []
     omissions = []
@@ -286,6 +312,14 @@ def collect_macos(output, modules):
     env["HOMEBREW_CACHE"] = str(cache)
     formulas = {}
     for entry in modules:
+        if not entry["pcfile"]:
+            # snappy ships no .pc; Homebrew still installs the library, so look
+            # for it by name and attribute the owning keg.
+            located = brew_library(entry["module"], env)
+            if not located:
+                omissions.append(f"{entry['module']}: no .pc and no Homebrew library found")
+                continue
+            entry = {**entry, "pcfile": located}
         parts = Path(entry["pcfile"]).parent.parts
         if "Cellar" not in parts:
             # Apple ships zlib, bzip2 and iconv in the SDK; Homebrew only adds a

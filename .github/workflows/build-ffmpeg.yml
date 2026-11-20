@@ -736,7 +736,7 @@ jobs:
           $version = $null
           foreach ($candidate in @('13.5', '13.4')) {
             try {
-              $sums = (Invoke-WebRequest -UseBasicParsing "$base/$candidate.0/docs/sidebar/md5sum.txt" -TimeoutSec 60).Content
+              $sums = (Invoke-WebRequest -UseBasicParsing "$base/${candidate}.0/docs/sidebar/md5sum.txt" -TimeoutSec 60).Content
             } catch { continue }
             if ($sums -split "`n" | Where-Object { $_ -match "cuda_${candidate}\.0_windows_arm64\.exe\s*$" }) {
               $version = $candidate
@@ -744,8 +744,8 @@ jobs:
             }
           }
           if (-not $version) { throw 'No CUDA release with a Windows arm64 installer found' }
-          $file = Join-Path $env:RUNNER_TEMP "cuda_$version.0_windows_arm64.exe"
-          $url = "$base/$version.0/local_installers/cuda_$version.0_windows_arm64.exe"
+          $file = Join-Path $env:RUNNER_TEMP "cuda_${version}.0_windows_arm64.exe"
+          $url = "$base/${version}.0/local_installers/cuda_${version}.0_windows_arm64.exe"
           for ($i = 1; $i -le 2; $i++) {
             Write-Host "Downloading $url (attempt $i/2)"
             try {
@@ -757,11 +757,11 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 子包名随版本变动，先只装 nvcc/cudart（够用），失败再退回默认集合。
+          # 子包名随版本变动（写错就是 0xE0E00019）；默认组件集合最稳。
           $quoted = '"' + $root + '"'
           $attempts = @(
-            @('-s', "nvcc_$version", "cudart_$version", '-n', '-N', '-p', $quoted),
-            @('-s', '-n', '-N', '-p', $quoted)
+            @('-s', '-n', '-N', '-p', $quoted),
+            @('-s', "nvcc_$version", "cudart_$version", '-n', '-N', '-p', $quoted)
           )
           $code = $null
           foreach ($arguments in $attempts) {
@@ -783,8 +783,13 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $cuda = $env:CUDA_HOME
-          if (-not $cuda) { throw 'CUDA installation failed: CUDA_HOME is not set' }
+          # setup-cuda 装完后不一定导出 CUDA_HOME；直接找安装目录。
+          $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
+          $found = @(Get-ChildItem -LiteralPath $root -Directory -Filter 'v*' -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+          if (-not $cuda -and $found.Count -gt 0) { $cuda = $found[0].FullName }
+          if (-not $cuda) { throw 'CUDA installation failed: no CUDA toolkit directory found' }
           if (-not (Test-Path "$cuda\bin\nvcc.exe")) { throw 'CUDA installation failed: nvcc.exe is missing' }
+          echo "CUDA_HOME=$cuda" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "CUDA: $cuda"
 
       - name: 检测 CUDA

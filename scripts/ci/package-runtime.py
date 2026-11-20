@@ -586,12 +586,12 @@ class Packager:
             resolved = query.returncode == 0 and bool(directory)
             pcfile = Path(directory) / (module + ".pc") if resolved else None
             version = run(["pkg-config", "--modversion", module], check=False).stdout.strip()
-            link_result = run(["pkg-config", "--libs", "--static", module], check=False)
-            libs = link_result.stdout.strip()
-            self.static_links.append({"module": module, "version": version or "unknown", "link_flags": libs})
             if not resolved:
                 self.gap_for_unresolved_module(module)
                 continue
+            link_result = run(["pkg-config", "--libs", "--static", module], check=False)
+            libs = link_result.stdout.strip()
+            self.static_links.append({"module": module, "version": version or "unknown", "link_flags": libs})
             if pcfile.is_file():
                 self.copy(pcfile, f"metadata/pkg-config/{module}.pc")
                 try:
