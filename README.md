@@ -266,11 +266,22 @@ CI 在移动后的发布目录验证三个可执行文件、libvmaf、JPEG XL �
 
 #### GitHub Actions 没有 RTX Spark / NVIDIA ARM 硬件
 
-所有 Windows/Linux ARM64 runner 都是 ARM SoC（Windows 侧为 Snapdragon X，Linux 侧为共用云主机），**没有 NVIDIA 独立显卡，也没有 RTX Spark（GB10）**。由此带来三条硬限制：
+GitHub 官方托管 runner **没有任何 GPU**——[官方规格表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)只列 CPU、内存、磁盘，没有 GPU 一项。ARM64 runner 名单也只有 `ubuntu-26.04-arm` / `windows-11-vs2026-arm` 这类通用云主机，均为 ARM SoC（Windows 侧 Snapdragon X，Linux 侧共用云主机），**不是 RTX Spark（GB10）**。
 
-1. **Windows ARM64 无法安装 CUDA 工具包。** NVIDIA 安装器在无 NVIDIA 硬件的机器上直接拒绝安装，返回 `0xE0E00059`（通用安装失败）。无论换组件名、`-y -gm2` 静默参数还是完整安装包都绕不过去，因此 `ffmpeg-windows-arm64-nvidia.zip` 不带 `--enable-cuda-nvcc`，也就没有 `scale_cuda` 等 CUDA 滤镜。
+要用 RTX Spark 跑 CI，只能自建 runner 并打自定义标签（如 `runs-on: [self-hosted, linux, ARM64, gpu]`），本项目未配置。由此带来四条硬限制：
+
+1. **Windows ARM64 无法安装 CUDA 工具包。** NVIDIA 安装器在无 NVIDIA 硬件的机器上直接拒绝安装，返回 `0xE0E00059`（通用安装失败）。换组件名、`-y -gm2` 静默参数、完整安装包都绕不过去，因此 `ffmpeg-windows-arm64-nvidia.zip` 不带 `--enable-cuda-nvcc`，也就没有 `scale_cuda` 等 CUDA 滤镜。
 2. **Windows ARM64 的 NVENC/NVDEC 只能验证「注册」，不能验证「编码」。** FFmpeg 的 `nvenc`/`cuvid` 只依赖 `nv-codec-headers`，运行时通过 `dlopen` 加载驱动 DLL（Arm64X 代理 `nvEncodeAPI.dll`）。所以在 Snapdragon runner 上能编译、能确认编码器已注册，但没有驱动和显卡，实际编码无法测试。发布产物在真正的 NVIDIA ARM 硬件上**未经验证**。
 3. **Linux ARM64 的 NVIDIA 产物（`ffmpeg-linux-arm-nvidia.tar.xz`）同样只有注册级验证。** 它用 SBSA 版 CUDA 工具包编译，CUDA 滤镜和 NVENC 都编进去了，但构建机没有 NVIDIA GPU，无法做实际编码。
+4. **CUDA 架构探测覆盖不到 RTX Spark。** DGX Spark 的 GB10 是 **compute capability 12.1（sm_121）**，而 CI 的探测候选是 `sm_75/80/90/100/110`。即使将来在 Spark 上构建，也需要显式加 `sm_121` 目标；当前产物不含该架构，PTX 可由驱动 JIT 兼容运行，但不会有针对性地优化。
+
+#### RTX Spark 硬件事实（供自建 runner 参考）
+
+NVIDIA 官方规格确认 DGX Spark / GB10 具备 **1× NVENC + 1× NVDEC**，因此在这类机器上自建 ARM64 runner 后，NVENC/NVDEC **可以**做真实编码验证——这是当前 GitHub 托管 runner 做不到的。届时需要：
+
+- 用 NVIDIA 官方驱动（非 Nouveau）
+- CUDA 13.x（GB10 需要 13.0+）
+- 在 `nvccflags` 中加入 `compute_121,code=sm_121`
 
 #### 关于 CUDA 架构
 

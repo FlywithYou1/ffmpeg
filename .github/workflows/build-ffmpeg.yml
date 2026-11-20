@@ -262,7 +262,7 @@ jobs:
           # SBSA (ARM) ships no sm_75 toolchain support; take the first arch the
           # installed nvcc accepts. x86 keeps the portable sm_75 target.
           if [ "${RUNNER_ARCH:-}" = ARM64 ]; then
-            CANDIDATES="110 100 90 80"
+            CANDIDATES="121 110 100 90 80"
           else
             CANDIDATES="75"
           fi
@@ -826,7 +826,7 @@ jobs:
           # Windows ARM64 has no sm_75; x86 keeps the portable target. Probe the
           # arch, and keep the real error visible when every candidate fails.
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = arm64 ]; then
-            CANDIDATES="110 100 90 80 75"
+            CANDIDATES="121 110 100 90 80 75"
           else
             CANDIDATES="75 80 90 100"
           fi

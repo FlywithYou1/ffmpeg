@@ -39,7 +39,8 @@ build_linux() {
       [ -x "${CUDA_HOME}/bin/nvcc" ] || { echo "未找到 CUDA Toolkit" >&2; return 1; }
       # SBSA (ARM) 工具链没有 sm_75；x86 保留可移植目标。
       local cuda_arch=75
-      [ "$(uname -m)" = aarch64 ] && cuda_arch="${CUDA_ARCH:-100}"
+      # GB10 (RTX Spark / DGX Spark) is sm_121; plain Grace/Hopper SBSA is sm_90+.
+      [ "$(uname -m)" = aarch64 ] && cuda_arch="${CUDA_ARCH:-121}"
       # 只有一种构建形态：直接用 CUDA Toolkit 的 nvcc（nonfree）。
       configure_extra+=(--enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm \
         "--nvcc=$CUDA_HOME/bin/nvcc" "--nvccflags=${NVCCFLAGS:--gencode arch=compute_${cuda_arch},code=sm_${cuda_arch} -O2}" --enable-cuvid --enable-nvenc)
