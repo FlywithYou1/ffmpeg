@@ -758,12 +758,12 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 安装器是 NVIDIA 自研（不是 NSIS），静默参数为 -s；-y 接受 EULA，
-          # -gm2 关闭 UI。逐个组件安装容易漏掉 crt/host_config.h（属于
-          # cuda_cudart 的子目录），所以直接装默认全集。
+          # 组件名来自 NVIDIA 的 version.json（无版本后缀）：cuda_nvcc 编译器、
+          # cuda_cudart 运行库与头文件、cuda_crt 的基础 crt 头。
+          # 只装这三项，避免 2.6 GB 全量安装拖到超时。
           $attempts = @(
-            @('-y', '-gm2', '-s', '-n'),
-            @('-s')
+            @('-y', '-gm2', '-s', 'cuda_nvcc', 'cuda_cudart', 'cuda_crt', '-n'),
+            @('-y', '-gm2', '-s', '-n')
           )
           $code = $null
           foreach ($arguments in $attempts) {
