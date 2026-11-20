@@ -757,17 +757,18 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 静默安装必须带 -y（接受 EULA）和 -gm2（无 UI），否则报 0xE0E00019。
-          # 不要传 -p：Start-Process 会把带空格的路径再包一层引号，安装器认不出。
+          # 安装器是 NVIDIA 自研（不是 NSIS），静默安装参数为 -s；-y 接受 EULA，
+          # -gm2 关闭 UI。失败时按更宽松的组合重试，并把输出全部打印出来。
           $attempts = @(
             @('-y', '-gm2', '-s', "nvcc_$version", "cudart_$version", '-n'),
-            @('-y', '-gm2', '-s', '-n')
+            @('-y', '-gm2', '-s', '-n'),
+            @('-s')
           )
           $code = $null
           foreach ($arguments in $attempts) {
             Write-Host "cuda installer $($arguments -join ' ')"
-            $process = Start-Process -FilePath $file -Wait -PassThru -ArgumentList $arguments
-            $code = $process.ExitCode
+            & $file @arguments 2>&1 | ForEach-Object { Write-Host $_ }
+            $code = $LASTEXITCODE
             if ($code -in @(0, 3010)) { break }
             Write-Host "exit $code"
           }
@@ -804,22 +805,34 @@ jobs:
           "${CUDA_BASE}/bin/nvcc.exe" --version
           WORK="$(cygpath -m "$RUNNER_TEMP")"
           printf '%s\n' '__global__ void ffmpeg_cuda_probe(void) {}' > "$WORK/ffmpeg-cuda-probe.cu"
-          # Windows ARM64 has no sm_75. x86 needs a fallback too: newer CUDA
-          # toolkits drop old targets, and VSCMD_ARG_TGT_ARCH may be unset here.
+          # nvcc needs the MSVC host compiler. ilammy/msvc-dev-cmd exports
+          # INCLUDE/LIB but Git Bash may not have cl.exe on PATH.
+          if [ -n "${VCToolsInstallDir:-}" ]; then
+            HOST_BIN="$(cygpath -u "${VCToolsInstallDir%/}")/bin/Host${VSCMD_ARG_HOST_ARCH:-x64}/${VSCMD_ARG_TGT_ARCH:-x64}"
+            [ -d "$HOST_BIN" ] && export PATH="$HOST_BIN:$PATH"
+          fi
+          command -v cl.exe >/dev/null && echo "cl.exe: $(command -v cl.exe)" || echo "::warning::cl.exe not on PATH"
+          # Windows ARM64 has no sm_75; x86 keeps the portable target. Probe the
+          # arch, and keep the real error visible when every candidate fails.
           if [ "${VSCMD_ARG_TGT_ARCH:-}" = arm64 ]; then
             CANDIDATES="110 100 90 80 75"
           else
             CANDIDATES="75 80 90 100"
           fi
           ARCH=""
+          ERROR_LOG="$WORK/nvcc-probe.log"
           for candidate in $CANDIDATES; do
             if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
-                 -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu"; then
+                 -o "$WORK/ffmpeg-cuda-probe.ptx" "$WORK/ffmpeg-cuda-probe.cu" > "$ERROR_LOG" 2>&1; then
               ARCH="$candidate"; break
             fi
             echo "sm_${candidate} rejected"
           done
-          [ -n "$ARCH" ] || { echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"; exit 1; }
+          if [ -z "$ARCH" ]; then
+            echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"
+            cat "$ERROR_LOG"
+            exit 1
+          fi
           echo "CUDA_ARCH=$ARCH" >> "${GITHUB_ENV}"
           echo "使用 CUDA 架构 sm_${ARCH}"
           grep -q '\.entry' "$WORK/ffmpeg-cuda-probe.ptx"

@@ -209,8 +209,10 @@ class Verifier:
         if self.platform == "macos":
             # Ad-hoc signed binaries are checked by Gatekeeper on first launch;
             # in CI that can stall for minutes, so drop the quarantine flag.
+            # xattr exits non-zero when no file carries the attribute, which is
+            # the normal case for a freshly built tree.
             run(["xattr", "-dr", "com.apple.quarantine", str(self.directory)], env=self.env,
-                cwd=self.directory, timeout=120)
+                cwd=self.directory, timeout=120, check=False)
         for name in ("ffmpeg", "ffprobe", "ffplay"):
             # ffplay links SDL; give it a shorter leash so a GUI/audio probe that
             # never returns fails fast instead of burning the whole job budget.
