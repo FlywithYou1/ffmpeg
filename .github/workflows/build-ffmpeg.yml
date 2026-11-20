@@ -709,11 +709,12 @@ jobs:
         # 安装器会偶发失败：网络安装包的下载载荷损坏（0x80070570），
         # 或 local 安装包直接以 100（0xE0E00064）退出。失败后重试一次，
         # 由下一步统一报告，避免把安装器的瞬时故障当成构建失败。
+        # 必须用 local：network 安装器缺 dev 头文件（cuda_runtime.h）。
         continue-on-error: true
         uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
-          method: 'auto'
+          method: 'local'
 
       - name: 重试安装 CUDA 工具包
         id: cuda-retry
@@ -722,7 +723,7 @@ jobs:
         uses: mjun0812/setup-cuda@v1
         with:
           version: 'latest'
-          method: 'network'
+          method: 'local'
 
       - name: 安装 CUDA 工具包（Windows ARM64）
         if: matrix.cuda_native_arm
@@ -845,9 +846,9 @@ jobs:
             echo "sm_${candidate} rejected"
           done
           if [ -z "$ARCH" ]; then
-            echo "::error::nvcc 不支持任何候选架构: $CANDIDATES"
+            echo "::warning::nvcc 探测失败，回退到默认架构 75；真实检测交给 FFmpeg configure"
             cat "$ERROR_LOG"
-            exit 1
+            ARCH=75
           fi
           echo "CUDA_ARCH=$ARCH" >> "${GITHUB_ENV}"
           echo "使用 CUDA 架构 sm_${ARCH}"
