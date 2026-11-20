@@ -758,10 +758,9 @@ jobs:
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
           # 安装器是 NVIDIA 自研（不是 NSIS），静默参数为 -s；-y 接受 EULA，
-          # -gm2 关闭 UI。只装 nvcc+cudart 会缺 crt/host_config.h（属于 CCCL），
-          # 所以先装包含 CCCL 的组合，最后回退到全部默认组件。
+          # -gm2 关闭 UI。逐个组件安装容易漏掉 crt/host_config.h（属于
+          # cuda_cudart 的子目录），所以直接装默认全集。
           $attempts = @(
-            @('-y', '-gm2', '-s', "nvcc_$version", "cudart_$version", "cccl_$version", '-n'),
             @('-y', '-gm2', '-s', '-n'),
             @('-s')
           )
@@ -829,10 +828,12 @@ jobs:
           ARCH=""
           ERROR_LOG="$WORK/nvcc-probe.log"
           # nvcc 未继承 CUDA_PATH 时找不到自带头文件；显式补上 include 目录。
-          INCLUDE_ARGS=(-I "$CUDA_BASE/include")
+          # crt/host_config.h 在 include/crt 下，父目录也要在搜索路径里。
+          INCLUDE_ARGS=(-I "$CUDA_BASE/include" -I "$CUDA_BASE/include/crt")
           for targets in "$CUDA_BASE/targets/x86_64-windows/include" "$CUDA_BASE/targets/aarch64-windows/include"; do
             [ -d "$targets" ] && INCLUDE_ARGS+=(-I "$targets")
           done
+          echo "include/crt present: $([ -f "$CUDA_BASE/include/crt/host_config.h" ] && echo yes || echo no)"
           for candidate in $CANDIDATES; do
             if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
                  "${INCLUDE_ARGS[@]}" \

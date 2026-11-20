@@ -26,7 +26,7 @@ class VerificationError(RuntimeError):
     pass
 
 
-def run(args, *, env, cwd, timeout=120):
+def run(args, *, env, cwd, timeout=120, check=True):
     try:
         result = subprocess.run([str(a) for a in args], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
@@ -34,7 +34,7 @@ def run(args, *, env, cwd, timeout=120):
                                 check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise VerificationError(f"Cannot launch {args[0]}: {exc}") from exc
-    if result.returncode:
+    if check and result.returncode:
         raise VerificationError(f"Command failed ({result.returncode}): {' '.join(map(str, args))}\n{result.stdout}\n{result.stderr}")
     return result
 
