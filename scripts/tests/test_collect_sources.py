@@ -140,6 +140,18 @@ class CollectorTests(unittest.TestCase):
         self.assertTrue(any("snappy" in omission for omission in omissions))
         self.assertEqual(records, [])
 
+    def test_brew_library_globs_the_keg(self):
+        prefix = self.root / "Cellar" / "snappy" / "1.3.1"
+        (prefix / "lib").mkdir(parents=True)
+        (prefix / "lib" / "libsnappy.1.dylib").write_bytes(b"\xcf\xfa\xed\xfe")
+        with mock.patch.object(collect, "run", return_value=result(str(prefix) + "\n")):
+            self.assertEqual(collect.brew_library("snappy", {}),
+                             str(prefix / "lib" / "libsnappy.1.dylib"))
+
+    def test_brew_library_missing_formula_returns_none(self):
+        with mock.patch.object(collect, "run", return_value=result("", code=1)):
+            self.assertIsNone(collect.brew_library("nosuch", {}))
+
     def test_dpkg_owner_returns_none_when_unknown(self):
         with mock.patch.object(collect, "run", return_value=result("", code=1)):
             self.assertIsNone(collect.dpkg_owner("/nowhere.pc"))

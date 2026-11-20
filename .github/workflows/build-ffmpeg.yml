@@ -757,11 +757,11 @@ jobs:
           }
           $root = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
           Write-Host "Installing CUDA $version natively (arm64)"
-          # 子包名随版本变动（写错就是 0xE0E00019）；默认组件集合最稳。
+          # 静默安装必须带 -y（接受 EULA）和 -gm2（无 UI）；缺了会被拒为 0xE0E00019。
           $quoted = '"' + $root + '"'
           $attempts = @(
-            @('-s', '-n', '-N', '-p', $quoted),
-            @('-s', "nvcc_$version", "cudart_$version", '-n', '-N', '-p', $quoted)
+            @('-y', '-gm2', '-s', "nvcc_$version", "cudart_$version", '-n', '-p', $quoted),
+            @('-y', '-gm2', '-s', '-n', '-p', $quoted)
           )
           $code = $null
           foreach ($arguments in $attempts) {

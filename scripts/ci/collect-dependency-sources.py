@@ -287,17 +287,20 @@ def brew_formula_source(formula):
 
 
 def brew_library(module, env):
-    """Locate the Homebrew keg path for a module that ships no .pc file."""
-    result = run(["brew", "--prefix", module], check=False, timeout=300, env=env)
-    if result.returncode != 0:
+    """Locate the Homebrew keg library for a module that ships no .pc file.
+
+    The keg path is authoritative: ``brew --prefix`` points at
+    /opt/homebrew/Cellar/<formula>/<version>, so glob its lib directory. Do not
+    assume the library is named after the module.
+    """
+    prefix = run(["brew", "--prefix", module], check=False, timeout=300, env=env)
+    if prefix.returncode != 0 or not prefix.stdout.strip():
         return None
-    prefix = result.stdout.strip()
-    if not prefix:
+    libdir = Path(prefix.stdout.strip()) / "lib"
+    if not libdir.is_dir():
         return None
-    for suffix in (".dylib", ".a"):
-        candidate = Path(prefix) / "lib" / ("lib" + module + suffix)
-        if candidate.exists():
-            # A keg path is what collect_macos parses; report the library.
+    for pattern in ("lib*.dylib", "lib*.a"):
+        for candidate in sorted(libdir.glob(pattern)):
             return str(candidate)
     return None
 
