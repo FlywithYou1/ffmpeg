@@ -827,13 +827,15 @@ jobs:
           fi
           ARCH=""
           ERROR_LOG="$WORK/nvcc-probe.log"
-          # nvcc 未继承 CUDA_PATH 时找不到自带头文件；显式补上 include 目录。
-          # crt/host_config.h 在 include/crt 下，父目录也要在搜索路径里。
-          INCLUDE_ARGS=(-I "$CUDA_BASE/include" -I "$CUDA_BASE/include/crt")
-          for targets in "$CUDA_BASE/targets/x86_64-windows/include" "$CUDA_BASE/targets/aarch64-windows/include"; do
-            [ -d "$targets" ] && INCLUDE_ARGS+=(-I "$targets")
+          # nvcc.exe 是原生 Windows 程序，不认 MSYS 的 /c/... 路径；转成 C:\... 再传。
+          CUDA_WIN="$(cygpath -w "$CUDA_BASE")"
+          INCLUDE_ARGS=(-I "$CUDA_WIN\\include" -I "$CUDA_WIN\\include\\crt")
+          for targets in "$CUDA_BASE"/targets/*/include; do
+            [ -d "$targets" ] && INCLUDE_ARGS+=(-I "$(cygpath -w "$targets")")
           done
           echo "include/crt present: $([ -f "$CUDA_BASE/include/crt/host_config.h" ] && echo yes || echo no)"
+          echo "cuda_runtime.h present: $([ -f "$CUDA_BASE/include/cuda_runtime.h" ] && echo yes || echo no)"
+          echo "include dirs:"; ls -d "$CUDA_BASE"/targets/*/include 2>/dev/null || echo "(no targets includes)"
           for candidate in $CANDIDATES; do
             if "${CUDA_BASE}/bin/nvcc.exe" -ptx --gpu-architecture="sm_${candidate}" \
                  "${INCLUDE_ARGS[@]}" \

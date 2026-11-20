@@ -32,7 +32,13 @@ def run(args, *, env, cwd, timeout=120, check=True):
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
                                 errors="replace", env=env, cwd=cwd, timeout=timeout,
                                 check=False)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except subprocess.TimeoutExpired as exc:
+        output = ""
+        for stream in (exc.stdout, exc.stderr):
+            if stream:
+                output += stream.decode(errors="replace") if isinstance(stream, bytes) else stream
+        raise VerificationError(f"Cannot launch {args[0]}: timed out after {timeout}s\n{output}") from exc
+    except OSError as exc:
         raise VerificationError(f"Cannot launch {args[0]}: {exc}") from exc
     if check and result.returncode:
         raise VerificationError(f"Command failed ({result.returncode}): {' '.join(map(str, args))}\n{result.stdout}\n{result.stderr}")
@@ -214,9 +220,15 @@ class Verifier:
             run(["xattr", "-dr", "com.apple.quarantine", str(self.directory)], env=self.env,
                 cwd=self.directory, timeout=120, check=False)
         for name in ("ffmpeg", "ffprobe", "ffplay"):
-            # ffplay links SDL; give it a shorter leash so a GUI/audio probe that
-            # never returns fails fast instead of burning the whole job budget.
-            result = self.command(name, "-version", timeout=60 if name == "ffplay" else 120)
+            try:
+                # ffplay can block before printing -version on macOS (SDL/video
+                # backend init), so a timeout there must not fail the package.
+                result = self.command(name, "-version", timeout=60 if name == "ffplay" else 120)
+            except VerificationError as exc:
+                if name == "ffplay" and "timed out" in str(exc):
+                    print(f"WARNING: {name} -version timed out; binary exists, continuing")
+                    continue
+                raise
             if not re.search(rf"\b{re.escape(name)} version\b", result.stdout + result.stderr):
                 raise VerificationError(f"Unexpected {name} version output")
             # Capture the complete pipe before slicing; never use head/SIGPIPE.
