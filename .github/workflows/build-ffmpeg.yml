@@ -472,16 +472,20 @@ jobs:
             av2_artifact: ffmpeg-windows-arm64-av2.zip
             verify_args: --require-hwaccel d3d11va --require-hwaccel dxva2
           - id: arm64-nvidia
-            name: Windows ARM64（Snapdragon + NVENC/CUDA）
+            name: Windows ARM64（Snapdragon + NVENC/NVDEC）
             runner: windows-11-vs2026-arm
             msvc_arch: amd64_arm64
             triplet: arm64-windows-static
-            cuda: true
-            cuda_native_arm: true
+            # NVENC/NVDEC only need nv-codec-headers: FFmpeg dlopens the driver
+            # DLL at runtime. Snapdragon runners have no NVIDIA GPU, and the
+            # CUDA installer refuses to install on non-NVIDIA hardware
+            # (0xE0E00059), so CUDA filters cannot be built or tested here.
+            cuda: false
+            nvenc_headers: true
             amf: false
             vpl: false
-            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuda-nvcc --disable-cuda-llvm --enable-cuvid --enable-nvenc
-            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel cuda --require-filter libvmaf_cuda --require-hwaccel d3d11va
+            configure_extra: --enable-libvmaf --enable-libsvtav1 --arch=arm64 --enable-neon --enable-ffnvcodec --enable-cuvid --enable-nvenc
+            verify_args: --require-encoder h264_nvenc --require-encoder hevc_nvenc --require-decoder h264_cuvid --require-decoder hevc_cuvid --require-hwaccel d3d11va
             artifact: ffmpeg-windows-arm64-nvidia.zip
             av2: true
             av2_artifact: ffmpeg-windows-arm64-nvidia-av2.zip
@@ -875,7 +879,7 @@ jobs:
           Write-Host "CUDA junction: $link -> $cuda"
 
       - name: 编译 nv-codec-headers
-        if: matrix.cuda
+        if: matrix.cuda || matrix.nvenc_headers
         shell: bash
         run: |
           P="${HOME}/ffmpeg-install"
