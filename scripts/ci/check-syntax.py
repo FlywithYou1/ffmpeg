@@ -20,9 +20,15 @@ def workflow_blocks(text):
         indent = len(match[1])
         body = []
         for following in lines[i + 1:]:
-            if following.strip() and len(following) - len(following.lstrip()) <= indent:
-                break
-            body.append(following[indent + 2:])
+            if following.strip():
+                if len(following) - len(following.lstrip()) <= indent:
+                    break
+                body.append(following[indent + 2:])
+            else:
+                body.append('')
+        # A trailing run of blank lines belongs to the next YAML key, not the block.
+        while body and not body[-1].strip():
+            body.pop()
         shell = 'bash'
         for previous in reversed(lines[:i]):
             shell_match = re.match(r'^\s*shell: (\S+)', previous)
@@ -35,10 +41,23 @@ def workflow_blocks(text):
 
 
 def check_powershell(executable, source, name):
-    parser = '$t=$null; $e=$null; [System.Management.Automation.Language.Parser]::ParseInput([Console]::In.ReadToEnd(),[ref]$t,[ref]$e)|Out-Null; if($e.Count){$e|ForEach-Object {[Console]::Error.WriteLine($_.Message)};exit 1}'
-    result = subprocess.run([executable, '-NoProfile', '-Command', parser], input=source.encode(), capture_output=True)
-    if result.returncode:
-        raise RuntimeError(f'{name}: {result.stderr.decode(errors="replace")}')
+    # Parse with the real parser via ParseFile, matching how Actions runs it.
+    # ParseInput() has been seen to reject valid multi-line array literals.
+    import os
+    import tempfile
+    with tempfile.NamedTemporaryFile('w', suffix='.ps1', delete=False, encoding='utf-8') as handle:
+        handle.write(source)
+        path = handle.name
+    try:
+        env = dict(os.environ, PS_CHECK_PATH=path)
+        parser = ('$t=$null; $e=$null; '
+                  '$null=[System.Management.Automation.Language.Parser]::ParseFile($env:PS_CHECK_PATH,[ref]$t,[ref]$e); '
+                  'if($e.Count){$e|ForEach-Object {[Console]::Error.WriteLine($_.Message)};exit 1}')
+        result = subprocess.run([executable, '-NoProfile', '-Command', parser], capture_output=True, env=env)
+        if result.returncode:
+            raise RuntimeError(f'{name}: {result.stderr.decode(errors="replace")}')
+    finally:
+        Path(path).unlink(missing_ok=True)
 
 
 def main():

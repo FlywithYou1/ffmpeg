@@ -289,19 +289,25 @@ def brew_formula_source(formula):
 def brew_library(module, env):
     """Locate the Homebrew keg library for a module that ships no .pc file.
 
-    The keg path is authoritative: ``brew --prefix`` points at
-    /opt/homebrew/Cellar/<formula>/<version>, so glob its lib directory. Do not
-    assume the library is named after the module.
+    ``brew --prefix`` is the documented way, but it can fail in CI (auto-update,
+    tap state). Fall back to the Cellar layout Homebrew always uses.
     """
     prefix = run(["brew", "--prefix", module], check=False, timeout=300, env=env)
-    if prefix.returncode != 0 or not prefix.stdout.strip():
-        return None
-    libdir = Path(prefix.stdout.strip()) / "lib"
-    if not libdir.is_dir():
-        return None
-    for pattern in ("lib*.dylib", "lib*.a"):
-        for candidate in sorted(libdir.glob(pattern)):
-            return str(candidate)
+    candidate = prefix.stdout.strip() if prefix.returncode == 0 else ""
+    roots = []
+    if candidate:
+        roots.append(Path(candidate))
+    for base in ("/opt/homebrew/Cellar", "/usr/local/Cellar"):
+        directory = Path(base) / module
+        if directory.is_dir():
+            roots.extend(sorted((p for p in directory.iterdir() if p.is_dir()), reverse=True))
+    for root in roots:
+        libdir = root / "lib"
+        if not libdir.is_dir():
+            continue
+        for pattern in ("lib*.dylib", "lib*.a"):
+            for library in sorted(libdir.glob(pattern)):
+                return str(library)
     return None
 
 
